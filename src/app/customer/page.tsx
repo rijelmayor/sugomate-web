@@ -15,7 +15,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const [{ data: profile }, { data: categories }, { data: municipalities }, { data: addresses }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order"),
-    supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),\n    supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
+    supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
   ]);
 
   let productQuery = supabase.from("products")
