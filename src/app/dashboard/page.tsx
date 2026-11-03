@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import { applyAsDriver, applyAsMerchant, signOut } from "./actions";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
@@ -24,7 +25,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="mx-auto max-w-6xl">
       <header className="flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-wide text-[#102e57]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-lg text-white">S</span>SUGOMATE</Link>
-        <div className="flex items-center gap-2"><Link href="/customer/orders" className="hidden rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold sm:inline-flex">My orders</Link><form action={signOut}><button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold">Sign out</button></form></div>
+        <div className="flex items-center gap-2"><Link href="/customer/orders" className="hidden rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md sm:inline-flex">My orders</Link><form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md" /></form></div>
       </header>
 
       <section className="relative mt-7 overflow-hidden rounded-[2rem] bg-[#102e57] p-6 text-white shadow-xl shadow-blue-950/10 sm:p-9">
