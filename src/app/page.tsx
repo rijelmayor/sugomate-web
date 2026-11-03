@@ -24,7 +24,7 @@ export default function HomePage() {
     <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-[82px] w-[min(1160px,calc(100%-40px))] items-center justify-between gap-5">
         <a href="#home" aria-label="SUGOMATE home" className="flex items-center">
-          <img src="/images/sugomate-eagle-road-logo.png" alt="SUGOMATE — Imong sugo, among ihatod." className="h-[58px] w-auto max-w-[min(320px,65vw)] object-contain object-left" />
+          <img src="/images/sugomate-eagle-road-logo.png" alt="SUGOMATE — Imong sugo, kami bahala." className="h-[58px] w-auto max-w-[min(320px,65vw)] object-contain object-left" />
         </a>
         <nav className="hidden items-center gap-8 md:flex">{nav.map(item => <a key={item.href} href={item.href} className="text-sm font-semibold text-slate-600 transition hover:text-orange-600">{item.label}</a>)}</nav>
         <button onClick={() => setDownloadOpen(true)} className="hidden items-center gap-2 rounded-full bg-gradient-to-r from-[#ff8a00] to-[#f0441c] px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-orange-200 transition hover:-translate-y-0.5 md:inline-flex"><Download size={16}/> Get the app</button>
@@ -35,7 +35,7 @@ export default function HomePage() {
 
     <section id="home" className="mx-auto w-[min(1200px,calc(100%-32px))] pb-12 pt-8 sm:pb-16 sm:pt-12">
       <div className="overflow-hidden rounded-[24px] sm:rounded-[30px]">
-        <img src="/images/sugomate-promotional-banner.png" alt="SUGOMATE — Imong sugo, among ihatod. Food, groceries, Pabili, parcels and errands." className="block h-auto w-full" />
+        <img src="/images/sugomate-promotional-banner.png" alt="SUGOMATE — Imong sugo, kami bahala. Food, groceries, Pabili, parcels and errands." className="block h-auto w-full" />
       </div>
       <div className="mx-auto mt-8 flex max-w-3xl flex-col items-center text-center">
         <p className="text-xs font-extrabold uppercase tracking-[.2em] text-orange-600">Your local delivery ecosystem</p>
@@ -67,7 +67,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <footer className="py-8"><div className="mx-auto flex w-[min(1080px,calc(100%-40px))] flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left"><p className="text-xs text-slate-500">© {new Date().getFullYear()} SUGOMATE. All rights reserved.</p><p className="text-xs font-semibold italic text-[#102e57]">Imong sugo, among ihatod.</p></div></footer>
+    <footer className="py-8"><div className="mx-auto flex w-[min(1080px,calc(100%-40px))] flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left"><p className="text-xs text-slate-500">© {new Date().getFullYear()} SUGOMATE. All rights reserved.</p><p className="text-xs font-semibold italic text-[#102e57]">Imong sugo, kami bahala.</p></div></footer>
 
     {downloadOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#071d38]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="download-title" onClick={() => setDownloadOpen(false)}><div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="text-xs font-extrabold uppercase tracking-widest text-orange-600">SUGOMATE mobile app</p><h2 id="download-title" className="mt-2 text-2xl font-black text-[#102e57]">Coming soon!</h2></div><button onClick={() => setDownloadOpen(false)} aria-label="Close" className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X/></button></div><p className="mt-3 text-sm leading-7 text-slate-500">We are preparing SUGOMATE for Android and iPhone. The official download links will be posted here when the apps are published.</p><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl border border-slate-200 p-4"><strong className="text-sm">Android</strong><p className="mt-1 text-xs text-slate-500">Coming soon</p></div><div className="rounded-xl border border-slate-200 p-4"><strong className="text-sm">iPhone</strong><p className="mt-1 text-xs text-slate-500">Coming soon</p></div></div><button onClick={() => setDownloadOpen(false)} className="mt-6 w-full rounded-full bg-orange-600 px-5 py-3 font-bold text-white">Got it</button></div></div>}
   </main>;
