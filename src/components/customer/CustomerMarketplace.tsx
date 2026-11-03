@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { placeOrder } from "@/app/customer/actions";
 import { useMemo, useState } from "react";
 
 type Product = {
@@ -12,12 +14,13 @@ type Product = {
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
 
-export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities }: {
+export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, addresses }: {
   products: Product[];
   categories: { id: string; name: string; slug: string; icon: string }[];
   selectedCategory: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
+  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
 }) {
   const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
   const [search, setSearch] = useState("");

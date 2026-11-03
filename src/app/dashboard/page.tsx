@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import { applyAsDriver, applyAsMerchant, signOut } from "./actions";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
@@ -9,34 +10,56 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: roles }, { data: merchants }, { data: driver }] = await Promise.all([
+  const [{ data: profile }, { data: roles }, { data: merchants }, { data: driver }, { count: orderCount }] = await Promise.all([
     supabase.from("profiles").select("display_name,phone,status").eq("id", user.id).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", user.id),
     supabase.from("merchant_members").select("merchant_id,member_role,merchants(name,status)").eq("user_id", user.id),
     supabase.from("driver_profiles").select("status,vehicle_type").eq("user_id", user.id).maybeSingle(),
+    supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id),
   ]);
   const roleNames = (roles ?? []).map(row => row.role).join(", ") || "customer";
   const hasMerchant = (merchants ?? []).length > 0;
-  return <main className="min-h-screen bg-[#fff7ef] px-4 py-10 text-[#102e57]">
-    <div className="mx-auto max-w-3xl">
-      <header className="flex items-center justify-between gap-4"><Link href="/" className="text-sm font-black text-orange-600">SUGOMATE</Link><nav className="flex items-center gap-2"><Link href="/customer" className="rounded-full bg-orange-500 px-4 py-2 text-sm font-extrabold text-white">Browse marketplace</Link><form action={signOut}><button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold">Sign out</button></form></nav></header>
-      <section className="mt-8 rounded-3xl bg-white p-7 shadow-lg shadow-orange-100/60 sm:p-9">
-        <p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">Your account</p>
-        <h1 className="mt-2 text-3xl font-black">Maayong pag-abot, {profile?.display_name || user.email}!</h1>
-        <p className="mt-2 text-sm text-slate-500">{user.email} · {roleNames}</p>
-        <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-900">Your SUGOMATE account is active. Customer ordering and delivery features will be enabled as the marketplace is built.</p>
+  const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
+
+  return <main className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl">
+      <header className="flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-wide text-[#102e57]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-lg text-white">S</span>SUGOMATE</Link>
+        <div className="flex items-center gap-2"><Link href="/customer/orders" className="hidden rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md sm:inline-flex">My orders</Link><form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md" /></form></div>
+      </header>
+
+      <section className="relative mt-7 overflow-hidden rounded-[2rem] bg-[#102e57] p-6 text-white shadow-xl shadow-blue-950/10 sm:p-9">
+        <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full border-[34px] border-white/5" />
+        <div className="pointer-events-none absolute -bottom-28 right-28 h-56 w-56 rounded-full bg-[#ff7a00]/20 blur-2xl" />
+        <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+          <div><p className="text-xs font-black uppercase tracking-[.2em] text-[#ffbd18]">Your SUGOMATE space</p><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Maayong adlaw, {firstName}!</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Your community is just a few taps away. Find what you need, order from local stores, and let us bring it to you.</p></div>
+          <Link href="/customer" className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#ffbd18] px-6 py-3.5 text-sm font-black text-[#102e57] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:bg-[#ffd15b]">Explore marketplace <span aria-hidden="true">↗</span></Link>
+        </div>
+        <div className="relative mt-7 grid grid-cols-2 gap-3 border-t border-white/15 pt-5 sm:max-w-md"><div><p className="text-2xl font-black">{orderCount ?? 0}</p><p className="mt-1 text-xs text-white/65">Orders placed</p></div><div><p className="text-sm font-bold capitalize">{profile?.status || "Active"}</p><p className="mt-1 text-xs text-white/65">Account status · {roleNames}</p></div></div>
       </section>
+
       {(error || success) && <p role="status" className={`mt-4 rounded-xl p-4 text-sm ${error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"}`}>{error ? "We could not submit that application. Check your details or contact support." : success === "merchant-pending" ? "Merchant application submitted for review." : "Driver application submitted for review."}</p>}
-      <section className="mt-6 grid gap-5 md:grid-cols-2">
-        <article className="rounded-2xl border border-orange-100 bg-white p-6">
-          <h2 className="text-lg font-black">Become a merchant</h2>
-          {hasMerchant ? <p className="mt-3 text-sm text-slate-500">Your store application is on file: {(merchants ?? []).map(m => (m.merchants as unknown as {name:string;status:string} | null)?.name).filter(Boolean).join(", ")}.</p> : <><p className="mt-2 text-sm leading-6 text-slate-500">Register your local business. Our operations team will review your store before it goes live.</p><form action={applyAsMerchant} className="mt-4 space-y-3"><input required name="business_name" placeholder="Business / store name" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/><input required name="business_slug" placeholder="Store URL name (e.g. juans-store)" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Apply as merchant</button></form></>}
-        </article>
-        <article className="rounded-2xl border border-orange-100 bg-white p-6">
-          <h2 className="text-lg font-black">Become a delivery partner</h2>
-          {driver ? <p className="mt-3 text-sm text-slate-500">Driver application status: <strong className="capitalize">{driver.status}</strong>.</p> : <><p className="mt-2 text-sm leading-6 text-slate-500">Apply to deliver orders in your service area. Approval is required before accepting deliveries.</p><form action={applyAsDriver} className="mt-4 space-y-3"><select required name="vehicle_type" defaultValue="" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="" disabled>Choose vehicle type</option><option>Motorcycle</option><option>Bicycle</option><option>Car</option><option>Other</option></select><input name="vehicle_plate" placeholder="Plate number (optional)" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Apply as delivery partner</button></form></>}
-        </article>
+
+      <section className="mt-7 grid gap-4 md:grid-cols-3">
+        <Link href="/customer" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-orange-100 text-2xl">🛍️</span><h2 className="mt-4 font-black">Shop local</h2><p className="mt-1 text-sm leading-5 text-slate-500">Discover food, groceries, and neighborhood stores.</p><p className="mt-4 text-sm font-extrabold text-orange-600">Browse marketplace →</p></Link>
+        <Link href="/customer/orders" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-2xl">📦</span><h2 className="mt-4 font-black">Your orders</h2><p className="mt-1 text-sm leading-5 text-slate-500">Keep an eye on purchases and delivery updates.</p><p className="mt-4 text-sm font-extrabold text-orange-600">View order history →</p></Link>
+        <Link href="/customer/addresses" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-2xl">📍</span><h2 className="mt-4 font-black">Delivery addresses</h2><p className="mt-1 text-sm leading-5 text-slate-500">Save your home, work, and favorite drop-off points.</p><p className="mt-4 text-sm font-extrabold text-orange-600">Manage addresses →</p></Link>
       </section>
+
+      <section className="mt-8 rounded-3xl border border-orange-100 bg-white p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[.18em] text-orange-600">Grow with us</p><h2 className="mt-1 text-xl font-black">Be part of the SUGOMATE community</h2><p className="mt-1 text-sm text-slate-500">Run a local store or deliver orders around your area.</p></div><span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">Partner opportunities</span></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <details className="group rounded-2xl border border-orange-100 bg-[#fffaf5] p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-orange-100 text-xl">🏪</span><span><strong className="block text-sm">Merchant partner</strong><span className="text-xs text-slate-500">{hasMerchant ? "Application already on file" : "List your store on SUGOMATE"}</span></span></span><span className="grid h-8 w-8 place-items-center rounded-full bg-white text-lg transition group-open:rotate-45">＋</span></summary>
+            {hasMerchant ? <p className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600">Your store: {(merchants ?? []).map(m => (m.merchants as unknown as {name:string;status:string} | null)?.name).filter(Boolean).join(", ")}. Application status is available through operations.</p> : <form action={applyAsMerchant} className="mt-4 space-y-3"><input required name="business_name" placeholder="Business / store name" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><input required name="business_slug" placeholder="Store URL name (e.g. juans-store)" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Submit merchant application</button></form>}
+          </details>
+          <details className="group rounded-2xl border border-orange-100 bg-[#fffaf5] p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-xl">🛵</span><span><strong className="block text-sm">Delivery partner</strong><span className="text-xs text-slate-500">{driver ? `Application status: ${driver.status}` : "Earn by delivering in your area"}</span></span></span><span className="grid h-8 w-8 place-items-center rounded-full bg-white text-lg transition group-open:rotate-45">＋</span></summary>
+            {driver ? <p className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600">Your delivery partner application is <strong className="capitalize">{driver.status}</strong>.</p> : <form action={applyAsDriver} className="mt-4 space-y-3"><select required name="vehicle_type" defaultValue="" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="" disabled>Choose vehicle type</option><option>Motorcycle</option><option>Bicycle</option><option>Car</option><option>Other</option></select><input name="vehicle_plate" placeholder="Plate number (optional)" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Submit driver application</button></form>}
+          </details>
+        </div>
+      </section>
+      <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, among ihatod.</footer>
     </div>
   </main>;
 }
