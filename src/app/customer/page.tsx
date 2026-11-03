@@ -5,7 +5,7 @@ import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
 import { signOut } from "@/app/dashboard/actions";
 
-type Search = { category?: string; municipality?: string };
+type Search = { category?: string; municipality?: string; error?: string };
 
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
@@ -43,7 +43,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <Link href="/" className="flex items-center gap-2 text-lg font-black tracking-tight text-[#102e57]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-xl text-white">S</span>SUGOMATE</Link>
         <div className="flex items-center gap-3"><span className="hidden text-sm text-slate-500 sm:inline">Maayong adlaw, {profile?.display_name || "Customer"}</span><Link href="/customer/orders" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md">Orders</Link><Link href="/customer/addresses" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md">Addresses</Link><Link href="/dashboard" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md">My account</Link><form action={signOut}><SignOutSubmitButton className="rounded-full bg-[#102e57] px-4 py-2 text-sm font-bold text-white hover:bg-[#174777] hover:text-white" /></form></div>
       </header>
-      <CustomerMarketplace products={products as never} categories={categories ?? []} selectedCategory={params.category ?? ""} selectedMunicipality={params.municipality ?? ""} municipalities={municipalities ?? []} addresses={(addresses ?? []) as never}/>
+      <CustomerMarketplace products={products as never} categories={categories ?? []} selectedCategory={params.category ?? ""} selectedMunicipality={params.municipality ?? ""} municipalities={municipalities ?? []} addresses={(addresses ?? []) as never} checkoutError={params.error}/>
       <footer className="mt-10 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, among ihatod.</footer>
     </div>
   </main>;
