@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         <form action={resendConfirmation} className="mt-4 border-t border-amber-200 pt-3">
           <label className="block text-sm font-bold">Your registration email<input required name="email" type="email" autoComplete="email" placeholder="you@example.com" className="mt-2 w-full rounded-xl border border-amber-300 bg-white px-3 py-3 font-normal text-[#102e57] outline-none focus:ring-2 focus:ring-amber-200"/></label>
-          <button className="mt-3 w-full rounded-full bg-[#102e57] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#174777]">Resend confirmation email</button>
+          <div className="mt-3"><AuthSubmitButton pendingLabel="Sending confirmation link…">Resend confirmation email</AuthSubmitButton></div>
         </form>
       </section> : error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{errors[error] ?? "Unable to sign in. Please try again."}</p>}
       {success === "resent" && <p role="status" className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900">If the address is registered and still needs confirmation, a new confirmation email has been requested. Check your Inbox and Spam folders.</p>}
