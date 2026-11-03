@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { placeOrder } from "@/app/customer/actions";
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 type Product = {
   id: string;
@@ -14,20 +15,33 @@ type Product = {
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
 
-export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, addresses }: {
+function CheckoutSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={disabled || pending} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ff8a00] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#ed5a19] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
+    {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+    {pending ? "Placing your order…" : "Place COD order"}
+  </button>;
+}
+
+export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, addresses, checkoutError }: {
   products: Product[];
   categories: { id: string; name: string; slug: string; icon: string }[];
   selectedCategory: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
-  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
+  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];\n  checkoutError?: string;
 }) {
   const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
   const [search, setSearch] = useState("");
+  const [customerNote, setCustomerNote] = useState("");
+  const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
   const items = Object.values(cart);
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
   const visible = useMemo(() => products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.merchant?.name.toLowerCase().includes(search.toLowerCase())), [products, search]);
+  const firstItem = items[0]?.product;
+  const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
+  const canCheckout = items.length > 0 && sameStore && addresses.length > 0 && Boolean(addressId);
 
   function add(product: Product) {
     setCart(current => ({ ...current, [product.id]: { product, quantity: (current[product.id]?.quantity ?? 0) + 1 } }));
@@ -42,7 +56,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
     });
   }
 
-  return <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+  return <div className="grid gap-6 lg:grid-cols-[1fr_340px]">\n    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
     <section>
       <div className="rounded-3xl bg-gradient-to-r from-[#102e57] via-[#124d80] to-[#ed5a19] p-6 text-white shadow-lg sm:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
@@ -77,7 +91,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
             <h3 className="font-extrabold text-[#102e57]">{product.name}</h3>
             <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">{product.description || product.merchant?.name || "Local favorite"}</p>
             <p className="mt-2 text-xs text-slate-400">{product.merchant?.name || "Local store"} · {product.branch?.municipalities?.name || "Leyte"}</p>
-            <div className="mt-3 flex items-center justify-between gap-2"><strong className="text-lg text-[#e95718]">₱{Number(product.price).toFixed(2)}</strong><button onClick={() => add(product)} className="rounded-full bg-[#102e57] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#174777]">+ Add</button></div>
+            <div className="mt-3 flex items-center justify-between gap-2"><strong className="text-lg text-[#e95718]">₱{Number(product.price).toFixed(2)}</strong><button type="button" onClick={() => add(product)} className="rounded-full bg-[#102e57] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#174777]">+ Add</button></div>
           </div>
         </article>)}
       </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12">
@@ -91,11 +105,26 @@ export default function CustomerMarketplace({ products, categories, selectedCate
       {items.length ? <div className="mt-4 space-y-4">
         {items.map(({product, quantity}) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="min-w-0"><p className="truncate text-sm font-bold text-[#102e57]">{product.name}</p><p className="text-xs text-slate-500">₱{Number(product.price).toFixed(2)}</p></div>
-          <div className="flex items-center gap-2"><button onClick={() => change(product.id,-1)} aria-label={`Remove one ${product.name}`} className="h-7 w-7 rounded-full border border-slate-200 font-bold">−</button><span className="w-4 text-center text-sm font-bold">{quantity}</span><button onClick={() => change(product.id,1)} aria-label={`Add one ${product.name}`} className="h-7 w-7 rounded-full bg-orange-100 font-bold text-orange-700">+</button></div>
+          <div className="flex items-center gap-2"><button type="button" onClick={() => change(product.id,-1)} aria-label={`Remove one ${product.name}`} className="h-7 w-7 rounded-full border border-slate-200 font-bold">−</button><span className="w-4 text-center text-sm font-bold">{quantity}</span><button type="button" onClick={() => change(product.id,1)} aria-label={`Add one ${product.name}`} className="h-7 w-7 rounded-full bg-orange-100 font-bold text-orange-700">+</button></div>
         </div>)}
-        <div className="flex justify-between pt-1 font-black text-[#102e57]"><span>Subtotal</span><span>₱{total.toFixed(2)}</span></div>
-        <button disabled className="w-full cursor-not-allowed rounded-full bg-slate-200 px-4 py-3 text-sm font-extrabold text-slate-500">Checkout coming in next phase</button>
-        <p className="text-center text-xs leading-5 text-slate-400">Your basket is temporary on this device for now.</p>
+        <div className="flex justify-between pt-1 font-black text-[#102e57]"><span>Items subtotal</span><span>₱{total.toFixed(2)}</span></div>
+        {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
+        <form action={placeOrder} className="space-y-3 border-t border-slate-100 pt-4">
+          <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
+          {addresses.length ? <>
+            <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Deliver to</label>
+            <select id="checkout-address" name="address_id" required value={addressId} onChange={e => setAddressId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-[#102e57]">
+              {addresses.map(a => <option key={a.id} value={a.id}>{a.label} · {a.address_line} ({a.municipalities?.name ?? "Area"})</option>)}
+            </select>
+          </> : <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Add a delivery address before checking out.</div>}
+          <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
+          <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]"/>
+          <input type="hidden" name="items" value={JSON.stringify(items.map(({product, quantity}) => ({product_id:product.id,quantity})))} />
+          <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: Cash on delivery</strong><br/>The store will confirm your order. Delivery fee is calculated by SUGOMATE at checkout.</div>
+          <CheckoutSubmitButton disabled={!canCheckout}/>
+          <p className="text-center text-[11px] leading-4 text-slate-400">Prices, stock, store approval and delivery fees are verified securely when you place the order.</p>
+        </form>
+        {!addresses.length && <Link href="/customer/addresses" className="block rounded-full border border-[#102e57] px-4 py-3 text-center text-sm font-extrabold text-[#102e57] transition hover:bg-slate-50">Add delivery address</Link>}
       </div> : <div className="py-8 text-center"><div className="text-4xl">🧺</div><p className="mt-3 text-sm font-semibold text-slate-600">Your basket is empty</p><p className="mt-1 text-xs text-slate-400">Add items from local stores to get started.</p></div>}
     </aside>
   </div>;
