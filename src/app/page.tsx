@@ -34,7 +34,7 @@ export default function HomePage() {
   return <main>
     <header className="sticky top-0 z-40 border-b border-slate-100/80 bg-white/90 backdrop-blur-xl">
       <div className="container flex h-[82px] items-center justify-between gap-5">
-        <a href="#home" aria-label="SUGOMATE home"><BrandLockup /></a>
+        <a href="#home" aria-label="SUGOMATE home" className="flex items-center"><img src="/images/sugomate-eagle-road-logo.png" alt="SUGOMATE — Imong sugo, among ihatod." className="h-[58px] w-auto max-w-[min(320px,62vw)] object-contain object-left" /></a>
         <nav className="hidden items-center gap-7 lg:flex">{nav.map(item => <a key={item.href} className="text-sm font-bold text-slate-700 transition hover:text-orange-600" href={item.href}>{item.label}</a>)}</nav>
         <div className="hidden lg:block"><button onClick={download} className="btn-primary"><Download size={17}/> Get the app</button></div>
         <button aria-label="Toggle menu" className="rounded-xl border border-slate-200 p-2 lg:hidden" onClick={() => setMobileMenu(!mobileMenu)}>{mobileMenu ? <X/> : <Menu/>}</button>
@@ -57,7 +57,7 @@ export default function HomePage() {
       </div>
     </div></section>
 
-    <section id="services" className="section"><div className="container"><div className="text-center"><span className="eyebrow">One app, many ways to help</span><h2 className="section-title">Whatever you need,<br/><span className="gradient-text">we can help bring it.</span></h2><p className="section-copy">From your next meal to an important parcel, SUGOMATE brings everyday local services together in one convenient app.</p></div>
+    <section aria-label="SUGOMATE promotional banner" className="bg-white py-8 sm:py-12"><div className="container"><img src="/images/sugomate-promotional-banner.png" alt="SUGOMATE — Imong sugo, among ihatod. Food, groceries, Pabili, parcels and errands delivered." className="block h-auto w-full rounded-2xl object-contain shadow-[0_18px_50px_rgba(13,47,89,0.12)]" /></div></section>\n\n    <section id="services" className="section"><div className="container"><div className="text-center"><span className="eyebrow">One app, many ways to help</span><h2 className="section-title">Whatever you need,<br/><span className="gradient-text">we can help bring it.</span></h2><p className="section-copy">From your next meal to an important parcel, SUGOMATE brings everyday local services together in one convenient app.</p></div>
       <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{services.map(service => {const Icon=service.icon;return <article key={service.title} className="service-card"><div className="mb-5 grid size-14 place-items-center rounded-2xl" style={{background:service.bg,color:service.color}}><Icon size={27}/></div><h3 className="text-lg font-black text-slate-900">{service.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{service.copy}</p></article>})}</div>
     </div></section>
 
