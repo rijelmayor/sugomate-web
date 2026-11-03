@@ -19,7 +19,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const hasMerchant = (merchants ?? []).length > 0;
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-10 text-[#102e57]">
     <div className="mx-auto max-w-3xl">
-      <header className="flex items-center justify-between gap-4"><Link href="/" className="text-sm font-black text-orange-600">SUGOMATE</Link><form action={signOut}><button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold">Sign out</button></form></header>
+      <header className="flex items-center justify-between gap-4"><Link href="/" className="text-sm font-black text-orange-600">SUGOMATE</Link><nav className="flex items-center gap-2"><Link href="/customer" className="rounded-full bg-orange-500 px-4 py-2 text-sm font-extrabold text-white">Browse marketplace</Link><form action={signOut}><button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold">Sign out</button></form></nav></header>
       <section className="mt-8 rounded-3xl bg-white p-7 shadow-lg shadow-orange-100/60 sm:p-9">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">Your account</p>
         <h1 className="mt-2 text-3xl font-black">Maayong pag-abot, {profile?.display_name || user.email}!</h1>
