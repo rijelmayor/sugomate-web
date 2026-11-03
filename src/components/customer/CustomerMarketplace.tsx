@@ -17,7 +17,7 @@ type Product = {
 
 function FilterSubmitButton() {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ffbd18] px-5 py-3 text-sm font-black text-[#102e57] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffd04a] hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70">
+  return <button type="submit" disabled={pending} className="inline-flex h-12 min-w-[4.5rem] items-center justify-center gap-2 rounded-xl bg-[#ffbd18] px-4 text-sm font-black text-[#102e57] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffd04a] hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70">
     {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-[#102e57]/30 border-t-[#102e57]" />}
     {pending ? "Applying…" : "Go"}
   </button>;
@@ -65,17 +65,17 @@ export default function CustomerMarketplace({ products, categories, selectedCate
     });
   }
 
-  return <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+  return <div className="grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
     {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
-    <section>
-      <div className="w-full min-w-0 overflow-hidden rounded-3xl bg-gradient-to-r from-[#102e57] via-[#124d80] to-[#ed5a19] p-5 text-white shadow-lg sm:p-8">
+    <section className="w-full min-w-0">
+      <div className="box-border w-full max-w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#102e57] via-[#124d80] to-[#ed5a19] p-5 text-white shadow-lg sm:p-7 lg:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
-        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Unsa imong sugo?</h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-white/85">Discover local stores and everyday essentials from your community.</p>
-        <div className="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" className="w-full rounded-xl border border-white/30 bg-white px-4 py-3 text-sm text-[#102e57] outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-orange-300"/>
-          <form action="/customer" className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <select name="municipality" defaultValue={selectedMunicipality} className="w-full min-w-0 rounded-xl border border-white/30 bg-white px-3 py-3 text-sm text-[#102e57]">
+        <h1 className="mt-2 max-w-full break-words text-[clamp(1.8rem,5vw,2.5rem)] font-black leading-tight">Unsa imong sugo?</h1>
+        <p className="mt-2 max-w-prose break-words text-sm leading-6 text-white/85 sm:text-base">Discover local stores and everyday essentials from your community.</p>
+        <div className="mt-5 grid w-full min-w-0 grid-cols-1 gap-3">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" aria-label="Search food, stores, and groceries" className="box-border h-12 w-full min-w-0 rounded-xl border border-white/30 bg-white px-4 text-sm text-[#102e57] outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-orange-300"/>
+          <form action="/customer" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <select name="municipality" defaultValue={selectedMunicipality} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-xl border border-white/30 bg-white px-3 text-sm text-[#102e57]">
               <option value="">All service areas</option>
               {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
@@ -84,7 +84,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
         </div>
       </div>
 
-      <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
+      <div aria-label="Product categories" className="mt-5 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
         <a href="/customer" aria-current={!selectedCategory ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-5 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${!selectedCategory ? "bg-[#102e57] text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={!selectedCategory ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>All</a>
         {categories.map(category => { const isSelected = selectedCategory === category.slug; return <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} aria-current={isSelected ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${isSelected ? "bg-[#102e57] !text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.icon} <span style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.name}</span></a>; })}
       </div>
@@ -94,8 +94,8 @@ export default function CustomerMarketplace({ products, categories, selectedCate
         <span className="text-xs font-semibold text-slate-400">{visible.length} items</span>
       </div>
 
-      {visible.length ? <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {visible.map(product => <article key={product.id} className="overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+      {visible.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {visible.map(product => <article key={product.id} className="min-w-0 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
           <div role="img" aria-label={product.name} className="flex h-36 items-center justify-center bg-gradient-to-br from-orange-50 to-amber-100 text-5xl" style={product.image_url ? { backgroundImage: `linear-gradient(#ffffff20,#ffffff20),url("${product.image_url}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>{!product.image_url && "🍽️"}</div>
           <div className="p-4">
             <h3 className="font-extrabold text-[#102e57]">{product.name}</h3>
@@ -110,7 +110,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
       </div>}
     </section>
 
-    <aside className="h-fit rounded-3xl border border-orange-100 bg-white p-5 shadow-sm lg:sticky lg:top-5">
+    <aside className="h-fit min-w-0 rounded-3xl border border-orange-100 bg-white p-5 shadow-sm lg:sticky lg:top-5">
       <div className="flex items-center justify-between"><h2 className="text-lg font-black text-[#102e57]">Your basket</h2><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">{count} items</span></div>
       {items.length ? <div className="mt-4 space-y-4">
         {items.map(({product, quantity}) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
