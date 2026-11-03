@@ -62,7 +62,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
 
       <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
         <a href="/customer" className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${!selectedCategory ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>All</a>
-        {categories.map(category => <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${selectedCategory === category.slug ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>{category.icon} {category.name}</a>)}
+        {categories.map(category => { const isSelected = selectedCategory === category.slug; return <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} aria-current={isSelected ? "page" : undefined} className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${isSelected ? "bg-[#102e57] !text-white" : "border border-slate-200 bg-white text-[#102e57]"}`} style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.icon} <span style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.name}</span></a>; })}
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-3">
