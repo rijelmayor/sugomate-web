@@ -20,6 +20,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   selectedCategory: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
+  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
 }) {
   const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
   const [search, setSearch] = useState("");
