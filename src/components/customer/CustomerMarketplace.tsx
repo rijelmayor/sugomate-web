@@ -15,6 +15,14 @@ type Product = {
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
 
+function FilterSubmitButton() {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ffbd18] px-5 py-3 text-sm font-black text-[#102e57] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffd04a] hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70">
+    {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-[#102e57]/30 border-t-[#102e57]" />}
+    {pending ? "Applying…" : "Go"}
+  </button>;
+}
+
 function CheckoutSubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={disabled || pending} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ff8a00] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#ed5a19] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
@@ -60,25 +68,25 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   return <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
     {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
     <section>
-      <div className="rounded-3xl bg-gradient-to-r from-[#102e57] via-[#124d80] to-[#ed5a19] p-6 text-white shadow-lg sm:p-8">
+      <div className="w-full min-w-0 overflow-hidden rounded-3xl bg-gradient-to-r from-[#102e57] via-[#124d80] to-[#ed5a19] p-5 text-white shadow-lg sm:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
         <h1 className="mt-2 text-3xl font-black sm:text-4xl">Unsa imong sugo?</h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-white/85">Discover local stores and everyday essentials from your community.</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_220px]">
+        <div className="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" className="w-full rounded-xl border border-white/30 bg-white px-4 py-3 text-sm text-[#102e57] outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-orange-300"/>
-          <form action="/customer" className="flex gap-2">
-            <select name="municipality" defaultValue={selectedMunicipality} className="min-w-0 flex-1 rounded-xl border border-white/30 bg-white px-3 py-3 text-sm text-[#102e57]">
+          <form action="/customer" className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <select name="municipality" defaultValue={selectedMunicipality} className="w-full min-w-0 rounded-xl border border-white/30 bg-white px-3 py-3 text-sm text-[#102e57]">
               <option value="">All service areas</option>
               {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            <button className="rounded-xl bg-[#ffbd18] px-4 py-3 text-sm font-black text-[#102e57]">Go</button>
+            <FilterSubmitButton />
           </form>
         </div>
       </div>
 
       <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
-        <a href="/customer" className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${!selectedCategory ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>All</a>
-        {categories.map(category => { const isSelected = selectedCategory === category.slug; return <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} aria-current={isSelected ? "page" : undefined} className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${isSelected ? "bg-[#102e57] !text-white" : "border border-slate-200 bg-white text-[#102e57]"}`} style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.icon} <span style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.name}</span></a>; })}
+        <a href="/customer" aria-current={!selectedCategory ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-5 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${!selectedCategory ? "bg-[#102e57] text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={!selectedCategory ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>All</a>
+        {categories.map(category => { const isSelected = selectedCategory === category.slug; return <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} aria-current={isSelected ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${isSelected ? "bg-[#102e57] !text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.icon} <span style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.name}</span></a>; })}
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-3">
