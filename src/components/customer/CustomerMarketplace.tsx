@@ -29,7 +29,8 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   selectedCategory: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
-  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];\n  checkoutError?: string;
+  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
+  checkoutError?: string;
 }) {
   const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
   const [search, setSearch] = useState("");
@@ -56,7 +57,8 @@ export default function CustomerMarketplace({ products, categories, selectedCate
     });
   }
 
-  return <div className="grid gap-6 lg:grid-cols-[1fr_340px]">\n    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
+  return <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
     <section>
       <div className="rounded-3xl bg-gradient-to-r from-[#102e57] via-[#124d80] to-[#ed5a19] p-6 text-white shadow-lg sm:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
