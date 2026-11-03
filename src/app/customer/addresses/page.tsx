@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { saveCustomerAddress } from "@/app/customer/actions";
+import FormSubmitButton from "@/components/FormSubmitButton";
 
 export default async function CustomerAddresses({ searchParams }: { searchParams: Promise<{error?:string;saved?:string}> }) {
   const params=await searchParams;
@@ -25,7 +26,7 @@ export default async function CustomerAddresses({ searchParams }: { searchParams
         <select name="municipality_id" required defaultValue="" className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="" disabled>Select municipality</option>{(municipalities??[]).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
         <textarea name="address_line" required placeholder="House no., street, purok / sitio, barangay" className="min-h-24 rounded-xl border border-slate-200 px-3 py-3 text-sm sm:col-span-2"/>
         <input name="landmark" placeholder="Nearby landmark (optional)" className="rounded-xl border border-slate-200 px-3 py-3 text-sm sm:col-span-2"/>
-        <button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-extrabold text-white sm:col-span-2">Save address</button>
+        <FormSubmitButton pendingLabel="Saving address…" className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-extrabold text-white sm:col-span-2">Save address</FormSubmitButton>
       </form>
     </section>
     <section className="mt-6 space-y-3"><h2 className="text-lg font-black">Saved addresses</h2>{(addresses??[]).length?(addresses??[]).map(a=><article key={a.id} className="rounded-2xl border border-orange-100 bg-white p-4"><p className="font-extrabold">{a.label} · {a.recipient_name}</p><p className="mt-1 text-sm text-slate-500">{a.address_line}, {(a.municipalities as unknown as {name:string}|null)?.name}</p><p className="text-sm text-slate-500">{a.recipient_phone} {a.landmark ? "· Near " + a.landmark : ""}</p></article>):<p className="rounded-xl bg-white p-5 text-sm text-slate-500">You haven't saved a delivery address yet.</p>}</section>
