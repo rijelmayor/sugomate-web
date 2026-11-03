@@ -101,7 +101,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
             <h3 className="font-extrabold text-[#102e57]">{product.name}</h3>
             <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">{product.description || product.merchant?.name || "Local favorite"}</p>
             <p className="mt-2 text-xs text-slate-400">{product.merchant?.name || "Local store"} · {product.branch?.municipalities?.name || "Leyte"}</p>
-            <div className="mt-3 flex items-center justify-between gap-2"><strong className="text-lg text-[#e95718]">₱{Number(product.price).toFixed(2)}</strong><button type="button" onClick={() => add(product)} className="rounded-full bg-[#102e57] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#174777]">+ Add</button></div>
+            <div className="mt-3 flex items-center justify-between gap-2"><strong className="text-lg text-[#e95718]">₱{Number(product.price).toFixed(2)}</strong><button type="button" onClick={() => add(product)} className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#102e57] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#174777] hover:shadow-md active:translate-y-0 active:scale-[.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2">+ Add</button></div>
           </div>
         </article>)}
       </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12">
