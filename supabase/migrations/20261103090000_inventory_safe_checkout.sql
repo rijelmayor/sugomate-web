@@ -179,3 +179,68 @@ $$;
 
 revoke all on function public.place_customer_order(uuid,jsonb,text,text) from public, anon;
 grant execute on function public.place_customer_order(uuid,jsonb,text,text) to authenticated;
+
+
+-- Merchant order status changes are performed through a narrowly-scoped RPC.
+create or replace function public.merchant_update_order_status(
+  p_order_id uuid,
+  p_next_status text,
+  p_note text default null
+) returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_order public.orders%rowtype;
+  v_allowed boolean := false;
+begin
+  if v_actor is null then
+    raise exception 'You must be signed in.';
+  end if;
+
+  select o.* into v_order
+  from public.orders o
+  where o.id = p_order_id
+    and exists (
+      select 1
+      from public.merchant_members mm
+      where mm.merchant_id = o.merchant_id
+        and mm.user_id = v_actor
+    )
+    and exists (
+      select 1 from public.merchants m
+      where m.id = o.merchant_id and m.status = 'approved'
+    )
+  for update;
+
+  if not found then
+    raise exception 'Order not found or you do not have permission to manage it.';
+  end if;
+
+  v_allowed :=
+    (v_order.status = 'pending_merchant' and p_next_status in ('accepted','rejected'))
+    or (v_order.status = 'accepted' and p_next_status = 'preparing')
+    or (v_order.status = 'preparing' and p_next_status = 'ready_for_pickup');
+
+  if not v_allowed then
+    raise exception 'This order cannot be moved to the requested status.';
+  end if;
+
+  update public.orders
+  set status = p_next_status,
+      updated_at = now()
+  where id = p_order_id;
+
+  insert into public.order_status_history (
+    order_id, from_status, to_status, actor_id, note
+  ) values (
+    p_order_id, v_order.status, p_next_status, v_actor,
+    nullif(left(coalesce(p_note,''),300),'')
+  );
+end;
+$$;
+
+revoke all on function public.merchant_update_order_status(uuid,text,text) from public, anon;
+grant execute on function public.merchant_update_order_status(uuid,text,text) to authenticated;
