@@ -28,7 +28,7 @@ export async function saveCustomerAddress(formData: FormData) {
 }
 
 export async function placeOrder(formData: FormData) {
-  const { supabase } = await requireCustomer();
+  const { supabase, user } = await requireCustomer();
   let addressId = String(formData.get("address_id") ?? "");
   const note = String(formData.get("customer_note") ?? "").trim().slice(0,500);
   if (addressId === "__new__" || !addressId) {
@@ -40,7 +40,7 @@ export async function placeOrder(formData: FormData) {
     const landmark = String(formData.get("landmark") ?? "").trim().slice(0,200);
     if (!recipientName || !recipientPhone || !/^[0-9a-f-]{36}$/i.test(municipalityId) || addressLine.length < 5) redirect("/customer?error=address");
     const { data: address, error: addressError } = await supabase.from("customer_addresses").insert({
-      customer_id: (await supabase.auth.getUser()).data.user?.id, label, recipient_name: recipientName,
+      customer_id: user.id, label, recipient_name: recipientName,
       recipient_phone: recipientPhone, municipality_id: municipalityId, address_line: addressLine, landmark: landmark || null
     }).select("id").single();
     if (addressError || !address) redirect("/customer?error=address");
