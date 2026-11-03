@@ -137,7 +137,7 @@ begin
     v_qty := (v_item->>'quantity')::integer;
     if v_qty is null or v_qty < 1 or v_qty > 99 then raise exception 'Invalid product quantity.'; end if;
 
-    select * into v_product from public.products p
+    select p.* into v_product from public.products p
       join public.merchants m on m.id = p.merchant_id
       join public.merchant_branches b on b.id = p.branch_id
       where p.id = v_product_id and p.is_available = true
