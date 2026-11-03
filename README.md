@@ -1,6 +1,6 @@
 # SUGOMATE Web
 
-Public website and app-download landing page for SUGOMATE — Imong sugo, among ihatod.
+Public website and app-download landing page for SUGOMATE — Imong sugo, kami bahala.
 
 ## Stack
 - Next.js 15 / React 19 / TypeScript
@@ -10,34 +10,23 @@ Public website and app-download landing page for SUGOMATE — Imong sugo, among 
 
 ## Authentication setup
 
-Copy `.env.example` to `.env.local` and set the SUGOMATE Supabase project URL and publishable key. Configure the same variables in Vercel before enabling authentication:
-
+Set these variables in local development and Vercel:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SITE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only; never expose to the browser)
+- `TEXTBEE_API_KEY` (server-only Textbee dashboard API key)
 
-The app uses `@supabase/ssr` with cookie-based sessions and Next.js 15 middleware. It does not use the deprecated `@supabase/auth-helpers-nextjs` package.
+### Registration and mobile verification
+New registrations require a Philippine mobile number in `09XXXXXXXXX` or `+639XXXXXXXXX` format. A six-digit OTP is sent through Textbee, expires in five minutes, allows five attempts, and can be resent after 60 seconds. Existing accounts are grandfathered as verified by the migration. Email confirmation remains independently enabled; complete both checks before protected access. Merchant and driver applications inherit the verified customer account. Newly created admin accounts are subject to the same verification gate.
 
-### Routes
-- `/register` — customer account registration (email confirmation may be required by Supabase Auth settings).
-- `/login` — email/password sign-in.
-- `/auth/callback` — exchanges the email-confirmation code for a session.
-- `/dashboard` — signed-in account page and merchant/driver application forms.
+Apply `supabase/migrations/20261103120000_textbee_phone_verification.sql` to Supabase before deploying.
 
-All new accounts receive the `customer` role through the database signup trigger. Merchant and driver applications are stored with pending status. An administrator must review and approve those applications and assign the appropriate application role through a trusted administrative process. Public users cannot grant themselves merchant, driver, or admin roles.
-
-### Supabase Auth dashboard configuration
-Set the Supabase Auth Site URL to `https://sugomate.com` and add these allowed redirect URLs:
-- `https://sugomate.com/auth/callback`
-- `http://localhost:3000/auth/callback`
-
-Keep email confirmation enabled for production. The confirmation email should redirect to the callback URL; use Supabase's PKCE/code flow.
+Set the Supabase Auth Site URL to `https://sugomate.com` and allow `https://sugomate.com/auth/callback` and `http://localhost:3000/auth/callback`. Keep email confirmation enabled in production.
 
 ## Development
-
 ```bash
 npm install
 npm run dev
 ```
-
-Run `npm run lint` and `npm run build` before merging. Do not commit `.env.local` or any service-role/secret key.
+Run `npm run lint` and `npm run build` before merging. Never commit `.env.local` or service-role/secret keys.
