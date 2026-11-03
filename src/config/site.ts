@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "SUGOMATE",
-  tagline: "Imong sugo, among ihatod.",
+  tagline: "Imong sugo, kami bahala.",
   description: "Your everyday delivery partner for food, groceries, parcels, errands and more.",
   url: "https://sugomate.com",
   androidUrl: "",
