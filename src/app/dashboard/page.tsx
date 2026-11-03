@@ -2,21 +2,30 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutSubmitButton from "@/components/SignOutSubmitButton";
+import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
 import { applyAsDriver, applyAsMerchant, signOut } from "./actions";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; partner?: string }> }) {
-  const { error, success, partner } = await searchParams;
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; partner?: string; category?: string; municipality?: string }> }) {
+  const { error, success, partner, category, municipality } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: roles }, { data: merchants }, { data: driver }, { count: orderCount }] = await Promise.all([
+  const [{ data: profile }, { data: roles }, { data: merchants }, { data: driver }, { count: orderCount }, { data: categories }, { data: municipalities }, { data: addresses }] = await Promise.all([
     supabase.from("profiles").select("display_name,phone,status").eq("id", user.id).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", user.id),
     supabase.from("merchant_members").select("merchant_id,member_role,merchants(name,status)").eq("user_id", user.id),
     supabase.from("driver_profiles").select("status,vehicle_type").eq("user_id", user.id).maybeSingle(),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id),
+    supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order"),
+    supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
+    supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
   ]);
+  let productQuery = supabase.from("products").select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug),branch:merchant_branches!products_branch_id_fkey(name,municipality_id,municipalities(name)),category:product_categories!products_category_id_fkey(slug)").eq("is_available", true).order("created_at", { ascending: false }).limit(60);
+  if (category) productQuery = productQuery.eq("category.slug", category);
+  if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
+  const { data: productRows, error: productError } = await productQuery;
+  const products = productError ? [] : (productRows ?? []).map(row => ({ ...row, price: Number(row.price), merchant: Array.isArray(row.merchant) ? row.merchant[0] : row.merchant, branch: Array.isArray(row.branch) ? row.branch[0] : row.branch }));
   const roleNames = (roles ?? []).map(row => row.role).join(", ") || "customer";
   const hasMerchant = (merchants ?? []).length > 0;
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
@@ -33,15 +42,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="pointer-events-none absolute -bottom-28 right-28 h-56 w-56 rounded-full bg-[#ff7a00]/20 blur-2xl" />
         <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
           <div><p className="text-xs font-black uppercase tracking-[.2em] text-[#ffbd18]">Your SUGOMATE space</p><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Maayong adlaw, {firstName}!</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Your community is just a few taps away. Find what you need, order from local stores, and let us bring it to you.</p></div>
-          <Link href="/customer" className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#ffbd18] px-6 py-3.5 text-sm font-black text-[#102e57] shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:bg-[#ffd15b]">Explore marketplace <span aria-hidden="true">↗</span></Link>
+
         </div>
         <div className="relative mt-7 grid grid-cols-2 gap-3 border-t border-white/15 pt-5 sm:max-w-md"><div><p className="text-2xl font-black">{orderCount ?? 0}</p><p className="mt-1 text-xs text-white/65">Orders placed</p></div><div><p className="text-sm font-bold capitalize">{profile?.status || "Active"}</p><p className="mt-1 text-xs text-white/65">Account status · {roleNames}</p></div></div>
       </section>
 
+      <section id="marketplace" className="mt-7 scroll-mt-6"><div className="mb-4"><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">Shop your community</p><h2 className="mt-1 text-2xl font-black">Browse products and order directly</h2></div><CustomerMarketplace products={products as never} categories={categories ?? []} selectedCategory={category ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} addresses={(addresses ?? []) as never} checkoutError={error}/></section>
+
       {(error || success) && <p role="status" className={`mt-4 rounded-xl p-4 text-sm ${error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"}`}>{error ? "We could not submit that application. Check your details or contact support." : success === "merchant-pending" ? "Merchant application submitted for review." : "Driver application submitted for review."}</p>}
 
       <section className="mt-7 grid gap-4 md:grid-cols-3">
-        <Link href="/customer" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-orange-100 text-2xl">🛍️</span><h2 className="mt-4 font-black">Shop local</h2><p className="mt-1 text-sm leading-5 text-slate-500">Discover food, groceries, and neighborhood stores.</p><p className="mt-4 text-sm font-extrabold text-orange-600">Browse marketplace →</p></Link>
+        
         <Link href="/customer/orders" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-2xl">📦</span><h2 className="mt-4 font-black">Your orders</h2><p className="mt-1 text-sm leading-5 text-slate-500">Keep an eye on purchases and delivery updates.</p><p className="mt-4 text-sm font-extrabold text-orange-600">View order history →</p></Link>
         <Link href="/customer/addresses" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-2xl">📍</span><h2 className="mt-4 font-black">Delivery addresses</h2><p className="mt-1 text-sm leading-5 text-slate-500">Save your home, work, and favorite drop-off points.</p><p className="mt-4 text-sm font-extrabold text-orange-600">Manage addresses →</p></Link>
       </section>

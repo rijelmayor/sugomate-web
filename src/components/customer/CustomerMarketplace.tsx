@@ -43,14 +43,14 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
   const [search, setSearch] = useState("");
   const [customerNote, setCustomerNote] = useState("");
-  const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
+  const [addressId, setAddressId] = useState(addresses[0]?.id ?? "__new__");
   const items = Object.values(cart);
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
   const visible = useMemo(() => products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.merchant?.name.toLowerCase().includes(search.toLowerCase())), [products, search]);
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
-  const canCheckout = items.length > 0 && sameStore && addresses.length > 0 && Boolean(addressId);
+  const canCheckout = items.length > 0 && sameStore && Boolean(addressId);
 
   function add(product: Product) {
     setCart(current => ({ ...current, [product.id]: { product, quantity: (current[product.id]?.quantity ?? 0) + 1 } }));
@@ -66,7 +66,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   }
 
   return <div className="grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check that the store is open, your items are still available, and a delivery fee is configured for your area." : "Your basket could not be processed. Please review your items and try again."}</p>}
+    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check store availability, product stock, and delivery coverage." : checkoutError === "address" ? "Please complete your delivery address before placing the order." : "Your basket could not be processed. Please review your items and try again."}</p>}
     <section className="w-full min-w-0">
       <div className="box-border w-full max-w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#102e57] via-[#124d80] to-[#ed5a19] p-5 text-white shadow-lg sm:p-7 lg:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
@@ -121,12 +121,20 @@ export default function CustomerMarketplace({ products, categories, selectedCate
         {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
         <form action={placeOrder} className="space-y-3 border-t border-slate-100 pt-4">
           <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
-          {addresses.length ? <>
-            <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Deliver to</label>
-            <select id="checkout-address" name="address_id" required value={addressId} onChange={e => setAddressId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-[#102e57]">
-              {addresses.map(a => <option key={a.id} value={a.id}>{a.label} · {a.address_line} ({a.municipalities?.name ?? "Area"})</option>)}
-            </select>
-          </> : <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Add a delivery address before checking out.</div>}
+          <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Delivery address <span className="text-rose-600">· required</span></label>
+          <select id="checkout-address" name="address_id" required value={addressId} onChange={e => setAddressId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-[#102e57]">
+            {addresses.map(a => <option key={a.id} value={a.id}>{a.label} · {a.address_line} ({a.municipalities?.name ?? "Area"})</option>)}
+            <option value="__new__">＋ Enter a new delivery address</option>
+          </select>
+          {addressId === "__new__" && <div className="space-y-2 rounded-xl border border-orange-100 bg-orange-50/60 p-3">
+            <p className="text-xs font-extrabold text-[#102e57]">Where should we deliver?</p>
+            <input name="new_label" defaultValue="Home" placeholder="Address label (Home, Work)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+            <input name="recipient_name" required placeholder="Recipient full name" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+            <input name="recipient_phone" required type="tel" placeholder="Mobile number" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+            <select name="municipality_id" required defaultValue="" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio, barangay" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+            <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+          </div>}
           <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
           <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]"/>
           <input type="hidden" name="items" value={JSON.stringify(items.map(({product, quantity}) => ({product_id:product.id,quantity})))} />
@@ -134,7 +142,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
           <CheckoutSubmitButton disabled={!canCheckout}/>
           <p className="text-center text-[11px] leading-4 text-slate-400">Prices, stock, store approval and delivery fees are verified securely when you place the order.</p>
         </form>
-        {!addresses.length && <Link href="/customer/addresses" className="block rounded-full border border-[#102e57] px-4 py-3 text-center text-sm font-extrabold text-[#102e57] transition hover:bg-slate-50">Add delivery address</Link>}
+        <Link href="/customer/addresses" className="block text-center text-xs font-bold text-slate-500 underline">Manage saved addresses</Link>
       </div> : <div className="py-8 text-center"><div className="text-4xl">🧺</div><p className="mt-3 text-sm font-semibold text-slate-600">Your basket is empty</p><p className="mt-1 text-xs text-slate-400">Add items from local stores to get started.</p></div>}
     </aside>
   </div>;
