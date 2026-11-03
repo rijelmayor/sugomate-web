@@ -37,8 +37,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     branch: Array.isArray(row.branch) ? row.branch[0] : row.branch,
   }));
 
-  return <main className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
-    <div className="mx-auto max-w-7xl">
+  return <main className="min-h-screen w-full min-w-0 overflow-x-clip bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl">
       <header className="mb-6 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/" className="flex w-fit items-center gap-2 text-lg font-black tracking-tight text-[#102e57]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-xl text-white">S</span>SUGOMATE</Link>
         <nav aria-label="Customer navigation" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
