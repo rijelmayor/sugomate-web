@@ -19,7 +19,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   ]);
 
   let productQuery = supabase.from("products")
-    .select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug),branch:merchant_branches!products_branch_id_fkey(name,municipalities(name)),category:product_categories!products_category_id_fkey(slug)")
+    .select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug),branch:merchant_branches!products_branch_id_fkey(name,municipality_id,municipalities(name)),category:product_categories!products_category_id_fkey(slug)")
     .eq("is_available", true)
     .order("created_at", { ascending: false })
     .limit(60);
