@@ -69,7 +69,7 @@ export async function verifyPhoneOtp(email: string, submittedCode: string) {
   if (!/^\d{6}$/.test(submittedCode)) return { ok: false as const, reason: "invalid" };
   const supabase = adminClient();
   const { data: challenge, error } = await supabase.from("phone_verification_challenges")
-    .select("user_id,code_hash,attempts,expires_at").eq("email", email.toLowerCase()).maybeSingle();
+    .select("user_id,phone,code_hash,attempts,expires_at").eq("email", email.toLowerCase()).maybeSingle();
   if (error || !challenge) return { ok: false as const, reason: "missing" };
   if (new Date(challenge.expires_at).getTime() <= Date.now()) return { ok: false as const, reason: "expired" };
   if (challenge.attempts >= 5) return { ok: false as const, reason: "locked" };
@@ -83,7 +83,7 @@ export async function verifyPhoneOtp(email: string, submittedCode: string) {
   }
 
   const { error: profileError } = await supabase.from("profiles")
-    .update({ phone_verified_at: new Date().toISOString() }).eq("id", challenge.user_id);
+    .update({ phone: challenge.phone, phone_verified_at: new Date().toISOString() }).eq("id", challenge.user_id);
   if (profileError) return { ok: false as const, reason: "save" };
   await supabase.from("phone_verification_challenges").delete().eq("user_id", challenge.user_id);
   return { ok: true as const };
