@@ -25,6 +25,9 @@ begin
  select status::text into v_old from public.merchants where id=p_merchant_id for update;
  if not found then raise exception 'Merchant not found.'; end if;
  update public.merchants set status=p_status::public.merchant_status,reviewed_at=now(),reviewed_by=v_actor,updated_at=now() where id=p_merchant_id;
+ if p_status='approved' then
+   insert into public.user_roles(user_id,role,assigned_by) select owner_id,'merchant'::public.app_role,v_actor from public.merchants where id=p_merchant_id on conflict(user_id,role) do nothing;
+ end if;
  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
  values(v_actor,'merchant_status_changed','merchants',p_merchant_id::text,jsonb_build_object('from',v_old,'to',p_status));
 end; $$;
