@@ -55,3 +55,15 @@ For every UI/interaction PR, verify:
 - [ ] Existing approved branding and page design are preserved unless redesign was explicitly requested.
 
 A PR is not ready to merge until the relevant checks above have been reviewed.
+
+## 6. Merchant incoming-order alerts
+
+- New merchant orders must trigger a clear visual alert and, when the merchant has enabled audio in the current browser session, a repeating audible chime.
+- Audio must respect browser autoplay restrictions. Provide an explicit **Enable sound alerts** action and a visible enabled/disabled state; never pretend sound is active when the browser has not allowed it.
+- The alert must continue until the merchant explicitly acknowledges it with a clearly labeled confirmation action.
+- **Acknowledging an alert is not accepting an order.** It only silences/dismisses the notification. The existing Accept/Reject order workflow remains a separate, explicit merchant decision.
+- If several orders arrive before acknowledgement, queue them so acknowledging one does not silently discard the others.
+- Do not replay alerts for old pending orders merely because the merchant refreshes or reopens the dashboard. Only newly received orders trigger a new alert; existing pending orders remain visible in the order list.
+- Subscribe only to orders belonging to the authenticated merchant memberships and rely on database row-level security. Never expose service-role credentials in the browser.
+- Show a visible fallback alert if audio is unavailable or disabled. Do not rely on sound alone.
+- Realtime subscriptions must be cleaned up when the merchant dashboard unmounts.

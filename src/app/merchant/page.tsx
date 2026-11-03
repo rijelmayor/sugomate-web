@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateMerchantOrderStatus } from "./actions";
 import FormSubmitButton from "@/components/FormSubmitButton";
+import MerchantNewOrderAlert from "@/components/merchant/MerchantNewOrderAlert";
 
 const statusLabels: Record<string, string> = {
   pending_merchant: "New order",
@@ -51,6 +52,8 @@ export default async function MerchantPortal({ searchParams }: {
         <Link href="/dashboard" className="text-sm font-black tracking-wide">SUGOMATE <span className="font-medium text-slate-400">/ Merchant</span></Link>
         <nav className="flex items-center gap-2"><Link href="/customer" className="rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold transition hover:-translate-y-0.5 hover:shadow-md">Marketplace</Link><Link href="/dashboard" className="rounded-full bg-[#102e57] px-4 py-2 text-sm font-bold text-white">My account</Link></nav>
       </header>
+
+      <MerchantNewOrderAlert merchantIds={approvedIds} />
 
       <section className="mt-7 rounded-3xl bg-[#102e57] p-6 text-white sm:p-8">
         <p className="text-xs font-black uppercase tracking-[.18em] text-[#ffbd18]">Merchant workspace</p>
