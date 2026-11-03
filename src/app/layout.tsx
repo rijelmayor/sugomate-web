@@ -7,6 +7,6 @@ export const metadata: Metadata = {
   applicationName: "SUGOMATE",
   openGraph: { title: "SUGOMATE — Imong sugo, kami bahala.", description: "Order, request, and deliver in one app.", url: "https://sugomate.com", siteName: "SUGOMATE", type: "website" }
 };
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode> }) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en"><body>{children}</body></html>;
 }
