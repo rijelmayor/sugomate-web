@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import { applyAsDriver, applyAsMerchant, signOut } from "./actions";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
-  const { error, success } = await searchParams;
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; partner?: string }> }) {
+  const { error, success, partner } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -46,12 +46,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Link href="/customer/addresses" className="group rounded-2xl border border-orange-100 bg-white p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100/70"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-2xl">📍</span><h2 className="mt-4 font-black">Delivery addresses</h2><p className="mt-1 text-sm leading-5 text-slate-500">Save your home, work, and favorite drop-off points.</p><p className="mt-4 text-sm font-extrabold text-orange-600">Manage addresses →</p></Link>
       </section>
 
-      <section className="mt-8 rounded-3xl border border-orange-100 bg-white p-5 sm:p-6">
+      <section id="merchant-application" className="mt-8 rounded-3xl border border-orange-100 bg-white p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[.18em] text-orange-600">Grow with us</p><h2 className="mt-1 text-xl font-black">Be part of the SUGOMATE community</h2><p className="mt-1 text-sm text-slate-500">Run a local store or deliver orders around your area.</p></div><span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">Partner opportunities</span></div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <details className="group rounded-2xl border border-orange-100 bg-[#fffaf5] p-4">
+          <details open={partner === "merchant"} className="group rounded-2xl border border-orange-100 bg-[#fffaf5] p-4">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-orange-100 text-xl">🏪</span><span><strong className="block text-sm">Merchant partner</strong><span className="text-xs text-slate-500">{hasMerchant ? "Application already on file" : "List your store on SUGOMATE"}</span></span></span><span className="grid h-8 w-8 place-items-center rounded-full bg-white text-lg transition group-open:rotate-45">＋</span></summary>
-            {hasMerchant ? <p className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600">Your store: {(merchants ?? []).map(m => (m.merchants as unknown as {name:string;status:string} | null)?.name).filter(Boolean).join(", ")}. Application status is available through operations.</p> : <form action={applyAsMerchant} className="mt-4 space-y-3"><input required name="business_name" placeholder="Business / store name" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><input required name="business_slug" placeholder="Store URL name (e.g. juans-store)" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Submit merchant application</button></form>}
+            {hasMerchant ? <div className="mt-4 space-y-3">{(merchants ?? []).map((m) => {
+              const store = m.merchants as unknown as { name: string; status: string } | null;
+              if (!store) return null;
+              const status = store.status?.toLowerCase() || "pending";
+              const statusStyle = status === "approved" ? "bg-green-50 text-green-700" : status === "rejected" ? "bg-red-50 text-red-700" : status === "suspended" ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-800";
+              const statusLabel = status === "approved" ? "Approved" : status === "rejected" ? "Not approved" : status === "suspended" ? "Suspended" : "Pending review";
+              return <div key={m.merchant_id} className="rounded-xl bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-700">Your store: {store.name}</p><span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyle}`}>{statusLabel}</span></div>
+                {status === "approved" ? <Link href="/merchant" className="mt-3 inline-flex rounded-full bg-[#102e57] px-4 py-2 text-sm font-bold text-white">Open Merchant Portal →</Link> : status === "rejected" ? <p className="mt-2 text-sm text-slate-600">Your application was not approved. Please contact SUGOMATE Operations for the review details.</p> : status === "suspended" ? <p className="mt-2 text-sm text-slate-600">Your merchant access is currently suspended. Please contact SUGOMATE Operations.</p> : <p className="mt-2 text-sm text-slate-600">Your application has been received and is waiting for review by SUGOMATE Operations.</p>}
+              </div>;
+            })}</div> : <form action={applyAsMerchant} className="mt-4 space-y-3"><input required name="business_name" placeholder="Business / store name" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><input required name="business_slug" placeholder="Store URL name (e.g. juans-store)" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"/><button className="rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Submit merchant application</button></form>}
           </details>
           <details className="group rounded-2xl border border-orange-100 bg-[#fffaf5] p-4">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-xl">🛵</span><span><strong className="block text-sm">Delivery partner</strong><span className="text-xs text-slate-500">{driver ? `Application status: ${driver.status}` : "Earn by delivering in your area"}</span></span></span><span className="grid h-8 w-8 place-items-center rounded-full bg-white text-lg transition group-open:rotate-45">＋</span></summary>
