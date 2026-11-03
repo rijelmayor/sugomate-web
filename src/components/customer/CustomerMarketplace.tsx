@@ -134,7 +134,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
             <select name="municipality_id" required defaultValue="" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
             <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio, barangay" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
             <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
-          </div>
+          </div>}
           <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
           <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]"/>
           <input type="hidden" name="items" value={JSON.stringify(items.map(({product, quantity}) => ({product_id:product.id,quantity})))} />
