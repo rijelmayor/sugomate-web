@@ -10,6 +10,25 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect("/login?error=credentials");
+  if (error) {
+    if (error.code === "email_not_confirmed" || error.message.toLowerCase().includes("email not confirmed")) {
+      redirect("/login?error=confirmation");
+    }
+    redirect("/login?error=credentials");
+  }
   redirect("/dashboard");
+}
+
+export async function resendConfirmation(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) redirect("/login?error=missing-email");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: "https://sugomate.com/auth/callback" },
+  });
+  if (error) redirect("/login?error=resend");
+  redirect("/login?success=resent");
 }
