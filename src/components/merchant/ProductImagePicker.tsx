@@ -35,8 +35,8 @@ async function compressToWebp(source: File): Promise<File> {
         return new File([blob], `${baseName}.webp`, { type: "image/webp", lastModified: Date.now() });
       }
 
-      width = Math.max(640, Math.round(width * 0.82));
-      height = Math.max(640, Math.round(height * 0.82));
+      width = Math.max(1, Math.round(width * 0.82));
+      height = Math.max(1, Math.round(height * 0.82));
     }
     throw new Error("Could not compress this photo below 4.5 MB. Please choose a smaller photo.");
   } finally {
