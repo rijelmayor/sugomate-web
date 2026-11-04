@@ -130,7 +130,8 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Regression coverage:** Add catalog assertions to ensure each policy references `storage.foldername(name)` and never `storage.foldername(m.name)`.
 - **Deployment status (2026-11-05):** PR #36 merged to `main` (merge commit `bce23a7d6879fda332a557bfad59b8fe3b4f18e1`). Supabase migration history now includes `20261104190907_fix_merchant_product_image_storage_policy` and `20261104190923_qualify_product_image_storage_object_path`.
 - **Database verification:** Live `pg_policies` inspection confirms exactly one INSERT, one UPDATE, and one DELETE policy for product images. All three bind merchant membership to `storage.foldername(objects.name)[1]`, check the authenticated user folder and approved merchant status. Regression SQL assertion passed; stale `storage.foldername(m.name)` reference count is zero.
-- **Residual verification:** A real authenticated camera/gallery upload and negative cross-merchant upload attempt have not yet been executed from a merchant browser session. Keep the finding operationally under observation until those tests pass.
+- **Positive runtime test (2026-11-05):** User supplied a screenshot from the live `/merchant` portal showing the green “Product saved successfully.” confirmation after the requested product-photo save test. This confirms the merchant save flow now completes successfully after the policy correction. The screenshot does not independently expose the stored object MIME/path, so WebP metadata verification remains outstanding.
+- **Negative runtime test outstanding:** Cross-merchant and foreign-user upload denial has not yet been exercised from a separate authenticated account. Keep the authorization-isolation portion open until that test passes.
 
 ## Iteration maintenance rule
 
