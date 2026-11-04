@@ -11,9 +11,15 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: roles }, { count: orderCount }, { data: categories }, { data: municipalities }, { data: addresses }] = await Promise.all([
+  const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+  const roleSet = new Set((roles ?? []).map(row => row.role));
+  if (roleSet.has("admin")) redirect("/admin");
+  if (roleSet.has("driver")) redirect("/driver");
+  if (roleSet.has("merchant")) redirect("/merchant");
+  if (!roleSet.has("customer")) redirect("/login?error=role");
+
+  const [{ data: profile }, { count: orderCount }, { data: categories }, { data: municipalities }, { data: addresses }] = await Promise.all([
     supabase.from("profiles").select("display_name,phone,status").eq("id", user.id).maybeSingle(),
-    supabase.from("user_roles").select("role").eq("user_id", user.id),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id),
     supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order"),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
@@ -24,11 +30,6 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
   const { data: productRows, error: productError } = await productQuery;
   const products = productError ? [] : (productRows ?? []).map(row => ({ ...row, price: Number(row.price), merchant: Array.isArray(row.merchant) ? row.merchant[0] : row.merchant, branch: Array.isArray(row.branch) ? row.branch[0] : row.branch }));
-  const roleSet = new Set((roles ?? []).map(row => row.role));
-  if (roleSet.has("admin")) redirect("/admin");
-  if (roleSet.has("driver")) redirect("/driver");
-  if (roleSet.has("merchant")) redirect("/merchant");
-  if (!roleSet.has("customer")) redirect("/login?error=role");
   const roleNames = "customer";
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
 
