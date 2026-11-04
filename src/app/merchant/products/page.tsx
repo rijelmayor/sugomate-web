@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createMerchantBranch, deleteMerchantProduct, saveMerchantProduct } from "../product-actions";
 import ProductImagePicker from "@/components/merchant/ProductImagePicker";
+import PortalSignOut from "@/components/PortalSignOut";
 
 type Params = { error?: string; saved?: string; created?: string; deleted?: string };
 
@@ -30,7 +31,7 @@ export default async function MerchantProductsPage({ searchParams }: { searchPar
     <div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><Link href="/merchant" className="text-sm font-black">SUGOMATE <span className="font-medium text-slate-400">/ Merchant</span></Link><h1 className="mt-2 text-2xl font-black sm:text-3xl">Product catalogue</h1><p className="mt-1 text-sm text-slate-500">Manage what customers can discover and order from your store.</p></div>
-        <nav className="flex gap-2"><Link href="/merchant" className="rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold">Orders</Link><Link href="/merchant" className="rounded-full bg-[#102e57] px-4 py-2 text-sm font-bold text-white">Orders</Link></nav>
+        <nav className="flex gap-2"><Link href="/merchant" className="rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold">Orders</Link><Link href="/merchant" className="rounded-full bg-[#102e57] px-4 py-2 text-sm font-bold text-white">Orders</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold"/></nav>
       </header>
       {(params.error || params.saved || params.created || params.deleted) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{params.error ? (params.error === "image" ? "Photo upload failed. Use a JPG, PNG or WEBP image up to 5 MB and try again." : "We could not save that. Check the fields and try again.") : params.created ? "Store branch added." : params.deleted ? "Product deleted." : "Product saved successfully."}</p>}
       {!approved.length ? <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6"><h2 className="font-black">No approved store found</h2><p className="mt-2 text-sm text-amber-900">Product management becomes available after Operations approves your merchant application.</p><Link href="/dashboard" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Return to account</Link></section> : <>
