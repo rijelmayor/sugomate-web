@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
-import { signOut } from "./actions";
+import { signOut } from "../dashboard/actions";
 
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; category?: string; municipality?: string }> }) {
   const { error, category, municipality } = await searchParams;
