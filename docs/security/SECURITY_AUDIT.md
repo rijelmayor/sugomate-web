@@ -121,11 +121,22 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Residual risk:** Browser-side conversion uses client CPU/memory; the source file is capped at 20 MiB. Browser WebP encoding support is required. The product-images bucket is public by design and must contain only public product photos.
 - **Verification required:** Confirm camera and gallery images display after save, verify uploaded object MIME/extension and dimensions, verify conversion and size reduction, and confirm invalid/oversized inputs are rejected.
 
+## SEC-010 — Product image Storage RLS checks the wrong object-path source
+
+- **Severity:** HIGH for merchant product-photo upload availability; no cross-tenant exposure identified in the inspected policy.
+- **Status:** Confirmed in the live Supabase `storage.objects` INSERT policy on 2026-11-05. The predicate compared `merchant_members.merchant_id` with `storage.foldername(m.name)[1]` (the merchant's display name) instead of the object path `storage.foldername(name)[1]`. UPDATE and DELETE policies contained the same incorrect reference.
+- **Impact:** A correctly authenticated, approved merchant uploading to the documented `{merchant_id}/{user_id}/{filename}` path can be denied by Storage RLS. This explains the product-photo upload failure even though the bucket permits WebP and the file size is within limits.
+- **Remediation in this change:** Recreate INSERT, UPDATE, and DELETE policies to compare membership against the first folder segment of the actual Storage object name. Keep the second segment bound to `auth.uid()` and require an approved merchant membership. No public read or cross-merchant write permission is added.
+- **Regression coverage:** Add catalog assertions to ensure each policy references `storage.foldername(name)` and never `storage.foldername(m.name)`.
+- **Verification required:** Apply migration, run SQL assertions, then test upload as an approved merchant, denial as a non-member/unapproved merchant, and denial when the object path contains another merchant ID or another user's UID. Re-run Supabase Security Advisor.
+
 ## Iteration maintenance rule
 
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — SEC-010 confirmed and policy correction prepared.** Live Storage policy inspection found INSERT/UPDATE/DELETE predicates incorrectly using `storage.foldername(m.name)`. Added a migration to use the actual object path and regression assertions. Pending migration application and live positive/negative upload tests; do not mark closed yet.
 
 - **2026-11-05 — Product image storage normalization (SEC-008/SEC-009).** Added browser-side WebP conversion and resizing for merchant camera/gallery uploads, a bounded 6 MiB Server Action request limit, server-side WebP signature validation, and a 5 MiB upload cap. Pending preview and device verification; do not mark closed until tests pass.
 
