@@ -29,7 +29,7 @@ export default function ProductImagePicker({ initialUrl = "" }: { initialUrl?: s
   }
 
   return <div className="sm:col-span-2">
-    <span className="text-xs font-bold">Product photo</span>
+    <span className="text-xs font-bold">Product photo</span><input type="hidden" name="image_url" value={initialUrl}/>
     <div className="mt-2 grid gap-3 sm:grid-cols-[160px_1fr]">
       <div className="grid min-h-36 place-items-center overflow-hidden rounded-2xl border border-dashed border-orange-200 bg-orange-50">
         {preview ? <img src={preview} alt="Product photo preview" className="h-36 w-full object-cover"/> : <div className="text-center text-orange-400"><div className="text-4xl">📷</div><p className="mt-1 text-[10px] font-bold">Photo preview</p></div>}
