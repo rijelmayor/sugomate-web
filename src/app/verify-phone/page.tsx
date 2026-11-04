@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { verifyRegistrationPhone, resendRegistrationPhoneOtp } from "@/app/register/actions";
+import FormSubmitButton from "@/components/FormSubmitButton";
 
 const messages: Record<string,string> = {
   invalid: "That code is incorrect. You have up to five attempts.",
@@ -24,9 +25,9 @@ export default async function VerifyPhonePage({ searchParams }: { searchParams: 
       <form action={verifyRegistrationPhone} className="mt-7 space-y-4">
         <input type="hidden" name="email" value={email}/><input type="hidden" name="next" value={safeNext}/>
         <label className="block text-sm font-bold">Six-digit verification code<input required name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" placeholder="000000" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-2xl tracking-[.4em] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label>
-        <button className="w-full rounded-xl bg-[#102e57] px-4 py-3 font-bold text-white">Verify mobile number</button>
+        <FormSubmitButton pendingLabel="Verifying…" className="w-full rounded-xl bg-[#102e57] px-4 py-3 font-bold text-white">Verify mobile number</FormSubmitButton>
       </form>
-      <form action={resendRegistrationPhoneOtp} className="mt-3"><input type="hidden" name="email" value={email}/><button className="w-full rounded-xl border border-orange-200 px-4 py-3 text-sm font-bold text-orange-700">Resend code</button></form>
+      <form action={resendRegistrationPhoneOtp} className="mt-3"><input type="hidden" name="email" value={email}/><input type="hidden" name="next" value={safeNext}/><FormSubmitButton pendingLabel="Sending…" className="w-full rounded-xl border border-orange-200 px-4 py-3 text-sm font-bold text-orange-700">Resend code</FormSubmitButton></form>
       <p className="mt-6 text-center text-sm text-slate-500">Already verified? <Link href={`/login?next=${encodeURIComponent(safeNext)}`} className="font-extrabold text-orange-600">Sign in</Link></p>
     </div>
   </main>;
