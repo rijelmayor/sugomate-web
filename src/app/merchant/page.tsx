@@ -63,7 +63,7 @@ export default async function MerchantPortal({ searchParams }: {
       </section>
 
       {params.updated && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">Order status updated.</p>}
-      {params.error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">We couldn't update that order. Refresh and try again.</p>}
+      {params.error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">We could not update that order. Refresh and try again.</p>}
 
       {merchantRows.some(m => m.merchant?.status !== "approved") && <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-extrabold">Store approval pending</h2><p className="mt-1 text-sm text-amber-900/75">Your store must be approved by SUGOMATE operations before you can receive and manage customer orders.</p>{merchantRows.filter(m => m.merchant?.status !== "approved").map(m => <p key={m.id} className="mt-2 text-sm font-semibold">{m.merchant?.name}: <span className="capitalize">{m.merchant?.status}</span></p>)}</section>}
 
