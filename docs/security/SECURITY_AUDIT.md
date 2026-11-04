@@ -133,11 +133,22 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Positive runtime test (2026-11-05):** User supplied a screenshot from the live `/merchant` portal showing the green “Product saved successfully.” confirmation after the requested product-photo save test. This confirms the merchant save flow now completes successfully after the policy correction. The screenshot does not independently expose the stored object MIME/path, so WebP metadata verification remains outstanding.
 - **Negative runtime test outstanding:** Cross-merchant and foreign-user upload denial has not yet been exercised from a separate authenticated account. Keep the authorization-isolation portion open until that test passes.
 
+## SEC-011 — Product-photo presentation consistency
+
+- **Severity:** LOW (presentation/usability; no authorization defect identified).
+- **Status:** Improvement prepared in PR for the merchant capture preview and customer marketplace cards.
+- **Change:** Use a consistent 4:3 image frame with `object-contain`, a soft neutral background, and padding. This preserves the complete product photo rather than cropping edges with `object-cover`/CSS background cover. Use a real `img` element with lazy loading and async decoding for marketplace photos; failed image loads fall back to the placeholder.
+- **Security assessment:** No new database, Storage, authentication, or authorization permissions. Product image URLs remain data values rendered as image sources rather than interpolated into CSS background declarations. Existing public product-image bucket behavior is unchanged.
+- **Verification:** Check portrait and landscape camera photos, gallery photos, WebP photos, and missing/broken image fallback on narrow Android screens and desktop. Confirm no image overflow and that product names and add-to-cart controls remain visible.
+
 ## Iteration maintenance rule
 
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — SEC-011 presentation refinement prepared.** Standardized merchant preview and customer marketplace photo frames to 4:3 with full-image contain behavior. No new privileged access or Storage policy changes. Visual device checks pending.
+
 
 - **2026-11-05 — SEC-010 policy correction deployed and database-verified.** PR #36 merged. Production migration history contains both Storage policy corrections. Live policy assertions passed: INSERT/UPDATE/DELETE policies exist, use the actual object path, retain user-folder and approved-membership guards, and contain zero stale merchant-name path references. Real browser upload and cross-tenant denial tests remain pending; keep operational closure conditional on those tests.
 

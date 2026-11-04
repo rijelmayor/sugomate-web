@@ -93,8 +93,8 @@ export default function ProductImagePicker({ initialUrl = "" }: { initialUrl?: s
   return <div className="sm:col-span-2">
     <span className="text-xs font-bold">Product photo</span><input type="hidden" name="image_url" value={initialUrl}/>
     <div className="mt-2 grid gap-3 sm:grid-cols-[160px_1fr]">
-      <div className="grid min-h-36 place-items-center overflow-hidden rounded-2xl border border-dashed border-orange-200 bg-orange-50">
-        {preview ? <img src={preview} alt="Product photo preview" className="h-36 w-full object-cover"/> : <div className="text-center text-orange-400"><div className="text-4xl">📷</div><p className="mt-1 text-[10px] font-bold">Photo preview</p></div>}
+      <div className="grid aspect-[4/3] min-h-36 place-items-center overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-50">
+        {preview ? <img src={preview} alt="Product photo preview" className="h-full max-h-48 w-full object-contain p-3"/> : <div className="text-center text-orange-400"><div className="text-4xl">📷</div><p className="mt-1 text-[10px] font-bold">Full photo preview</p></div>}
       </div>
       <div className="flex flex-col justify-center gap-2">
         <label className={`flex items-center justify-center gap-2 rounded-xl bg-[#102e57] px-4 py-3 text-sm font-bold text-white ${processing ? "cursor-wait opacity-60" : "cursor-pointer"}`}>
