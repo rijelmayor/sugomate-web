@@ -18,6 +18,17 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 
 ## Findings and remediation status
 
+### SEC-008 — Merchant product camera upload exceeds Server Action request limit
+
+- **Severity:** LOW security exposure / HIGH user-impact availability defect.
+- **Status:** Root cause confirmed from production Vercel runtime logs on 2026-11-04.
+- **Evidence:** The `POST /merchant/products` request failed with HTTP 413 and `Body exceeded 1 MB limit`, digest `3759789597`. The merchant product action accepts images up to 5 MiB, but Next.js Server Actions retained their default 1 MiB request-body limit. Camera-captured photos commonly exceed that default, so the request is rejected before the action can validate or upload the image.
+- **Impact:** Editing an existing product with a camera photo fails; adding a new product with a large camera photo can fail for the same reason. The screenshot digest matches the production runtime log.
+- **Remediation in this change:** Set the Next.js Server Action body limit to 6 MiB, just above the existing 5 MiB server-side image limit to allow multipart overhead. Preserve the action's server-side MIME and 5 MiB file-size checks.
+- **Risk trade-off:** The request-body ceiling is larger for all Server Actions, increasing maximum accepted payload size. The cap remains finite at 6 MiB; product file validation remains 5 MiB and authenticated merchant access remains required. Revisit direct-to-Storage upload if future forms need larger files.
+- **Verification required:** Confirm preview build; test existing-product camera replacement, new-product camera upload, gallery upload, invalid MIME, and file larger than 5 MiB. Confirm an upload above the request cap is rejected without a server exception.
+
+
 ### SEC-001 — Protected profile fields are not constrained by the self-update policy
 
 - **Severity:** MEDIUM latent risk; no direct authenticated Data API UPDATE grant observed at audit time.
@@ -109,6 +120,8 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — SEC-008 identified and remediation proposed.** Production runtime logs tied the user-reported digest to Next.js Server Actions' default 1 MiB request-body cap. Proposed a 6 MiB cap aligned with the existing 5 MiB product image validation. Preview and device testing pending; do not mark resolved until verified.
 
 - **2026-11-04 — Initial audit and authorization hardening proposal.** Follow-up privilege checks corrected the initial severity assessment for SEC-001/002: the broad policies were present, but direct UPDATE grants were absent. Added proposed trigger-based defense-in-depth and explicit revokes in the migration accompanying this report. Pending CI, migration application, and runtime verification.
 
