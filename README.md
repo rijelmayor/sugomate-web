@@ -38,3 +38,6 @@ See [docs/ECOSYSTEM_OVERVIEW.md](docs/ECOSYSTEM_OVERVIEW.md) for the approved fi
 The delivery partner operations workflow adds `supabase/migrations/20261104100000_driver_dispatch_delivery_proof.sql`. Apply migrations in timestamp order before verifying driver availability, dispatch assignment, pickup/transit updates, and private delivery proof access.
 
 Cash on delivery is the initial checkout method. Do not enable GCash until a separate payment integration and reconciliation plan is approved.
+
+
+Merchant product images: the product catalogue supports direct camera capture on compatible phones and gallery selection. Images are validated (JPG/PNG/WEBP, maximum 5 MB), uploaded to the `product-images` Supabase Storage bucket, and saved as public product image URLs. Apply `20261104110000_merchant_product_image_storage.sql` after the delivery proof migration.
