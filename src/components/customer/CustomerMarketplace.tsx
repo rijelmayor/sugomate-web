@@ -11,7 +11,7 @@ type Product = {
   description: string | null;
   price: number | string;
   image_url: string | null;
-  merchant: { name: string; slug: string } | null;
+  merchant: { name: string; slug: string; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
 
@@ -31,12 +31,14 @@ function CheckoutSubmitButton({ disabled }: { disabled: boolean }) {
   </button>;
 }
 
-export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, addresses, checkoutError }: {
+export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError }: {
   products: Product[];
   categories: { id: string; name: string; slug: string; icon: string }[];
   selectedCategory: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
+  merchantCategories?: { id: string; name: string; slug: string; icon: string }[];
+  selectedMerchantCategory?: string;
   addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
   checkoutError?: string;
 }) {
@@ -47,7 +49,7 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   const items = Object.values(cart);
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-  const visible = useMemo(() => products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.merchant?.name.toLowerCase().includes(search.toLowerCase())), [products, search]);
+  const visible = useMemo(() => products.filter(p => (!search || p.name.toLowerCase().includes(search.toLowerCase()) || p.merchant?.name.toLowerCase().includes(search.toLowerCase())) && (!selectedMerchantCategory || p.merchant?.store_category?.slug === selectedMerchantCategory)), [products, search, selectedMerchantCategory]);
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId);
@@ -83,6 +85,8 @@ export default function CustomerMarketplace({ products, categories, selectedCate
           </form>
         </div>
       </div>
+
+      {merchantCategories.length > 0 && <div className="mt-5"><p className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">Shop by store type</p><div aria-label="Store categories" className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"><a href={`/customer${selectedMunicipality ? `?municipality=${selectedMunicipality}` : ""}`} className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-4 py-2 text-xs font-bold ${!selectedMerchantCategory ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>All stores</a>{merchantCategories.map(item => <a key={item.id} href={`/customer?storeCategory=${item.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-4 py-2 text-xs font-bold ${selectedMerchantCategory === item.slug ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>{item.icon} {item.name}</a>)}</div></div>}
 
       <div aria-label="Product categories" className="mt-5 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
         <a href="/customer" aria-current={!selectedCategory ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-5 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${!selectedCategory ? "bg-[#102e57] text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={!selectedCategory ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>All</a>
