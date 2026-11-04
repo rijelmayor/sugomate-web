@@ -12,7 +12,8 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
   const {data:orders}=await supabase.from("orders").select("id,order_number,status,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,delivery_proof_path,driver_note,merchants(name),order_items(id,product_name,quantity,line_total)").eq("customer_id",user.id).order("placed_at",{ascending:false}).limit(50);
   const orderIds=(orders??[]).map(order=>order.id);
   const {data:history}=orderIds.length?await supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id",orderIds).order("created_at",{ascending:true}):{data:[]};
-  const historyByOrder=new Map<string,typeof history>(orderIds.map(id=>[id,(history??[]).filter(event=>event.order_id===id)]));
+  const historyByOrder=new Map<string,{id:string;order_id:string;to_status:string;note:string|null;created_at:string}[]>();
+  for(const id of orderIds) historyByOrder.set(id,(history??[]).filter(event=>event.order_id===id));
   const proofUrls=new Map<string,string>();
   for(const order of orders??[]){
     if(order.delivery_proof_path){
