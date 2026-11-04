@@ -57,3 +57,19 @@ export async function setMunicipalityServiceability(formData: FormData) {
   if (error) redirect("/admin?error=area");
   redirect("/admin?updated=area");
 }
+
+
+export async function assignOrderToDriver(formData: FormData) {
+  const supabase = await requireAdmin();
+  const orderId = String(formData.get("order_id") ?? "");
+  const driverUserId = String(formData.get("driver_user_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId) || !/^[0-9a-f-]{36}$/i.test(driverUserId)) {
+    redirect("/admin/dispatch?error=invalid");
+  }
+  const { error } = await supabase.rpc("admin_assign_order_to_driver", {
+    p_order_id: orderId,
+    p_driver_user_id: driverUserId,
+  });
+  if (error) redirect("/admin/dispatch?error=assignment");
+  redirect("/admin/dispatch?updated=assigned");
+}
