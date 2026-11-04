@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import PortalSignOut from "@/components/PortalSignOut";
 import { assignMerchantCategory, saveMerchantCategory } from "./actions";
 
 type Params = { error?: string; saved?: string; assigned?: string };
@@ -21,7 +22,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
     <div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">SUGOMATE / Admin</p><h1 className="mt-1 text-3xl font-black">Store categories</h1><p className="mt-1 text-sm text-slate-500">Create the types of businesses that can join the marketplace, then assign each merchant to a category.</p></div>
-        <Link href="/admin" className="rounded-full bg-[#102b4e] px-5 py-3 text-sm font-bold text-white">Back to operations</Link>
+        <div className="flex flex-wrap items-center gap-2"><Link href="/admin" className="rounded-full bg-[#102b4e] px-5 py-3 text-sm font-bold text-white">Back to operations</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-bold"/></div>
       </header>
       {(params.error || params.saved || params.assigned) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{params.error ? "The change could not be saved. Check that the name is unique and the fields are valid." : params.assigned ? "Merchant category updated." : "Store category saved."}</p>}
       <section className="mt-6 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
