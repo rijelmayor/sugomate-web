@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import PortalSignOut from "@/components/PortalSignOut";
 
 const labels: Record<string,string> = {pending_merchant:"Awaiting store",accepted:"Accepted",preparing:"Preparing",ready_for_pickup:"Ready for pickup",assigned:"Driver assigned",picked_up:"Picked up",in_transit:"On the way",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
 
@@ -22,7 +23,7 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
     }
   }
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">
-    <Link href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</Link>
+    <div className="flex items-center justify-between gap-3"><Link href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div>
     <h1 className="mt-5 text-3xl font-black">My orders</h1><p className="mt-2 text-sm text-slate-500">Follow your orders from store confirmation through delivery.</p>
     {params.placed&&<div role="status" className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">Your order was submitted. The store will review and confirm it shortly.</div>}
     <div className="mt-6 space-y-4">{(orders??[]).length?(orders??[]).map(o=><article key={o.id} className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
