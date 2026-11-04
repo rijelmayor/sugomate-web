@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const requestedNext = String(formData.get("next") ?? "");
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/dashboard";
   if (!email || !password) redirect("/login?error=missing");
 
   const supabase = await createClient();
@@ -16,7 +18,7 @@ export async function signIn(formData: FormData) {
     }
     redirect("/login?error=credentials");
   }
-  redirect("/dashboard");
+  redirect(next);
 }
 
 export async function resendConfirmation(formData: FormData) {

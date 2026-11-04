@@ -10,8 +10,9 @@ const errors: Record<string, string> = {
   resend: "We couldn't send a new confirmation email. Please try again shortly.",
 };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
-  const { error, success } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; next?: string }> }) {
+  const { error, success, next } = await searchParams;
+  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-12 text-[#102e57]">
     <div className="mx-auto max-w-md rounded-3xl border border-orange-100 bg-white p-8 shadow-xl shadow-orange-100/60">
       <Link href="/" className="text-sm font-extrabold text-orange-600">← SUGOMATE</Link>
@@ -29,12 +30,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </form>
       </section> : error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{errors[error] ?? "Unable to sign in. Please try again."}</p>}
       {success === "resent" && <p role="status" className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900">If the address is registered and still needs confirmation, a new confirmation email has been requested. Check your Inbox and Spam folders.</p>}
-      <form action={signIn} className="mt-7 space-y-4">
+      <form action={signIn} className="mt-7 space-y-4"><input type="hidden" name="next" value={safeNext}/>
         <label className="block text-sm font-bold">Email address<input required name="email" type="email" autoComplete="email" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label>
         <label className="block text-sm font-bold">Password<input required name="password" type="password" autoComplete="current-password" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label>
         <AuthSubmitButton pendingLabel="Signing you in…">Sign in</AuthSubmitButton>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-500">New to SUGOMATE? <Link href="/register" className="font-extrabold text-orange-600">Create an account</Link></p>
+      <p className="mt-6 text-center text-sm text-slate-500">New to SUGOMATE? <Link href={`/register?next=${encodeURIComponent(safeNext)}`} className="font-extrabold text-orange-600">Create an account</Link></p>
     </div>
   </main>;
 }
