@@ -5,7 +5,7 @@ import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
 import { signOut } from "../dashboard/actions";
 
-export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; category?: string; municipality?: string }> }) {
+export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; category?: string; municipality?: string; storeCategory?: string }> }) {
   const { error, category, municipality, storeCategory } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -29,7 +29,6 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   let productQuery = supabase.from("products").select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey(name,municipality_id,municipalities(name)),category:product_categories!products_category_id_fkey(slug)").eq("is_available", true).order("created_at", { ascending: false }).limit(60);
   if (category) productQuery = productQuery.eq("category.slug", category);
   if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
-  if (storeCategory) productQuery = productQuery.eq("merchant.store_category.slug", storeCategory);
   const { data: productRows, error: productError } = await productQuery;
   const products = productError ? [] : (productRows ?? []).map(row => ({ ...row, price: Number(row.price), merchant: Array.isArray(row.merchant) ? row.merchant[0] : row.merchant, branch: Array.isArray(row.branch) ? row.branch[0] : row.branch }));
   const roleNames = "customer";
