@@ -234,3 +234,17 @@ grant execute on function public.admin_assign_order_to_driver(uuid,uuid) to auth
 grant execute on function public.driver_set_availability(boolean) to authenticated;
 grant execute on function public.driver_respond_to_assignment(uuid,boolean) to authenticated;
 grant execute on function public.driver_update_order_status(uuid,text,text,text) to authenticated;
+
+
+drop policy if exists "Customers read proof for their delivered orders" on storage.objects;
+create policy "Customers read proof for their delivered orders"
+on storage.objects for select to authenticated
+using (
+  bucket_id = 'delivery-proofs'
+  and exists (
+    select 1 from public.orders o
+    where o.delivery_proof_path = storage.objects.name
+      and o.customer_id = (select auth.uid())
+      and o.status = 'delivered'
+  )
+);
