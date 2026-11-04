@@ -22,7 +22,7 @@ export default async function AdminControlCenter({ searchParams }: { searchParam
   const [merchantsQ, driversQ, ordersQ, zonesQ, municipalitiesQ, usersQ, logsQ] = await Promise.all([
     supabase.from("merchants").select("id,owner_id,name,slug,status,submitted_at,description").in("status", ["pending", "approved", "rejected", "suspended"]).order("submitted_at", { ascending: false }).limit(100),
     supabase.from("driver_profiles").select("user_id,status,vehicle_type,vehicle_plate,license_storage_path,id_storage_path,created_at").order("created_at", { ascending: false }).limit(100),
-    supabase.from("orders").select("id,order_number,status,payment_method,payment_status,total,placed_at,merchant_id,customer_id").order("placed_at", { ascending: false }).limit(12),
+    supabase.from("orders").select("id,order_number,status,payment_method,payment_status,total,placed_at,merchant_id,customer_id").order("placed_at", { ascending: false }).limit(100),
     supabase.from("service_zones").select("id,municipality_id,name,is_active,base_delivery_fee,created_at").order("created_at"),
     supabase.from("municipalities").select("id,name,province,is_serviceable").order("name"),
     supabase.from("profiles").select("id,display_name,phone,status,created_at").order("created_at", { ascending: false }).limit(10),
