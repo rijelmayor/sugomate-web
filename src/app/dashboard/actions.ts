@@ -15,30 +15,30 @@ export async function applyAsMerchant(formData: FormData) {
   const name = String(formData.get("business_name") ?? "").trim();
   const slug = String(formData.get("business_slug") ?? "").trim().toLowerCase()
     .normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (!name || slug.length < 3) redirect("/dashboard?error=merchant-details");
+  if (!name || slug.length < 3) redirect("/merchant/apply?error=details");
 
   const { data: merchant, error } = await supabase.from("merchants")
     .insert({ owner_id: user.id, name, slug, status: "pending" })
     .select("id").single();
-  if (error || !merchant) redirect("/dashboard?error=merchant-application");
+  if (error || !merchant) redirect("/merchant/apply?error=application");
 
   const { error: memberError } = await supabase.from("merchant_members")
     .insert({ merchant_id: merchant.id, user_id: user.id, member_role: "owner" });
-  if (memberError) redirect("/dashboard?error=merchant-membership");
-  redirect("/dashboard?success=merchant-pending");
+  if (memberError) redirect("/merchant/apply?error=membership");
+  redirect("/merchant/apply?success=submitted");
 }
 
 export async function applyAsDriver(formData: FormData) {
   const { supabase, user } = await requireUser();
   const vehicleType = String(formData.get("vehicle_type") ?? "").trim();
   const vehiclePlate = String(formData.get("vehicle_plate") ?? "").trim();
-  if (!vehicleType) redirect("/dashboard?error=driver-details");
+  if (!vehicleType) redirect("/driver/apply?error=details");
 
   const { error } = await supabase.from("driver_profiles").insert({
     user_id: user.id, vehicle_type: vehicleType, vehicle_plate: vehiclePlate || null, status: "pending",
   });
-  if (error) redirect("/dashboard?error=driver-application");
-  redirect("/dashboard?success=driver-pending");
+  if (error) redirect("/driver/apply?error=application");
+  redirect("/driver/apply?success=submitted");
 }
 
 export async function signOut() {
