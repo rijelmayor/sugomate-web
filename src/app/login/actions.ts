@@ -23,14 +23,16 @@ export async function signIn(formData: FormData) {
 
 export async function resendConfirmation(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!email) redirect("/login?error=missing-email");
+  const requestedNext = String(formData.get("next") ?? "");
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/dashboard";
+  if (!email) redirect(`/login?error=missing-email&next=${encodeURIComponent(next)}`);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
-    options: { emailRedirectTo: "https://sugomate.com/auth/callback" },
+    options: { emailRedirectTo: `https://sugomate.com/auth/callback?next=${encodeURIComponent(next)}` },
   });
-  if (error) redirect("/login?error=resend");
-  redirect("/login?success=resent");
+  if (error) redirect(`/login?error=resend&next=${encodeURIComponent(next)}`);
+  redirect(`/login?success=resent&next=${encodeURIComponent(next)}`);
 }
