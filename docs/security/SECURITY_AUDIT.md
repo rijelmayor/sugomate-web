@@ -128,7 +128,9 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Impact:** A correctly authenticated, approved merchant uploading to the documented `{merchant_id}/{user_id}/{filename}` path can be denied by Storage RLS. This explains the product-photo upload failure even though the bucket permits WebP and the file size is within limits.
 - **Remediation in this change:** Recreate INSERT, UPDATE, and DELETE policies to compare membership against the first folder segment of the actual Storage object name. Keep the second segment bound to `auth.uid()` and require an approved merchant membership. No public read or cross-merchant write permission is added.
 - **Regression coverage:** Add catalog assertions to ensure each policy references `storage.foldername(name)` and never `storage.foldername(m.name)`.
-- **Verification required:** Apply migration, run SQL assertions, then test upload as an approved merchant, denial as a non-member/unapproved merchant, and denial when the object path contains another merchant ID or another user's UID. Re-run Supabase Security Advisor.
+- **Deployment status (2026-11-05):** PR #36 merged to `main` (merge commit `bce23a7d6879fda332a557bfad59b8fe3b4f18e1`). Supabase migration history now includes `20261104190907_fix_merchant_product_image_storage_policy` and `20261104190923_qualify_product_image_storage_object_path`.
+- **Database verification:** Live `pg_policies` inspection confirms exactly one INSERT, one UPDATE, and one DELETE policy for product images. All three bind merchant membership to `storage.foldername(objects.name)[1]`, check the authenticated user folder and approved merchant status. Regression SQL assertion passed; stale `storage.foldername(m.name)` reference count is zero.
+- **Residual verification:** A real authenticated camera/gallery upload and negative cross-merchant upload attempt have not yet been executed from a merchant browser session. Keep the finding operationally under observation until those tests pass.
 
 ## Iteration maintenance rule
 
@@ -136,7 +138,7 @@ Update this file in the same change set whenever code, migration, RLS policy, RP
 
 ## Change log
 
-- **2026-11-05 — SEC-010 confirmed and policy correction prepared.** Live Storage policy inspection found INSERT/UPDATE/DELETE predicates incorrectly using `storage.foldername(m.name)`. Added a migration to use the actual object path and regression assertions. Pending migration application and live positive/negative upload tests; do not mark closed yet.
+- **2026-11-05 — SEC-010 policy correction deployed and database-verified.** PR #36 merged. Production migration history contains both Storage policy corrections. Live policy assertions passed: INSERT/UPDATE/DELETE policies exist, use the actual object path, retain user-folder and approved-membership guards, and contain zero stale merchant-name path references. Real browser upload and cross-tenant denial tests remain pending; keep operational closure conditional on those tests.
 
 - **2026-11-05 — Product image storage normalization (SEC-008/SEC-009).** Added browser-side WebP conversion and resizing for merchant camera/gallery uploads, a bounded 6 MiB Server Action request limit, server-side WebP signature validation, and a 5 MiB upload cap. Pending preview and device verification; do not mark closed until tests pass.
 
