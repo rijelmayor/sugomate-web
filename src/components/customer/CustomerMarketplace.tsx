@@ -100,7 +100,17 @@ export default function CustomerMarketplace({ products, categories, selectedCate
 
       {visible.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map(product => <article key={product.id} className="min-w-0 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-          <div role="img" aria-label={product.name} className="flex h-36 items-center justify-center bg-gradient-to-br from-orange-50 to-amber-100 text-5xl" style={product.image_url ? { backgroundImage: `linear-gradient(#ffffff20,#ffffff20),url("${product.image_url}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>{!product.image_url && "🍽️"}</div>
+          <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-orange-50 via-white to-amber-50">
+            <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-5xl text-orange-300">🍽️</div>
+            {product.image_url && <img
+              src={product.image_url}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />}
+          </div>
           <div className="p-4">
             <h3 className="font-extrabold text-[#102e57]">{product.name}</h3>
             <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">{product.description || product.merchant?.name || "Local favorite"}</p>
