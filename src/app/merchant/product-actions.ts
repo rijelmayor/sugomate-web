@@ -65,13 +65,20 @@ export async function saveMerchantProduct(formData: FormData) {
   let imageUrl = existingImageUrl || null;
   let uploadedPath: string | null = null;
   if (selectedImage) {
-    if (!["image/jpeg", "image/png", "image/webp"].includes(selectedImage.type) ||
-        selectedImage.size > 5 * 1024 * 1024) redirect("/merchant/products?error=image");
-    const extension = selectedImage.type === "image/png" ? "png" :
-      selectedImage.type === "image/webp" ? "webp" : "jpg";
-    uploadedPath = `${merchantId}/${user.id}/${randomUUID()}.${extension}`;
+    // The client picker normalizes all camera/gallery inputs to WebP.
+    // Validate the actual RIFF/WEBP signature as well as the declared MIME type.
+    if (selectedImage.type !== "image/webp" || selectedImage.size > 5 * 1024 * 1024) {
+      redirect("/merchant/products?error=image");
+    }
+    const signature = new Uint8Array(await selectedImage.slice(0, 12).arrayBuffer());
+    const isWebp = signature.length === 12 &&
+      String.fromCharCode(...signature.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...signature.slice(8, 12)) === "WEBP";
+    if (!isWebp) redirect("/merchant/products?error=image");
+
+    uploadedPath = `${merchantId}/${user.id}/${randomUUID()}.webp`;
     const { error: uploadError } = await supabase.storage.from("product-images").upload(uploadedPath, selectedImage, {
-      contentType: selectedImage.type, cacheControl: "3600", upsert: false,
+      contentType: "image/webp", cacheControl: "3600", upsert: false,
     });
     if (uploadError) redirect("/merchant/products?error=image");
     imageUrl = supabase.storage.from("product-images").getPublicUrl(uploadedPath).data.publicUrl;
