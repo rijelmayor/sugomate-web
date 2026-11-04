@@ -6,7 +6,7 @@ import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
 import { signOut } from "../dashboard/actions";
 
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; category?: string; municipality?: string }> }) {
-  const { error, category, municipality } = await searchParams;
+  const { error, category, municipality, storeCategory } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -18,16 +18,18 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   if (roleSet.has("merchant")) redirect("/merchant");
   if (!roleSet.has("customer")) redirect("/login?error=role");
 
-  const [{ data: profile }, { count: orderCount }, { data: categories }, { data: municipalities }, { data: addresses }] = await Promise.all([
+  const [{ data: profile }, { count: orderCount }, { data: categories }, { data: municipalities }, { data: addresses }, { data: merchantCategories }] = await Promise.all([
     supabase.from("profiles").select("display_name,phone,status").eq("id", user.id).maybeSingle(),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id),
     supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order"),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name"),
   ]);
-  let productQuery = supabase.from("products").select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug),branch:merchant_branches!products_branch_id_fkey(name,municipality_id,municipalities(name)),category:product_categories!products_category_id_fkey(slug)").eq("is_available", true).order("created_at", { ascending: false }).limit(60);
+  let productQuery = supabase.from("products").select("id,name,description,price,image_url,merchant:merchants!products_merchant_id_fkey(name,slug,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey(name,municipality_id,municipalities(name)),category:product_categories!products_category_id_fkey(slug)").eq("is_available", true).order("created_at", { ascending: false }).limit(60);
   if (category) productQuery = productQuery.eq("category.slug", category);
   if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
+  if (storeCategory) productQuery = productQuery.eq("merchant.store_category.slug", storeCategory);
   const { data: productRows, error: productError } = await productQuery;
   const products = productError ? [] : (productRows ?? []).map(row => ({ ...row, price: Number(row.price), merchant: Array.isArray(row.merchant) ? row.merchant[0] : row.merchant, branch: Array.isArray(row.branch) ? row.branch[0] : row.branch }));
   const roleNames = "customer";
@@ -50,7 +52,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <div className="relative mt-7 grid grid-cols-2 gap-3 border-t border-white/15 pt-5 sm:max-w-md"><div><p className="text-2xl font-black">{orderCount ?? 0}</p><p className="mt-1 text-xs text-white/65">Orders placed</p></div><div><p className="text-sm font-bold capitalize">{profile?.status || "Active"}</p><p className="mt-1 text-xs text-white/65">Account status · {roleNames}</p></div></div>
       </section>
 
-      <section id="marketplace" className="mt-7 scroll-mt-6"><div className="mb-4"><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">Shop your community</p><h2 className="mt-1 text-2xl font-black">Browse products and order directly</h2></div><CustomerMarketplace products={products as never} categories={categories ?? []} selectedCategory={category ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} addresses={(addresses ?? []) as never} checkoutError={error}/></section>
+      <section id="marketplace" className="mt-7 scroll-mt-6"><div className="mb-4"><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">Shop your community</p><h2 className="mt-1 text-2xl font-black">Browse products and order directly</h2></div><CustomerMarketplace products={products as never} categories={categories ?? []} selectedCategory={category ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={merchantCategories ?? []} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error}/></section>
 
       <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, among ihatod.</footer>
     </div>
