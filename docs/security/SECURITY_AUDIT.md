@@ -104,11 +104,30 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 5. Implement signed, idempotent payment callbacks before enabling online payments.
 6. Complete production secret/configuration review, cross-tenant tests, and backup/restore checks.
 
+## SEC-008 — Product image requests exceed the Next.js Server Action body limit
+
+- **Severity:** LOW–MEDIUM availability risk.
+- **Evidence:** Production Vercel runtime log for `POST /merchant/products` returned HTTP 413, `Body exceeded 1 MB limit`, digest `3759789597`. The picker previously allowed images up to 5 MiB while Next.js used its default 1 MiB Server Action limit.
+- **Remediation in this change:** Set the Server Action request limit to 6 MiB. The image is now compressed in the browser to WebP and limited to 4.5 MiB before form submission; the server retains a 5 MiB hard limit.
+- **Residual risk:** Oversized non-image form fields or a future larger upload feature could still approach the 6 MiB request cap. Do not increase this limit without a corresponding abuse and resource review.
+- **Verification required:** Vercel preview build, camera replacement of an existing product, new product camera upload, gallery upload, and rejection of oversized/invalid files.
+
+## SEC-009 — Product image uploads were stored in original formats without normalization
+
+- **Severity:** LOW (storage efficiency and consistency).
+- **Evidence:** The merchant picker accepted JPG, PNG, and WebP and uploaded the original bytes. High-resolution camera images could consume substantially more storage and bandwidth than necessary.
+- **Remediation in this change:** Convert camera/gallery selections to WebP in the browser before upload, downscale the longest edge to at most 1600 px, iteratively reduce quality/dimensions to a maximum 4.5 MiB, and display the before/after size. Server upload accepts only declared WebP with a verified RIFF/WEBP file signature, stores a `.webp` object with `image/webp` content type, and enforces a 5 MiB hard limit.
+- **Why WebP, not TIFF:** WebP is suitable for browser-rendered product thumbnails and generally provides better size efficiency; TIFF is typically much larger and is not appropriate for this storefront delivery path.
+- **Residual risk:** Browser-side conversion uses client CPU/memory; the source file is capped at 20 MiB. Browser WebP encoding support is required. The product-images bucket is public by design and must contain only public product photos.
+- **Verification required:** Confirm camera and gallery images display after save, verify uploaded object MIME/extension and dimensions, verify conversion and size reduction, and confirm invalid/oversized inputs are rejected.
+
 ## Iteration maintenance rule
 
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — Product image storage normalization (SEC-008/SEC-009).** Added browser-side WebP conversion and resizing for merchant camera/gallery uploads, a bounded 6 MiB Server Action request limit, server-side WebP signature validation, and a 5 MiB upload cap. Pending preview and device verification; do not mark closed until tests pass.
 
 - **2026-11-04 — Initial audit and authorization hardening proposal.** Follow-up privilege checks corrected the initial severity assessment for SEC-001/002: the broad policies were present, but direct UPDATE grants were absent. Added proposed trigger-based defense-in-depth and explicit revokes in the migration accompanying this report. Pending CI, migration application, and runtime verification.
 
