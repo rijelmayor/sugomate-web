@@ -98,24 +98,33 @@ export default function CustomerMarketplace({ products, categories, selectedCate
         <span className="text-xs font-semibold text-slate-400">{visible.length} items</span>
       </div>
 
-      {visible.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {visible.map(product => <article key={product.id} className="min-w-0 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-          <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-orange-50 via-white to-amber-50">
-            <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-5xl text-orange-300">🍽️</div>
+      {visible.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-2">
+        {visible.map(product => <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="relative aspect-square w-[40%] max-w-44 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50">
+            <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-4xl text-orange-300">🛍️</div>
             {product.image_url && <img
               src={product.image_url}
               alt={product.name}
               loading="lazy"
               decoding="async"
-              className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4"
+              className="absolute inset-0 h-full w-full object-contain p-2"
               onError={(event) => { event.currentTarget.style.display = "none"; }}
             />}
           </div>
-          <div className="p-4">
-            <h3 className="font-extrabold text-[#102e57]">{product.name}</h3>
-            <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">{product.description || product.merchant?.name || "Local favorite"}</p>
-            <p className="mt-2 text-xs text-slate-400">{product.merchant?.name || "Local store"} · {product.branch?.municipalities?.name || "Leyte"}</p>
-            <div className="mt-3 flex items-center justify-between gap-2"><strong className="text-lg text-[#e95718]">₱{Number(product.price).toFixed(2)}</strong><button type="button" onClick={() => add(product)} className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#102e57] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#174777] hover:shadow-md active:translate-y-0 active:scale-[.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2">+ Add</button></div>
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3">
+            <div className="min-w-0">
+              <h3 className="line-clamp-2 break-words text-sm font-extrabold leading-snug text-[#102e57] sm:text-base">{product.name}</h3>
+              <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-600 sm:text-xs">
+                <span aria-hidden="true">▣</span><span className="line-clamp-1">{product.merchant?.name || "Local store"}</span>
+              </p>
+              <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-400 sm:text-xs">
+                <span aria-hidden="true">⌖</span><span className="line-clamp-1">{product.branch?.municipalities?.name || "Leyte"}</span>
+              </p>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <strong className="text-base font-black text-[#e95718] sm:text-lg">₱{Number(product.price).toFixed(2)}</strong>
+              <button type="button" onClick={() => add(product)} aria-label={`Add ${product.name} to basket`} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#102e57] px-3 py-2 text-[11px] font-extrabold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#174777] hover:shadow-md active:translate-y-0 active:scale-[.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 sm:px-4 sm:text-xs"><span aria-hidden="true">🛒</span> Add</button>
+            </div>
           </div>
         </article>)}
       </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12">

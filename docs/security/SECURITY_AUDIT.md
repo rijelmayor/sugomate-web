@@ -141,11 +141,22 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Security assessment:** No new database, Storage, authentication, or authorization permissions. Product image URLs remain data values rendered as image sources rather than interpolated into CSS background declarations. Existing public product-image bucket behavior is unchanged.
 - **Verification:** Check portrait and landscape camera photos, gallery photos, WebP photos, and missing/broken image fallback on narrow Android screens and desktop. Confirm no image overflow and that product names and add-to-cart controls remain visible.
 
+## SEC-012 — Compact horizontal product cards
+
+- **Severity:** LOW (presentation/usability; no security boundary changed).
+- **Change:** Customer marketplace product cards now use a compact horizontal layout: square photo panel on the left, product name/store/location on the right, and price plus add-to-basket action at the bottom. The full photo remains visible with `object-contain`; the image panel has a neutral warm background and rounded corners.
+- **Responsive behavior:** Single-column card list on narrow screens; two-column list at wider breakpoints. The product photo is capped in width so the details and add action retain usable space.
+- **Security assessment:** No new database, Storage, authentication, authorization, or external integrations. Existing product image URLs remain rendered as image sources. Existing customer-role and checkout server-side enforcement are unchanged.
+- **Verification:** Validate on narrow Android widths and desktop; verify long product names, missing images, portrait/landscape photos, and add-to-basket interaction.
+
 ## Iteration maintenance rule
 
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — SEC-012 compact horizontal marketplace cards prepared.** Replaced tall product cards with square photo panels beside compact product details and basket action. No privileged access changes. Preview/device verification pending.
+
 
 - **2026-11-05 — SEC-011 presentation refinement prepared.** Standardized merchant preview and customer marketplace photo frames to 4:3 with full-image contain behavior. No new privileged access or Storage policy changes. Visual device checks pending.
 
