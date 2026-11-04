@@ -149,11 +149,22 @@ The first audit version described SEC-001 and SEC-002 as directly exploitable HI
 - **Security assessment:** No new database, Storage, authentication, authorization, or external integrations. Existing product image URLs remain rendered as image sources. Existing customer-role and checkout server-side enforcement are unchanged.
 - **Verification:** Validate on narrow Android widths and desktop; verify long product names, missing images, portrait/landscape photos, and add-to-basket interaction.
 
+## SEC-013 — Duplicate marketplace category controls and inaccessible selected filter label
+
+- **Severity:** LOW (customer usability/accessibility; no data-access issue identified).
+- **Finding:** The customer marketplace rendered merchant store-type filters and product-category filters as two adjacent chip rows. Seeded labels overlap (for example Food & Meals and Groceries), creating apparent duplicate categories. The selected “All stores” chip also rendered as a dark-blue pill with invisible text on the reported Android browser.
+- **Remediation:** Remove the redundant store-type filter row from the customer marketplace and retain product-category filtering. Merchant category records, admin management, and merchant assignment remain unchanged. No category data is deleted or merged.
+- **Security impact:** Presentation-only. No schema, RLS, Storage, authentication, role, or checkout permission changes.
+- **Verification:** Confirm only one category chip row appears; the “All” selected chip has readable white text; product-category filtering and municipality filtering continue to work; no empty blue pill remains on Android.
+
 ## Iteration maintenance rule
 
 Update this file in the same change set whenever code, migration, RLS policy, RPC, Storage policy, authentication setting, environment-variable contract, or external integration changes security behavior. Each update must record date, PR/commit, affected controls, tests run and results, residual risks, and any new or closed findings. Re-run Supabase Security Advisor after database migrations and policy changes.
 
 ## Change log
+
+- **2026-11-05 — SEC-013 duplicate category controls documented and fix prepared.** Removed the customer-facing store-type chip row while preserving merchant-category records and admin management. Presentation-only change; Android regression verification pending.
+
 
 - **2026-11-05 — SEC-012 compact horizontal marketplace cards prepared.** Replaced tall product cards with square photo panels beside compact product details and basket action. No privileged access changes. Preview/device verification pending.
 
