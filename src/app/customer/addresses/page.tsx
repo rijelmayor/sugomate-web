@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { saveCustomerAddress } from "@/app/customer/actions";
 import FormSubmitButton from "@/components/FormSubmitButton";
+import PortalSignOut from "@/components/PortalSignOut";
 
 export default async function CustomerAddresses({ searchParams }: { searchParams: Promise<{error?:string;saved?:string}> }) {
   const params=await searchParams;
@@ -14,7 +15,7 @@ export default async function CustomerAddresses({ searchParams }: { searchParams
     supabase.from("municipalities").select("id,name").eq("is_serviceable",true).order("name")
   ]);
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-2xl">
-    <Link href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</Link>
+    <div className="flex items-center justify-between gap-3"><Link href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div>
     <h1 className="mt-5 text-3xl font-black">Delivery addresses</h1><p className="mt-2 text-sm text-slate-500">Save where SUGOMATE should deliver your orders.</p>
     {params.saved&&<p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">Address saved successfully.</p>}
     {params.error&&<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">Please complete the required fields and try again.</p>}
