@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,7 +17,7 @@ async function merchantContext() {
     merchant: row.merchants as unknown as { id: string; name: string; status: string } | null,
   })).filter((row) => row.merchant?.status === "approved");
   if (!stores.length) redirect("/merchant?error=no-approved-store");
-  return { supabase, stores };
+  return { supabase, stores, user };
 }
 
 export async function createMerchantBranch(formData: FormData) {
@@ -36,7 +38,7 @@ export async function createMerchantBranch(formData: FormData) {
 }
 
 export async function saveMerchantProduct(formData: FormData) {
-  const { supabase, stores } = await merchantContext();
+  const { supabase, stores, user } = await merchantContext();
   const id = String(formData.get("product_id") ?? "");
   const merchantId = String(formData.get("merchant_id") ?? "");
   const branchId = String(formData.get("branch_id") ?? "");
@@ -67,7 +69,7 @@ export async function saveMerchantProduct(formData: FormData) {
         selectedImage.size > 5 * 1024 * 1024) redirect("/merchant/products?error=image");
     const extension = selectedImage.type === "image/png" ? "png" :
       selectedImage.type === "image/webp" ? "webp" : "jpg";
-    uploadedPath = `${merchantId}/${(await supabase.auth.getUser()).data.user!.id}/${crypto.randomUUID()}.${extension}`;
+    uploadedPath = `${merchantId}/${user.id}/${randomUUID()}.${extension}`;
     const { error: uploadError } = await supabase.storage.from("product-images").upload(uploadedPath, selectedImage, {
       contentType: selectedImage.type, cacheControl: "3600", upsert: false,
     });
