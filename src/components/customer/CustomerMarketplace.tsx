@@ -147,7 +147,11 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
   const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
-  const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;\n  const gcashPaymentType = cartStore?.gcashPaymentType ?? firstItem?.merchant?.gcash_payment_type ?? "qr";\n  const gcashAccountName = cartStore?.gcashAccountName ?? firstItem?.merchant?.gcash_account_name ?? null;\n  const gcashMobileNumber = cartStore?.gcashMobileNumber ?? firstItem?.merchant?.gcash_mobile_number ?? null;\n  const gcashConfigured = gcashPaymentType === "number" ? Boolean(gcashAccountName && gcashMobileNumber) : Boolean(gcashQrUrl);
+  const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
+  const gcashPaymentType = cartStore?.gcashPaymentType ?? firstItem?.merchant?.gcash_payment_type ?? "qr";
+  const gcashAccountName = cartStore?.gcashAccountName ?? firstItem?.merchant?.gcash_account_name ?? null;
+  const gcashMobileNumber = cartStore?.gcashMobileNumber ?? firstItem?.merchant?.gcash_mobile_number ?? null;
+  const gcashConfigured = gcashPaymentType === "number" ? Boolean(gcashAccountName && gcashMobileNumber) : Boolean(gcashQrUrl);
 
   function href(next: { storeCategory?: string; store?: string; municipality?: string }) {
     const params = new URLSearchParams();
