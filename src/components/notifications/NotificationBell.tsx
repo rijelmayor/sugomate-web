@@ -106,6 +106,9 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
       <span aria-hidden="true" className={`absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full border border-white ${live ? "bg-emerald-500" : "bg-slate-300"}`} />
     </button>
     {open && <div role="dialog" aria-label="Order notifications and alert settings" className="animate-fade-in fixed inset-x-4 top-[4.25rem] z-50 max-h-[min(80vh,42rem)] overflow-y-auto rounded-2xl border border-orange-100 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
+      <div className="mb-4 border-b border-slate-100 pb-4">
+        <AlertControlBar sound={sound} label="customer alerts" testMessage="Your order has an update." />
+      </div>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-black text-[#102e57]">Notifications</h2>
         {unread > 0 && <button type="button" onClick={markAllRead} className="text-xs font-bold text-orange-600">Mark all read</button>}
