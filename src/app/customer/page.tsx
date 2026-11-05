@@ -13,7 +13,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const { user, supabase } = await requireCustomer();
 
   // One lightweight pass over available products; stores and category counts are derived from it.
-  let productQuery = supabase.from("products").select(`id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))`).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
+  let productQuery = supabase.from("products").select(`id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
   if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
 
   const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: merchantCategories }, { data: zones }, { data: productRows, error: productError }] = await Promise.all([
@@ -39,15 +39,24 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   });
 
   // A "store" is one merchant branch, matching the one-store-per-order rule at checkout.
-  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null }>();
+  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null }>();
   for (const row of rows) {
     const existing = storeMap.get(row.branch_id);
-    if (existing) { existing.count += 1; if (!existing.image && row.image_url) existing.image = row.image_url; continue; }
-    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlug: row.merchant?.store_category?.slug ?? "other", area: row.branch?.municipalities?.name ?? "", count: 1, image: row.image_url });
+    if (existing) { existing.count += 1; continue; }
+    const schedule = (row.branch?.store_hours ?? {}) as Record<string, {open?:string;close?:string;closed?:boolean}>;
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+    const part = (type: string) => parts.find(item => item.type === type)?.value ?? "";
+    const dayKey = part("weekday").toLowerCase().slice(0,3);
+    const slot = schedule[dayKey] ?? { open: "08:00", close: "20:00", closed: false };
+    const nowMinutes = Number(part("hour")) * 60 + Number(part("minute"));
+    const openMinutes = Number((slot.open ?? "08:00").slice(0,2)) * 60 + Number((slot.open ?? "08:00").slice(3,5));
+    const closeMinutes = Number((slot.close ?? "20:00").slice(0,2)) * 60 + Number((slot.close ?? "20:00").slice(3,5));
+    const isOpen = !row.branch?.is_temporarily_closed && !slot.closed && nowMinutes >= openMinutes && nowMinutes < closeMinutes;
+    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlug: row.merchant?.store_category?.slug ?? "other", area: row.branch?.municipalities?.name ?? "", count: 1, image: row.merchant?.logo_url ?? null, isOpen, acceptedPaymentMethods: row.merchant?.accepted_payment_methods ?? ["cod"], gcashQrUrl: row.merchant?.gcash_qr_url ?? null });
   }
   const stores = [...storeMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   // Only the open store's menu is sent to the browser, which keeps the home page light.
-  const products = store ? rows.filter(row => row.branch_id === store) : [];
+  const products = store && storeMap.get(store)?.isOpen ? rows.filter(row => row.branch_id === store) : [];
 
   const deliveryFees: Record<string, number> = {};
   for (const zone of zones ?? []) if (!(zone.municipality_id in deliveryFees)) deliveryFees[zone.municipality_id] = Number(zone.base_delivery_fee);
