@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, MapPin, Minus, Plus, Search, ShoppingBasket,
 import { placeOrder } from "@/app/customer/actions";
 import PendingLink from "@/components/PendingLink";
 import { CART_KEY } from "@/lib/cart";
+import CategoryTile, { CategoryGlyph } from "@/components/customer/CategoryTile";
 
 type Product = {
   id: string;
@@ -60,7 +61,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   selectedStore?: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
-  merchantCategories?: { id: string; name: string; slug: string; icon: string }[];
+  merchantCategories?: { id: string; name: string; slug: string; icon: string; image_url?: string | null }[];
   selectedMerchantCategory?: string;
   addresses: Address[];
   checkoutError?: string;
@@ -133,13 +134,15 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
   const storeMatches = stores.filter(item => (!selectedMerchantCategory || item.categorySlug === selectedMerchantCategory) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
   const uncategorised = stores.filter(item => item.categorySlug === "other").length;
-  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", count: uncategorised }] : [])];
+  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", image_url: null, count: uncategorised }] : [])];
   const activeCategory = tiles.find(item => item.slug === selectedMerchantCategory);
   const view: "store" | "stores" | "home" = currentStore ? "store" : selectedMerchantCategory || q ? "stores" : "home";
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.branch_id === firstItem?.branch_id);
   const cartStore = stores.find(item => item.id === firstItem?.branch_id);
-  const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && Boolean(cartStore?.isOpen);
+  const storeClosed = Boolean(cartStore) && !cartStore?.isOpen;
+  // The basket store can sit outside the current area filter; the server re-verifies hours and stock on checkout.
+  const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && !storeClosed;
   const selectedAddress = addresses.find(a => a.id === addressId);
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
@@ -160,6 +163,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   function add(product: Product) {
     setCart(current => ({ ...current, [product.id]: { product, quantity: (current[product.id]?.quantity ?? 0) + 1 } }));
   }
+  function clearBasket() { setCart({}); }
   function change(id: string, delta: number) {
     setCart(current => {
       const next = { ...current };
@@ -192,12 +196,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
       {view === "home" && <>
         <div className="mt-6"><h2 className="text-xl font-black text-[#102e57]">Browse by category</h2><p className="mt-0.5 text-sm text-slate-500">Pick what you need — we&apos;ll show the stores.</p></div>
-        {tiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {tiles.map(item => <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className="flex min-h-28 flex-col items-center justify-center gap-1.5 rounded-3xl border border-orange-100/90 bg-white p-4 text-center shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg active:scale-[.98]">
-            <span aria-hidden="true" className="text-3xl">{item.icon}</span>
-            <span className="text-sm font-extrabold text-[#102e57]">{item.name}</span>
-            <span className="text-[11px] font-semibold text-slate-400">{item.count} {item.count === 1 ? "store" : "stores"}</span>
-          </PendingLink>)}
+        {tiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {tiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
         </div> : null}
         {stores.length > 0 && <>
           <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
@@ -209,11 +209,11 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       {view === "stores" && <>
         <div className="mt-5 flex items-center gap-2">
           <PendingLink href={href({ storeCategory: "" })} aria-label="Back to categories" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
-          <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{q ? "Search results" : `${activeCategory?.icon ?? ""} ${activeCategory?.name ?? "Stores"}`}</h2><p className="text-xs text-slate-400">{isFiltering ? "Updating…" : `${storeMatches.length} ${storeMatches.length === 1 ? "store" : "stores"}`}</p></div>
+          <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{q ? "Search results" : activeCategory?.name ?? "Stores"}</h2><p className="text-xs text-slate-400">{isFiltering ? "Updating…" : `${storeMatches.length} ${storeMatches.length === 1 ? "store" : "stores"}`}</p></div>
         </div>
         {tiles.length > 1 && <div aria-label="Store categories" className="mt-3 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
           <PendingLink href={href({ storeCategory: "" })} className={chip(false, "sm")}>All categories</PendingLink>
-          {tiles.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}>{item.icon} {item.name}</PendingLink>; })}
+          {tiles.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}><CategoryGlyph slug={item.slug} size={14} />{item.name}</PendingLink>; })}
         </div>}
         {storeMatches.length ? <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{storeMatches.map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><Store aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching stores" : "No stores here yet"}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{q ? "Try another store or area name." : "Stores in this category will appear here once they are approved."}</p></div>}
       </>}
@@ -258,7 +258,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
     <aside role={sheetOpen ? "dialog" : undefined} aria-modal={sheetOpen ? true : undefined} aria-label="Your basket" className={`min-w-0 border border-orange-100 bg-white p-5 shadow-sm transition-[transform,visibility] duration-300 ease-out fixed inset-x-0 bottom-0 z-50 max-h-[88vh] overflow-y-auto rounded-t-3xl shadow-2xl pb-safe ${sheetOpen ? "visible translate-y-0" : "invisible translate-y-full"} lg:visible lg:inset-x-auto lg:bottom-auto lg:z-auto lg:h-fit lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:rounded-3xl lg:pb-5 lg:shadow-sm lg:sticky lg:top-5`}>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-black text-[#102e57]">Your basket</h2>
-        <div className="flex items-center gap-2"><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">{count} {count === 1 ? "item" : "items"}</span><button type="button" onClick={() => setSheetOpen(false)} aria-label="Close basket" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition active:scale-90 lg:hidden"><X size={18} /></button></div>
+        <div className="flex items-center gap-2">{count > 0 && <button type="button" onClick={clearBasket} className="rounded-full px-2.5 py-1 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-rose-600 active:scale-95">Clear</button>}<span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">{count} {count === 1 ? "item" : "items"}</span><button type="button" onClick={() => setSheetOpen(false)} aria-label="Close basket" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition active:scale-90 lg:hidden"><X size={18} /></button></div>
       </div>
       {items.length ? <div className="mt-4 space-y-4">
         {items.map(({ product, quantity }) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -270,8 +270,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{fee !== undefined ? peso(fee) : "Calculated at checkout"}</span></div>
           {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total (COD)</span><span>{peso(total + fee)}</span></div>}
         </div>
-        {items.length > 0 && !cartStore?.isOpen && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">This store is closed. You can keep your basket, but checkout will be available when it reopens.</p>}
-        {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
+        {items.length > 0 && storeClosed && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">This store is closed. You can keep your basket, but checkout will be available when it reopens.</p>}
+        {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue. <button type="button" onClick={clearBasket} className="font-extrabold underline">Start a fresh basket</button></p>}
         <form action={placeOrder} className="space-y-3 border-t border-slate-100 pt-4">
           <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
           <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Delivery address <span className="text-rose-600">· required</span></label>

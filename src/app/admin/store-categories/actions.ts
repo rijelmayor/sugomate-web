@@ -22,12 +22,14 @@ export async function saveMerchantCategory(formData: FormData) {
   const id = String(formData.get("category_id") ?? "");
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   const icon = String(formData.get("icon") ?? "🏪").trim().slice(0, 12) || "🏪";
+  const imageRaw = String(formData.get("image_url") ?? "").trim().slice(0, 500);
+  const imageUrl = imageRaw && /^(\/|https:\/\/)/.test(imageRaw) ? imageRaw : null;
   const sortOrder = Number(formData.get("sort_order") ?? 0);
   const isActive = formData.get("is_active") === "on";
   const slug = slugify(name);
   if (name.length < 2 || !slug || !Number.isInteger(sortOrder) || sortOrder < 0 ||
       (id && !/^[0-9a-f-]{36}$/i.test(id))) redirect("/admin/store-categories?error=invalid");
-  const payload = { name, slug, icon, sort_order: sortOrder, is_active: isActive };
+  const payload = { name, slug, icon, image_url: imageUrl, sort_order: sortOrder, is_active: isActive };
   const result = id
     ? await supabase.from("merchant_categories").update(payload).eq("id", id)
     : await supabase.from("merchant_categories").insert(payload);

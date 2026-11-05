@@ -16,15 +16,17 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   let productQuery = supabase.from("products").select(`id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
   if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
 
-  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: merchantCategories }, { data: zones }, { data: productRows, error: productError }] = await Promise.all([
+  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: productRows, error: productError }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name"),
+    supabase.from("merchant_categories").select("id,name,slug,icon,image_url").eq("is_active", true).order("sort_order").order("name"),
     // Optional: needs 20261105110000_customer_read_delivery_fees.sql. Without it this returns nothing and checkout shows "Calculated at checkout".
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
   ]);
+  // If the photo migration has not run yet, fall back to the original columns so tiles still appear.
+  const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
   // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
   const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
   const rows = productError ? [] : (productRows ?? []).map(row => {
