@@ -27,6 +27,10 @@ export async function signUpDriver(formData: FormData) {
   if (error || !data.user) redirect(`/register/driver?error=signup&next=${encodeURIComponent(next)}`);
 
   try { await createAndSendPhoneOtp(data.user.id, email, phone); }
-  catch { redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`); }
+  catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("valid Philippine")) redirect(`/register/driver?error=invalid&next=${encodeURIComponent(next)}`);
+    redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`);
+  }
   redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}`);
 }

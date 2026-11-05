@@ -17,10 +17,24 @@ function hashCode(userId: string, code: string) {
 }
 
 export function normalizePhilippineMobile(input: string) {
-  const digits = input.replace(/[\s()-]/g, "");
-  if (/^09\d{9}$/.test(digits)) return "+63" + digits.slice(1);
-  if (/^9\d{9}$/.test(digits)) return "+63" + digits;
-  if (/^\+639\d{9}$/.test(digits)) return digits;
+  // Keep a leading +, strip spaces/punctuation/other non-digits
+  let cleaned = input.trim();
+  if (cleaned.startsWith("+")) {
+    cleaned = "+" + cleaned.slice(1).replace(/\D/g, "");
+  } else {
+    cleaned = cleaned.replace(/\D/g, "");
+  }
+
+  // 09XXXXXXXXX (11 digits) → +639XXXXXXXXX
+  if (/^09\d{9}$/.test(cleaned)) return "+63" + cleaned.slice(1);
+  // 9XXXXXXXXX (10 digits) → +639XXXXXXXXX
+  if (/^9\d{9}$/.test(cleaned)) return "+63" + cleaned;
+  // 639XXXXXXXXX (12 digits, no +) → +639XXXXXXXXX
+  if (/^639\d{9}$/.test(cleaned)) return "+" + cleaned;
+  // +639XXXXXXXXX
+  if (/^\+639\d{9}$/.test(cleaned)) return cleaned;
+  // +6309XXXXXXXXX (common mistake of keeping the 0) → +639XXXXXXXXX
+  if (/^\+6309\d{9}$/.test(cleaned)) return "+63" + cleaned.slice(4);
   return null;
 }
 
@@ -28,7 +42,7 @@ export async function createAndSendPhoneOtp(userId: string, email: string, rawPh
   const phone = normalizePhilippineMobile(rawPhone);
   if (!phone) throw new Error("Enter a valid Philippine mobile number.");
   const apiKey = process.env.TEXTBEE_API_KEY;
-  if (!apiKey) throw new Error("SMS delivery is not configured yet.");
+  if (!apiKey) throw new Error("SMS delivery is not configured (missing TEXTBEE_API_KEY).");
   const supabase = adminClient();
   const { data: previous } = await supabase.from("phone_verification_challenges")
     .select("last_sent_at").eq("user_id", userId).maybeSingle();
@@ -58,9 +72,15 @@ export async function createAndSendPhoneOtp(userId: string, email: string, rawPh
     }),
     cache: "no-store",
   });
-  if (!response.ok) throw new Error("We couldn't send your SMS. Please try again shortly.");
-  const result = await response.json() as { data?: { success?: boolean; failureCount?: number } };
+  const bodyText = await response.text();
+  let result: { data?: { success?: boolean; failureCount?: number; message?: string } } = {};
+  try { result = JSON.parse(bodyText); } catch { /* non-json */ }
+  if (!response.ok) {
+    console.error("[textbee] send failed", response.status, bodyText.slice(0, 500));
+    throw new Error("We couldn't send your SMS. Please try again shortly.");
+  }
   if (result.data?.success === false || (result.data?.failureCount ?? 0) > 0) {
+    console.error("[textbee] queue failed", bodyText.slice(0, 500));
     throw new Error("Textbee could not queue your SMS. Please try again.");
   }
 }
