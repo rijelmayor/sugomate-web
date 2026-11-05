@@ -23,3 +23,16 @@
 .footer{background:#0b2547;color:#dce7f5;padding:54px 0 28px}
 @media(max-width:900px){.hero-grid{grid-template-columns:1fr;padding-block:55px 65px}.hero-visual{min-height:430px;max-width:590px;width:100%;margin:auto}.phone{width:190px;height:370px}.section{padding:68px 0}}
 @media(max-width:560px){.container{width:min(100% - 32px,1180px)}.hero-grid{gap:12px}.hero-title{font-size:47px}.hero-copy{font-size:16px}.hero-visual{min-height:370px}.phone{width:158px;height:320px;border-width:6px;border-radius:27px}.phone.one{left:6%;top:32px}.phone.two{right:5%;top:48px}.phone-screen{padding:17px 9px}.floating-pill{font-size:10px;padding:9px 11px}.floating-pill.top{right:0}.floating-pill.bottom{bottom:3px}.download-band{padding:30px 22px}.service-card{padding:19px 12px}}
+
+/* --- Loading, motion and mobile polish --- */
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton{background:linear-gradient(90deg,#ffe9d6 25%,#fff4ea 50%,#ffe9d6 75%);background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite}
+@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.animate-pop{animation:pop .28s ease-out}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+.animate-bump{animation:bump .3s ease-out}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+.animate-fade-in{animation:fade-in .2s ease-out}
+button,a{-webkit-tap-highlight-color:transparent}
+.pb-safe{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.skeleton{animation:none}}

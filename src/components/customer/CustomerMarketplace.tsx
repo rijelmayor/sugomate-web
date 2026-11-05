@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { placeOrder } from "@/app/customer/actions";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
+import { MapPin, Minus, Plus, Search, ShoppingBasket, Store, X } from "lucide-react";
+import { placeOrder } from "@/app/customer/actions";
+import PendingLink from "@/components/PendingLink";
+import { CART_KEY } from "@/lib/cart";
 
 type Product = {
   id: string;
@@ -14,24 +18,29 @@ type Product = {
   merchant: { name: string; slug: string; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
+type Cart = Record<string, { product: Product; quantity: number }>;
+type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
-function FilterSubmitButton() {
-  const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className="inline-flex h-12 min-w-[4.5rem] items-center justify-center gap-2 rounded-xl bg-[#ffbd18] px-4 text-sm font-black text-[#102e57] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffd04a] hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70">
-    {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-[#102e57]/30 border-t-[#102e57]" />}
-    {pending ? "Applying…" : "Go"}
-  </button>;
-}
+const peso = (value: number) => `₱${value.toFixed(2)}`;
+const activeStyle = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
 function CheckoutSubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={disabled || pending} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ff8a00] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#ed5a19] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
+  return <button type="submit" disabled={disabled || pending} aria-busy={pending} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ff8a00] px-4 py-3.5 text-sm font-extrabold text-white shadow-md shadow-orange-200 transition duration-200 hover:bg-[#ed5a19] active:scale-[.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100 data-[pending=true]:cursor-wait" data-pending={pending}>
     {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
     {pending ? "Placing your order…" : "Place COD order"}
   </button>;
 }
 
-export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError }: {
+function ProductImage({ src, alt }: { src: string | null; alt: string }) {
+  const [state, setState] = useState<"loading" | "ok" | "error">(src ? "loading" : "error");
+  return <div className={`relative aspect-square w-[40%] max-w-44 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50 ${state === "loading" ? "skeleton" : ""}`}>
+    {state !== "ok" && <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-orange-300"><ShoppingBasket size={34} strokeWidth={1.5} /></div>}
+    {src && state !== "error" && <img src={src} alt={alt} loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("error")} className={`absolute inset-0 h-full w-full object-contain p-2 transition-opacity duration-300 ${state === "ok" ? "opacity-100" : "opacity-0"}`} />}
+  </div>;
+}
+
+export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
   products: Product[];
   categories: { id: string; name: string; slug: string; icon: string }[];
   selectedCategory: string;
@@ -39,21 +48,87 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   municipalities: { id: string; name: string }[];
   merchantCategories?: { id: string; name: string; slug: string; icon: string }[];
   selectedMerchantCategory?: string;
-  addresses: { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipalities: { name: string } | null }[];
+  addresses: Address[];
   checkoutError?: string;
+  deliveryFees?: Record<string, number>;
 }) {
-  const [cart, setCart] = useState<Record<string, { product: Product; quantity: number }>>({});
+  const router = useRouter();
+  const [isFiltering, startFilter] = useTransition();
+  const [cart, setCart] = useState<Cart>({});
+  const [hydrated, setHydrated] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "__new__");
+  const [newMunicipalityId, setNewMunicipalityId] = useState("");
+
+  // Restore the basket after a refresh, a failed checkout, or leaving and returning.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CART_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Cart;
+        const next: Cart = {};
+        for (const [id, entry] of Object.entries(parsed ?? {})) {
+          if (entry?.product?.id === id && Number.isInteger(entry.quantity) && entry.quantity > 0 && entry.quantity < 100) next[id] = entry;
+        }
+        setCart(next);
+      }
+    } catch { /* storage unavailable: basket just works for this visit */ }
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try { window.localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch { /* ignore */ }
+  }, [cart, hydrated]);
+  // Refresh saved items with the latest name and price from the server.
+  useEffect(() => {
+    if (!hydrated) return;
+    setCart(current => {
+      let changed = false;
+      const next = { ...current };
+      for (const p of products) {
+        const entry = next[p.id];
+        if (entry && (Number(entry.product.price) !== Number(p.price) || entry.product.name !== p.name)) { next[p.id] = { ...entry, product: p }; changed = true; }
+      }
+      return changed ? next : current;
+    });
+  }, [products, hydrated]);
+  // Lock page scroll while the mobile basket sheet is open; Esc closes it.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSheetOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
+  }, [sheetOpen]);
+
   const items = Object.values(cart);
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-  const visible = useMemo(() => products.filter(p => (!search || p.name.toLowerCase().includes(search.toLowerCase()) || p.merchant?.name.toLowerCase().includes(search.toLowerCase())) && (!selectedMerchantCategory || p.merchant?.store_category?.slug === selectedMerchantCategory)), [products, search, selectedMerchantCategory]);
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return products.filter(p => (!q || p.name.toLowerCase().includes(q) || p.merchant?.name.toLowerCase().includes(q)) && (!selectedMerchantCategory || p.merchant?.store_category?.slug === selectedMerchantCategory));
+  }, [products, search, selectedMerchantCategory]);
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId);
+  const selectedAddress = addresses.find(a => a.id === addressId);
+  const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
+  const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
 
+  function href(next: { category?: string; storeCategory?: string; municipality?: string }) {
+    const params = new URLSearchParams();
+    const category = next.category ?? selectedCategory;
+    const storeCategory = next.storeCategory ?? selectedMerchantCategory;
+    const municipality = next.municipality ?? selectedMunicipality;
+    if (category) params.set("category", category);
+    if (storeCategory) params.set("storeCategory", storeCategory);
+    if (municipality) params.set("municipality", municipality);
+    const query = params.toString();
+    return query ? `/customer?${query}` : "/customer";
+  }
   function add(product: Product) {
     setCart(current => ({ ...current, [product.id]: { product, quantity: (current[product.id]?.quantity ?? 0) + 1 } }));
   }
@@ -62,85 +137,93 @@ export default function CustomerMarketplace({ products, categories, selectedCate
       const next = { ...current };
       const quantity = (next[id]?.quantity ?? 0) + delta;
       if (quantity <= 0) delete next[id];
-      else next[id] = { ...next[id], quantity };
+      else if (quantity < 100) next[id] = { ...next[id], quantity };
       return next;
     });
   }
+  const chip = (active: boolean, size: "sm" | "md") => `${size === "sm" ? "min-h-9 px-4 py-2 text-xs" : "min-h-10 px-4 py-2.5 text-sm"} shrink-0 rounded-full font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${active ? "bg-[#102e57] shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`;
 
-  return <div className="grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check store availability, product stock, and delivery coverage." : checkoutError === "address" ? "Please complete your delivery address before placing the order." : "Your basket could not be processed. Please review your items and try again."}</p>}
+  return <div className={`grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] ${count > 0 ? "pb-24 lg:pb-0" : ""}`}>
+    {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check store availability, product stock, and delivery coverage. Your basket is still saved." : checkoutError === "address" ? "Please complete your delivery address before placing the order." : "Your basket could not be processed. Please review your items and try again."}</p>}
     <section className="w-full min-w-0">
-      <div className="box-border w-full max-w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#102e57] via-[#124d80] to-[#ed5a19] p-5 text-white shadow-lg sm:p-7 lg:p-8">
-        <p className="text-xs font-black uppercase tracking-[.18em] text-orange-200">SUGOMATE marketplace</p>
-        <h1 className="mt-2 max-w-full break-words text-[clamp(1.8rem,5vw,2.5rem)] font-black leading-tight">Unsa imong sugo?</h1>
-        <p className="mt-2 max-w-prose break-words text-sm leading-6 text-white/85 sm:text-base">Discover local stores and everyday essentials from your community.</p>
-        <div className="mt-5 grid w-full min-w-0 grid-cols-1 gap-3">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" aria-label="Search food, stores, and groceries" className="box-border h-12 w-full min-w-0 rounded-xl border border-white/30 bg-white px-4 text-sm text-[#102e57] outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-orange-300"/>
-          <form action="/customer" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <select name="municipality" defaultValue={selectedMunicipality} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-xl border border-white/30 bg-white px-3 text-sm text-[#102e57]">
-              <option value="">All service areas</option>
-              {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            <FilterSubmitButton />
-          </form>
+      <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="relative">
+          <Search aria-hidden="true" size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" aria-label="Search food, stores, and groceries" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-10 pr-10 text-sm text-[#102e57] shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-200" />
+          {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 active:scale-90"><X size={16} /></button>}
+        </div>
+        <div className="relative">
+          <MapPin aria-hidden="true" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-orange-500" />
+          <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
+            <option value="">All service areas</option>
+            {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
         </div>
       </div>
 
-      {merchantCategories.length > 0 && <div className="mt-5"><p className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">Shop by store type</p><div aria-label="Store categories" className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"><a href={`/customer${selectedMunicipality ? `?municipality=${selectedMunicipality}` : ""}`} className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-4 py-2 text-xs font-bold ${!selectedMerchantCategory ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>All stores</a>{merchantCategories.map(item => <a key={item.id} href={`/customer?storeCategory=${item.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-4 py-2 text-xs font-bold ${selectedMerchantCategory === item.slug ? "bg-[#102e57] text-white" : "border border-slate-200 bg-white text-[#102e57]"}`}>{item.icon} {item.name}</a>)}</div></div>}
+      {merchantCategories.length > 0 && <div aria-label="Store categories" className="mt-4 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
+        <PendingLink href={href({ storeCategory: "" })} className={chip(!selectedMerchantCategory, "sm")} style={!selectedMerchantCategory ? activeStyle : undefined}>All stores</PendingLink>
+        {merchantCategories.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}>{item.icon} {item.name}</PendingLink>; })}
+      </div>}
 
-      <div aria-label="Product categories" className="mt-5 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
-        <a href="/customer" aria-current={!selectedCategory ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-5 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${!selectedCategory ? "bg-[#102e57] text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={!selectedCategory ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>All</a>
-        {categories.map(category => { const isSelected = selectedCategory === category.slug; return <a key={category.id} href={`/customer?category=${category.slug}${selectedMunicipality ? `&municipality=${selectedMunicipality}` : ""}`} aria-current={isSelected ? "page" : undefined} className={`inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-sm font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${isSelected ? "bg-[#102e57] !text-white shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`} style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.icon} <span style={isSelected ? { color: "#ffffff", WebkitTextFillColor: "#ffffff" } : undefined}>{category.name}</span></a>; })}
+      <div aria-label="Product categories" className="mt-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
+        <PendingLink href={href({ category: "" })} aria-current={!selectedCategory ? "page" : undefined} className={chip(!selectedCategory, "md")} style={!selectedCategory ? activeStyle : undefined}>All</PendingLink>
+        {categories.map(category => { const active = selectedCategory === category.slug; return <PendingLink key={category.id} href={href({ category: category.slug })} aria-current={active ? "page" : undefined} className={chip(active, "md")} style={active ? activeStyle : undefined}>{category.icon} {category.name}</PendingLink>; })}
       </div>
 
-      <div className="mt-5 flex items-end justify-between gap-3">
-        <div><h2 className="text-xl font-black text-[#102e57]">Popular near you</h2><p className="mt-1 text-sm text-slate-500">Local merchants approved by SUGOMATE</p></div>
-        <span className="text-xs font-semibold text-slate-400">{visible.length} items</span>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div><h2 className="text-xl font-black text-[#102e57]">Popular near you</h2><p className="mt-0.5 text-sm text-slate-500">Local merchants approved by SUGOMATE</p></div>
+        <span className="text-xs font-semibold text-slate-400">{isFiltering ? "Updating…" : `${visible.length} items`}</span>
       </div>
 
-      {visible.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-2">
-        {visible.map(product => <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="relative aspect-square w-[40%] max-w-44 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50">
-            <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-4xl text-orange-300">🛍️</div>
-            {product.image_url && <img
-              src={product.image_url}
-              alt={product.name}
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-contain p-2"
-              onError={(event) => { event.currentTarget.style.display = "none"; }}
-            />}
-          </div>
+      {visible.length ? <div className={`mt-4 grid min-w-0 grid-cols-1 gap-3 transition-opacity duration-200 sm:grid-cols-2 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
+        {visible.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+          <ProductImage src={product.image_url} alt={product.name} />
           <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3">
             <div className="min-w-0">
               <h3 className="line-clamp-2 break-words text-sm font-extrabold leading-snug text-[#102e57] sm:text-base">{product.name}</h3>
-              <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-600 sm:text-xs">
-                <span aria-hidden="true">▣</span><span className="line-clamp-1">{product.merchant?.name || "Local store"}</span>
-              </p>
-              <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-400 sm:text-xs">
-                <span aria-hidden="true">⌖</span><span className="line-clamp-1">{product.branch?.municipalities?.name || "Leyte"}</span>
-              </p>
+              <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-600 sm:text-xs"><Store aria-hidden="true" size={13} className="shrink-0" /><span className="line-clamp-1">{product.merchant?.name || "Local store"}</span></p>
+              <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-400 sm:text-xs"><MapPin aria-hidden="true" size={13} className="shrink-0" /><span className="line-clamp-1">{product.branch?.municipalities?.name || "Leyte"}</span></p>
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <strong className="text-base font-black text-[#e95718] sm:text-lg">₱{Number(product.price).toFixed(2)}</strong>
-              <button type="button" onClick={() => add(product)} aria-label={`Add ${product.name} to basket`} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#102e57] px-3 py-2 text-[11px] font-extrabold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#174777] hover:shadow-md active:translate-y-0 active:scale-[.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 sm:px-4 sm:text-xs"><span aria-hidden="true">🛒</span> Add</button>
+              <strong className="text-base font-black text-[#e95718] sm:text-lg">{peso(Number(product.price))}</strong>
+              {qty > 0 ? <div className="inline-flex items-center rounded-full bg-[#102e57] text-white shadow-sm">
+                <button type="button" onClick={() => change(product.id, -1)} aria-label={`Remove one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full transition active:scale-90"><Minus size={16} /></button>
+                <span key={qty} aria-live="polite" className="animate-pop min-w-6 text-center text-sm font-black">{qty}</span>
+                <button type="button" onClick={() => change(product.id, 1)} aria-label={`Add one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full transition active:scale-90"><Plus size={16} /></button>
+              </div> : <button type="button" onClick={() => add(product)} aria-label={`Add ${product.name} to basket`} className="inline-flex h-9 items-center justify-center gap-1 rounded-full bg-[#102e57] px-4 text-xs font-extrabold text-white shadow-sm transition duration-200 hover:bg-[#174777] hover:shadow-md active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2"><Plus size={14} /> Add</button>}
             </div>
           </div>
-        </article>)}
+        </article>; })}
       </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12">
-        <div className="text-5xl">🛍️</div><h3 className="mt-4 text-xl font-black text-[#102e57]">{search ? "No matching items" : "Your local marketplace is getting ready"}</h3>
+        <ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{search ? "No matching items" : "Your local marketplace is getting ready"}</h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{search ? "Try another product or store name." : "We’re preparing merchant catalogs in Hilongos, Bato, Hindang, Inopacan, and Matalom. Approved stores and products will appear here as they join."}</p>
       </div>}
     </section>
 
-    <aside className="h-fit min-w-0 rounded-3xl border border-orange-100 bg-white p-5 shadow-sm lg:sticky lg:top-5">
-      <div className="flex items-center justify-between"><h2 className="text-lg font-black text-[#102e57]">Your basket</h2><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">{count} items</span></div>
+    {sheetOpen && <div onClick={() => setSheetOpen(false)} aria-hidden="true" className="animate-fade-in fixed inset-0 z-40 bg-slate-900/50 lg:hidden" />}
+    {count > 0 && !sheetOpen && <div className="pb-safe fixed inset-x-0 bottom-0 z-30 px-4 pt-2 lg:hidden">
+      <button type="button" onClick={() => setSheetOpen(true)} className="flex w-full items-center justify-between rounded-full bg-[#ff8a00] px-5 py-3.5 text-white shadow-xl shadow-orange-300/60 transition active:scale-[.98]">
+        <span className="flex items-center gap-2 text-sm font-extrabold"><span key={count} className="animate-bump grid h-7 min-w-7 place-items-center rounded-full bg-white px-1.5 text-xs font-black text-[#ed5a19]">{count}</span>View basket</span>
+        <span className="text-sm font-black">{peso(total)}</span>
+      </button>
+    </div>}
+
+    <aside role={sheetOpen ? "dialog" : undefined} aria-modal={sheetOpen ? true : undefined} aria-label="Your basket" className={`min-w-0 border border-orange-100 bg-white p-5 shadow-sm transition-[transform,visibility] duration-300 ease-out fixed inset-x-0 bottom-0 z-50 max-h-[88vh] overflow-y-auto rounded-t-3xl shadow-2xl pb-safe ${sheetOpen ? "visible translate-y-0" : "invisible translate-y-full"} lg:visible lg:inset-x-auto lg:bottom-auto lg:z-auto lg:h-fit lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:rounded-3xl lg:pb-5 lg:shadow-sm lg:sticky lg:top-5`}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-black text-[#102e57]">Your basket</h2>
+        <div className="flex items-center gap-2"><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">{count} {count === 1 ? "item" : "items"}</span><button type="button" onClick={() => setSheetOpen(false)} aria-label="Close basket" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition active:scale-90 lg:hidden"><X size={18} /></button></div>
+      </div>
       {items.length ? <div className="mt-4 space-y-4">
-        {items.map(({product, quantity}) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="min-w-0"><p className="truncate text-sm font-bold text-[#102e57]">{product.name}</p><p className="text-xs text-slate-500">₱{Number(product.price).toFixed(2)}</p></div>
-          <div className="flex items-center gap-2"><button type="button" onClick={() => change(product.id,-1)} aria-label={`Remove one ${product.name}`} className="h-7 w-7 rounded-full border border-slate-200 font-bold">−</button><span className="w-4 text-center text-sm font-bold">{quantity}</span><button type="button" onClick={() => change(product.id,1)} aria-label={`Add one ${product.name}`} className="h-7 w-7 rounded-full bg-orange-100 font-bold text-orange-700">+</button></div>
+        {items.map(({ product, quantity }) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="min-w-0"><p className="truncate text-sm font-bold text-[#102e57]">{product.name}</p><p className="text-xs text-slate-500">{peso(Number(product.price))}</p></div>
+          <div className="flex items-center gap-1"><button type="button" onClick={() => change(product.id, -1)} aria-label={`Remove one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 transition active:scale-90"><Minus size={15} /></button><span key={quantity} className="animate-pop w-6 text-center text-sm font-bold">{quantity}</span><button type="button" onClick={() => change(product.id, 1)} aria-label={`Add one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full bg-orange-100 text-orange-700 transition active:scale-90"><Plus size={15} /></button></div>
         </div>)}
-        <div className="flex justify-between pt-1 font-black text-[#102e57]"><span>Items subtotal</span><span>₱{total.toFixed(2)}</span></div>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between text-slate-600"><span>Items subtotal</span><span>{peso(total)}</span></div>
+          <div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{fee !== undefined ? peso(fee) : "Calculated at checkout"}</span></div>
+          {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total (COD)</span><span>{peso(total + fee)}</span></div>}
+        </div>
         {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
         <form action={placeOrder} className="space-y-3 border-t border-slate-100 pt-4">
           <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
@@ -151,22 +234,22 @@ export default function CustomerMarketplace({ products, categories, selectedCate
           </select>
           {addressId === "__new__" && <div className="space-y-2 rounded-xl border border-orange-100 bg-orange-50/60 p-3">
             <p className="text-xs font-extrabold text-[#102e57]">Where should we deliver?</p>
-            <input name="new_label" defaultValue="Home" placeholder="Address label (Home, Work)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
-            <input name="recipient_name" required placeholder="Recipient full name" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
-            <input name="recipient_phone" required type="tel" placeholder="Mobile number" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
-            <select name="municipality_id" required defaultValue="" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
-            <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio, barangay" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
-            <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"/>
+            <input name="new_label" defaultValue="Home" placeholder="Address label (Home, Work)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
+            <input name="recipient_name" required placeholder="Recipient full name" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
+            <input name="recipient_phone" required type="tel" placeholder="Mobile number" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
+            <select name="municipality_id" required value={newMunicipalityId} onChange={e => setNewMunicipalityId(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio, barangay" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
+            <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
           </div>}
           <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
-          <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]"/>
-          <input type="hidden" name="items" value={JSON.stringify(items.map(({product, quantity}) => ({product_id:product.id,quantity})))} />
-          <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: Cash on delivery</strong><br/>The store will confirm your order. Delivery fee is calculated by SUGOMATE at checkout.</div>
-          <CheckoutSubmitButton disabled={!canCheckout}/>
+          <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]" />
+          <input type="hidden" name="items" value={JSON.stringify(items.map(({ product, quantity }) => ({ product_id: product.id, quantity })))} />
+          <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: Cash on delivery</strong><br />The store will confirm your order.{fee === undefined && " Delivery fee is calculated by SUGOMATE at checkout."}</div>
+          <CheckoutSubmitButton disabled={!canCheckout} />
           <p className="text-center text-[11px] leading-4 text-slate-400">Prices, stock, store approval and delivery fees are verified securely when you place the order.</p>
         </form>
         <Link href="/customer/addresses" className="block text-center text-xs font-bold text-slate-500 underline">Manage saved addresses</Link>
-      </div> : <div className="py-8 text-center"><div className="text-4xl">🧺</div><p className="mt-3 text-sm font-semibold text-slate-600">Your basket is empty</p><p className="mt-1 text-xs text-slate-400">Add items from local stores to get started.</p></div>}
+      </div> : <div className="py-8 text-center"><ShoppingBasket aria-hidden="true" size={40} strokeWidth={1.5} className="mx-auto text-orange-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Your basket is empty</p><p className="mt-1 text-xs text-slate-400">Add items from local stores to get started.</p></div>}
     </aside>
   </div>;
 }
