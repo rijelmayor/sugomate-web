@@ -54,7 +54,7 @@ export default async function MerchantPortal({ searchParams }: {
   const storeInfo = (approvedRows[0] ?? merchantRows[0])?.merchant;
   const { data: orders } = approvedIds.length
     ? await supabase.from("orders")
-        .select("id,order_number,status,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,order_items(id,product_name,quantity,line_total)")
+        .select("id,order_number,status,driver_user_id,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,order_items(id,product_name,quantity,line_total)")
         .in("merchant_id", approvedIds)
         .order("placed_at", { ascending: false })
         .limit(100)
@@ -86,11 +86,11 @@ export default async function MerchantPortal({ searchParams }: {
         {visible.length ? visible.map((order) => {
           const address = order.address_snapshot as { recipient_name?: string; recipient_phone?: string; address_line?: string; landmark?: string };
           const canAccept = order.status === "pending_merchant";
-          const next = order.status === "accepted" ? "preparing" : order.status === "preparing" ? "ready_for_pickup" : null;
+          const next = order.status === "accepted" && order.driver_user_id ? "preparing" : order.status === "preparing" ? "ready_for_pickup" : null;
           return <article key={order.id} className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${canAccept ? "border-orange-300 ring-2 ring-orange-100" : "border-orange-100"}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0"><h2 className="truncate text-base font-black">{address?.recipient_name || "Customer"}</h2><p className="mt-0.5 text-xs text-slate-500">{order.order_number} · {new Date(order.placed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</p></div>
-              <span className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-extrabold text-orange-800">{statusLabels[order.status] ?? order.status}</span>
+              <span className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-extrabold text-orange-800">{order.status === "accepted" ? (order.driver_user_id ? "Rider assigned" : "Waiting for rider") : statusLabels[order.status] ?? order.status}</span>
             </div>
             {tab === "active" && <OrderProgress status={order.status} />}
             <ul className="mt-3 space-y-1.5 text-sm">{(order.order_items ?? []).map((item: { id: string; product_name: string; quantity: number; line_total: number }) => <li key={item.id} className="flex justify-between gap-3"><span>{item.quantity} × {item.product_name}</span><strong>₱{Number(item.line_total).toFixed(2)}</strong></li>)}</ul>
@@ -98,7 +98,7 @@ export default async function MerchantPortal({ searchParams }: {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
               <p className="flex flex-wrap items-center gap-2 text-sm text-slate-500">Total <strong className="text-lg text-[#102e57]">₱{Number(order.total).toFixed(2)}</strong><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{order.payment_method.toUpperCase()} · {order.payment_status}</span></p>
               {canAccept ? <div className="flex gap-2"><form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id} /><input type="hidden" name="next_status" value="rejected" /><FormSubmitButton pendingLabel="Rejecting…" className="min-h-11 rounded-full border border-red-200 px-4 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50">Reject</FormSubmitButton></form><form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id} /><input type="hidden" name="next_status" value="accepted" /><FormSubmitButton pendingLabel="Accepting…" className="min-h-11 rounded-full bg-[#102e57] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#174777]">Accept order</FormSubmitButton></form></div>
-                : next ? <form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id} /><input type="hidden" name="next_status" value={next} /><FormSubmitButton pendingLabel="Updating…" className="min-h-11 rounded-full bg-[#ff8a00] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#ed5a19]">{next === "preparing" ? "Start preparing" : "Mark ready for pickup"}</FormSubmitButton></form>
+                : order.status === "accepted" && !order.driver_user_id ? <span className="rounded-full bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">Waiting for a driver to claim</span> : next ? <form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id} /><input type="hidden" name="next_status" value={next} /><FormSubmitButton pendingLabel="Updating…" className="min-h-11 rounded-full bg-[#ff8a00] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#ed5a19]">{next === "preparing" ? "Start preparing" : "Mark ready for pickup"}</FormSubmitButton></form>
                 : null}
             </div>
             <details className="mt-3"><summary className="cursor-pointer text-xs font-bold text-slate-500">Delivery details</summary><p className="mt-2 text-sm font-semibold">{address?.address_line || "Address unavailable"}</p><p className="mt-1 text-sm text-slate-500">{address?.recipient_phone || ""}{address?.landmark ? " · Near " + address.landmark : ""}</p></details>
