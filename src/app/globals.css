@@ -35,4 +35,9 @@
 .animate-fade-in{animation:fade-in .2s ease-out}
 button,a{-webkit-tap-highlight-color:transparent}
 .pb-safe{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+/* Order tracker: the line to the next stage flows forward; a rider glides along it once preparing is done. */
+@keyframes track-flow{from{background-position:0 0}to{background-position:16px 0}}
+.track-flow{background:linear-gradient(90deg,#ff8a00 0 50%,#ffcf9e 50% 100%);background-size:16px 100%;animation:track-flow .7s linear infinite}
+@keyframes rider-go{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:0}}
+.rider-go{animation:rider-go 2.6s ease-in-out infinite;transform:translateX(-50%)}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.skeleton{animation:none}}

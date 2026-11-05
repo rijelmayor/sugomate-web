@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/dashboard/actions";
 import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import FormSubmitButton from "@/components/FormSubmitButton";
+import DriverOfferAlarm from "@/components/driver/DriverOfferAlarm";
 import { respondToDriverAssignment, setDriverAvailability, updateDriverOrderStatus } from "./actions";
 
 const labels: Record<string,string> = {
@@ -35,6 +36,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
     <Link href="/" className="flex items-center gap-2 text-sm font-black"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-white">S</span>SUGOMATE <span className="font-medium text-slate-400">/ Delivery partner</span></Link>
     <div className="flex items-center gap-2"><form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></form></div>
    </header>
+   {active&&<DriverOfferAlarm userId={user.id} offeredIds={offered.map(o=>o.id)}/>}
    <section className="mt-7 overflow-hidden rounded-[2rem] bg-[#102e57] p-6 text-white shadow-xl sm:p-8">
     <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.18em] text-[#ffbd18]">Delivery partner workspace</p><h1 className="mt-2 text-3xl font-black sm:text-4xl">Maayong adlaw, {(profile?.display_name||"Partner").split(/\s+/)[0]}!</h1><p className="mt-2 text-sm text-white/70">{driver.vehicle_type}{driver.vehicle_plate?" · "+driver.vehicle_plate:""} · {profile?.phone||"Contact not set"}</p></div><span className={`rounded-full px-4 py-2 text-xs font-black ${active?"bg-emerald-300/15 text-emerald-100":"bg-amber-300/15 text-amber-100"}`}>{driver.status==="active"?"Approved partner":driver.status==="pending"?"Application pending":driver.status}</span></div>
     {active&&<div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/15 pt-5"><div><p className="font-bold">Availability</p><p className="mt-1 text-xs text-white/65">{driver.is_available?"You are online and eligible for dispatch.":"You are offline and will not receive new assignments."}</p></div><form action={setDriverAvailability}><input type="hidden" name="is_available" value={String(!driver.is_available)}/><FormSubmitButton pendingLabel="Updating…" className={`rounded-full px-5 py-3 text-sm font-black ${driver.is_available?"bg-white/10 text-white":"bg-[#ffbd18] text-[#102e57]"}`}>{driver.is_available?"Go offline":"Go online"}</FormSubmitButton></form></div>}
