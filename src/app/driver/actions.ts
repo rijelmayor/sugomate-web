@@ -2,6 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireActiveDriver() {
@@ -18,8 +19,8 @@ export async function setDriverAvailability(formData: FormData) {
   const { supabase } = await requireActiveDriver();
   const available = String(formData.get("is_available")) === "true";
   const { error } = await supabase.rpc("driver_set_availability", { p_is_available: available });
-  if (error) redirect("/driver?error=availability");
-  redirect("/driver?updated=availability");
+  if (error) throw new Error("Could not update availability. Please try again.");
+  revalidatePath("/driver");
 }
 
 export async function claimReadyOrder(formData: FormData) {
@@ -27,8 +28,8 @@ export async function claimReadyOrder(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=claim");
   const { error } = await supabase.rpc("driver_claim_order", { p_order_id: orderId });
-  if (error) redirect("/driver?error=claim");
-  redirect("/driver?updated=claimed");
+  if (error) throw new Error("Could not claim this order. Please try again.");
+  revalidatePath("/driver");
 }
 
 export async function respondToDriverAssignment(formData: FormData) {
@@ -39,8 +40,8 @@ export async function respondToDriverAssignment(formData: FormData) {
   const { error } = await supabase.rpc("driver_respond_to_assignment", {
     p_order_id: orderId, p_accept: accept,
   });
-  if (error) redirect("/driver?error=assignment");
-  redirect(accept ? "/driver?updated=accepted" : "/driver?updated=declined");
+  if (error) throw new Error("Could not respond to this dispatch offer. Please try again.");
+  revalidatePath("/driver");
 }
 
 
@@ -49,8 +50,8 @@ export async function confirmRiderOnTheWay(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=commitment");
   const { error } = await supabase.rpc("driver_confirm_on_the_way", { p_order_id: orderId });
-  if (error) redirect("/driver?error=commitment");
-  redirect("/driver?updated=on-the-way");
+  if (error) throw new Error("Could not confirm departure. Please try again.");
+  revalidatePath("/driver");
 }
 
 export async function releaseDriverClaim(formData: FormData) {
@@ -58,8 +59,8 @@ export async function releaseDriverClaim(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=release");
   const { error } = await supabase.rpc("driver_release_order_claim", { p_order_id: orderId });
-  if (error) redirect("/driver?error=release");
-  redirect("/driver?updated=released");
+  if (error) throw new Error("Could not release this order. Please try again.");
+  revalidatePath("/driver");
 }
 
 export async function updateDriverOrderStatus(formData: FormData) {
@@ -92,7 +93,7 @@ export async function updateDriverOrderStatus(formData: FormData) {
   });
   if (error) {
     if (proofPath) await supabase.storage.from("delivery-proofs").remove([proofPath]);
-    redirect("/driver?error=delivery");
+    throw new Error("Could not update this delivery. Please try again.");
   }
-  redirect("/driver?updated=" + nextStatus);
+  revalidatePath("/driver");
 }
