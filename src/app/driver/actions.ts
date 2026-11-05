@@ -43,6 +43,25 @@ export async function respondToDriverAssignment(formData: FormData) {
   redirect(accept ? "/driver?updated=accepted" : "/driver?updated=declined");
 }
 
+
+export async function confirmRiderOnTheWay(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=commitment");
+  const { error } = await supabase.rpc("driver_confirm_on_the_way", { p_order_id: orderId });
+  if (error) redirect("/driver?error=commitment");
+  redirect("/driver?updated=on-the-way");
+}
+
+export async function releaseDriverClaim(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=release");
+  const { error } = await supabase.rpc("driver_release_order_claim", { p_order_id: orderId });
+  if (error) redirect("/driver?error=release");
+  redirect("/driver?updated=released");
+}
+
 export async function updateDriverOrderStatus(formData: FormData) {
   const { supabase, user } = await requireActiveDriver();
   const orderId = String(formData.get("order_id") ?? "");
