@@ -8,7 +8,7 @@ import DriverOfferAlarm from "@/components/driver/DriverOfferAlarm";
 import { respondToDriverAssignment, setDriverAvailability, updateDriverOrderStatus, claimReadyOrder } from "./actions";
 
 const labels: Record<string,string> = {
- accepted:"Waiting for merchant", preparing:"Merchant preparing", ready_for_pickup:"Ready for pickup", assigned:"Assignment offered", picked_up:"Picked up", in_transit:"On the way", delivered:"Delivered"
+ accepted:"Waiting for merchant", preparing:"Merchant preparing", ready_for_pickup:"Ready for pickup", assigned:"Driver assigned", picked_up:"Picked up", in_transit:"On the way", delivered:"Delivered"
 };
 const money=(value:number|string)=>"₱"+Number(value).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -60,7 +60,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
        <p className="mt-3 text-sm text-slate-600">{addr?.address_line||"Address on file"}{addr?.landmark?` · ${addr.landmark}`:""}</p>
        <form action={claimReadyOrder} className="mt-4"><input type="hidden" name="order_id" value={order.id}/><FormSubmitButton pendingLabel="Claiming…" className="rounded-full bg-[#102e57] px-5 py-2.5 text-sm font-black text-white">Claim this order</FormSubmitButton></form>
       </article>;
-     })}{!(readyOrders??[]).length&&<div className="rounded-2xl border border-dashed border-orange-200 bg-white p-8 text-center text-sm text-slate-500">No orders waiting for pickup right now.</div>}</div>}
+     })}{!(readyOrders??[]).length&&<div className="rounded-2xl border border-dashed border-orange-200 bg-white p-8 text-center text-sm text-slate-500">No available orders right now. New accepted orders will appear here automatically.</div>}</div>}
     </section>
     <section className="mt-8"><div className="mb-4"><p className="text-xs font-black uppercase tracking-widest text-orange-600">Dispatch queue</p><h2 className="mt-1 text-2xl font-black">Your assigned deliveries</h2><p className="mt-1 text-sm text-slate-500">Accept a dispatch offer, confirm pickup, update transit, then upload a delivery photo to complete the order.</p></div>
      <div className="space-y-4">{current.length?current.map(order=>{const address=order.address_snapshot as {recipient_name?:string;recipient_phone?:string;address_line?:string;landmark?:string};return <article key={order.id} className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:p-6">
