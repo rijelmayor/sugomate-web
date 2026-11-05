@@ -47,7 +47,6 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     const prev = statusRef.current[row.id];
     statusRef.current[row.id] = row.status;
     if (prev === undefined || prev === row.status) return;
-    router.refresh();
     const message = deliveryMessages[row.status];
     if (!message) return;
     setUpdates(current => [{ key: `${row.id}:${row.status}`, orderNumber: row.order_number || "Order", message }, ...current.filter(item => item.key !== `${row.id}:${row.status}`)].slice(0, 6));
@@ -92,7 +91,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter }, payload => {
         const row = payload.new as OrderRow;
-        if (row?.id && row.status && ids.includes(row.merchant_id)) trackStatus(row);
+        if (row?.id && row.status && ids.includes(row.merchant_id)) { trackStatus(row); router.refresh(); }
       })
       .subscribe(status => { const connected = status === "SUBSCRIBED"; setLive(connected); if (connected) void checkPending(); });
 
