@@ -39,14 +39,14 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     seenRef.current.add(row.id);
     statusRef.current[row.id] = "pending_merchant";
     setQueue(current => [...current, row]);
-    router.refresh(); // show the new order in the list straight away
-  }, [router]);
+  }, []);
 
   // Compares against the last known status, so a status change is announced once whether it arrives live or on catch-up.
   const trackStatus = useCallback((row: OrderRow) => {
     const prev = statusRef.current[row.id];
     statusRef.current[row.id] = row.status;
     if (prev === undefined || prev === row.status) return;
+    router.refresh();
     const message = deliveryMessages[row.status];
     if (!message) return;
     setUpdates(current => [{ key: `${row.id}:${row.status}`, orderNumber: row.order_number || "Order", message }, ...current.filter(item => item.key !== `${row.id}:${row.status}`)].slice(0, 6));
