@@ -48,16 +48,21 @@ async function uploadDriverDocuments(supabase: Awaited<ReturnType<typeof createC
     const value = formData.get(item.field);
     const present = value instanceof File && value.size > 0;
     if (!present) { if (item.required) redirect(`${errorPath}?error=docs`); continue; }
-    if (value.size > 5 * 1024 * 1024 || !DOC_TYPES.includes(value.type)) redirect(`${errorPath}?error=docs`);
+    const typeOk = DOC_TYPES.includes(value.type) || /\.jpe?g$/i.test(value.name) || value.type === "";
+    if (value.size > 5 * 1024 * 1024 || !typeOk) redirect(`${errorPath}?error=docs`);
     files[item.key] = value;
   }
   const uploaded: string[] = [];
   const paths: Record<string, string | null> = { id: null, selfie: null, license: null };
   for (const [key, file] of Object.entries(files)) {
-    const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    // Prefer JPEG after client compression; fall back to detected type
+    const isJpeg = file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
+    const extension = isJpeg ? "jpg" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const contentType = isJpeg ? "image/jpeg" : file.type || "image/jpeg";
     const path = `${userId}/${key}-${randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from("driver-documents").upload(path, file, { contentType: file.type, upsert: false });
+    const { error } = await supabase.storage.from("driver-documents").upload(path, file, { contentType, upsert: false });
     if (error) {
+      console.error("[driver-docs] upload failed", { path, contentType, size: file.size, message: error.message });
       if (uploaded.length) await supabase.storage.from("driver-documents").remove(uploaded);
       redirect(`${errorPath}?error=upload`);
     }
