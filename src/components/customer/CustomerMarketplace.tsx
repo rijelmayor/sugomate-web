@@ -15,21 +15,21 @@ type Product = {
   description: string | null;
   price: number | string;
   image_url: string | null;
-  merchant: { name: string; slug: string; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
+  merchant: { name: string; slug: string; logo_url?: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
-type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null };
+type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
 const peso = (value: number) => `₱${value.toFixed(2)}`;
 const activeStyle = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
-function CheckoutSubmitButton({ disabled }: { disabled: boolean }) {
+function CheckoutSubmitButton({ disabled, paymentMethod }: { disabled: boolean; paymentMethod: string }) {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={disabled || pending} aria-busy={pending} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ff8a00] px-4 py-3.5 text-sm font-extrabold text-white shadow-md shadow-orange-200 transition duration-200 hover:bg-[#ed5a19] active:scale-[.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100 data-[pending=true]:cursor-wait" data-pending={pending}>
     {pending && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-    {pending ? "Placing your order…" : "Place COD order"}
+    {pending ? "Placing your order…" : paymentMethod === "gcash" ? "Place GCash order" : "Place COD order"}
   </button>;
 }
 
@@ -42,19 +42,15 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
 }
 
 function StoreCard({ item, href }: { item: Store; href: string }) {
-  const [failed, setFailed] = useState(false);
-  return <PendingLink href={href} className="flex min-w-0 items-center gap-3 rounded-3xl border border-orange-100/90 bg-white p-3 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-    <span className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
-      {item.image && !failed ? <img src={item.image} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <Store aria-hidden="true" size={30} strokeWidth={1.5} />}
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className="block truncate text-base font-extrabold text-[#102e57]">{item.name}</span>
-      {item.branchName && item.branchName !== item.name && <span className="block truncate text-xs text-slate-500">{item.branchName}</span>}
-      <span className="mt-1 flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} className="shrink-0" /><span className="truncate">{item.area || "Leyte"}</span></span>
-      <span className="mt-1.5 inline-block rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-bold text-orange-700">{item.count} {item.count === 1 ? "item" : "items"}</span>
-    </span>
-    <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-slate-300" />
-  </PendingLink>;
+  const content = <><span className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+    {item.image ? <img src={item.image} alt={item.name + " logo"} loading="lazy" decoding="async" className="h-full w-full object-contain p-2" /> : <Store aria-hidden="true" size={30} strokeWidth={1.5} />}
+  </span><span className="min-w-0 flex-1"><span className="block truncate text-base font-extrabold text-[#102e57]">{item.name}</span>
+    {item.branchName && item.branchName !== item.name && <span className="block truncate text-xs text-slate-500">{item.branchName}</span>}
+    <span className="mt-1 flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} className="shrink-0" /><span className="truncate">{item.area || "Leyte"}</span></span>
+    <span className={"mt-1.5 inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold " + (item.isOpen ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600")}>{item.isOpen ? "Open now" : "Closed"}</span>
+  </span>{item.isOpen ? <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-slate-300" /> : <span className="text-[11px] font-bold text-slate-400">Unavailable</span>}</>;
+  const className = "flex min-w-0 items-center gap-3 rounded-3xl border border-orange-100/90 bg-white p-3 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 " + (item.isOpen ? "hover:-translate-y-0.5 hover:shadow-lg" : "opacity-75");
+  return item.isOpen ? <PendingLink href={href} className={className}>{content}</PendingLink> : <div aria-disabled="true" className={className}>{content}</div>;
 }
 
 export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
@@ -78,6 +74,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const [customerNote, setCustomerNote] = useState("");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "__new__");
   const [newMunicipalityId, setNewMunicipalityId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cod");
 
   // Restore the basket after a refresh, a failed checkout, or leaving and returning.
   useEffect(() => {
@@ -141,6 +138,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const selectedAddress = addresses.find(a => a.id === addressId);
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
+  const acceptedPaymentMethods = currentStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
+  const gcashQrUrl = currentStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
 
   function href(next: { storeCategory?: string; store?: string; municipality?: string }) {
     const params = new URLSearchParams();
@@ -286,8 +285,14 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
           <textarea id="checkout-note" name="customer_note" value={customerNote} onChange={e => setCustomerNote(e.target.value)} maxLength={500} rows={2} placeholder="Landmark, instructions for the rider…" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#102e57]" />
           <input type="hidden" name="items" value={JSON.stringify(items.map(({ product, quantity }) => ({ product_id: product.id, quantity })))} />
-          <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: Cash on delivery</strong><br />The store will confirm your order.{fee === undefined && " Delivery fee is calculated by SUGOMATE at checkout."}</div>
-          <CheckoutSubmitButton disabled={!canCheckout} />
+          <fieldset className="space-y-2"><legend className="text-xs font-bold text-slate-600">Payment method</legend>
+            {acceptedPaymentMethods.includes("cod") && <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="radio" name="payment_method_choice" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="accent-orange-500"/>Cash on delivery</label>}
+            {acceptedPaymentMethods.includes("gcash") && <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="radio" name="payment_method_choice" value="gcash" checked={paymentMethod === "gcash"} onChange={() => setPaymentMethod("gcash")} className="accent-orange-500"/>GCash</label>}
+          </fieldset>
+          <input type="hidden" name="payment_method" value={paymentMethod}/>
+          {paymentMethod === "gcash" && gcashQrUrl && <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-center"><p className="text-xs font-bold text-sky-900">Scan the merchant GCash QR to pay</p><img src={gcashQrUrl} alt="Merchant GCash payment QR" className="mx-auto mt-2 h-40 w-40 rounded-xl border border-slate-200 bg-white object-contain p-2"/><p className="mt-2 text-[11px] text-sky-800">Keep your payment confirmation. The store will verify the payment.</p></div>}
+          <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: {paymentMethod === "gcash" ? "GCash" : "Cash on delivery"}</strong><br />The store will confirm your order.{fee === undefined && " Delivery fee is calculated by SUGOMATE at checkout."}</div>
+          <CheckoutSubmitButton disabled={!canCheckout || !acceptedPaymentMethods.includes(paymentMethod) || (paymentMethod === "gcash" && !gcashQrUrl)} paymentMethod={paymentMethod} />
           <p className="text-center text-[11px] leading-4 text-slate-400">Prices, stock, store approval and delivery fees are verified securely when you place the order.</p>
         </form>
         <Link href="/customer/addresses" className="block text-center text-xs font-bold text-slate-500 underline">Manage saved addresses</Link>
