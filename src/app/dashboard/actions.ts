@@ -16,10 +16,13 @@ export async function applyAsMerchant(formData: FormData) {
   const name = String(formData.get("business_name") ?? "").trim();
   const slug = String(formData.get("business_slug") ?? "").trim().toLowerCase()
     .normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const address = String(formData.get("business_address") ?? "").trim().slice(0, 500);
+  const contactPhone = String(formData.get("business_phone") ?? "").trim().slice(0, 20);
+  const description = String(formData.get("business_description") ?? "").trim().slice(0, 1000);
   if (!name || slug.length < 3) redirect("/merchant/apply?error=details");
 
   const { data: merchant, error } = await supabase.from("merchants")
-    .insert({ owner_id: user.id, name, slug, status: "pending" })
+    .insert({ owner_id: user.id, name, slug, status: "pending", address: address || null, contact_phone: contactPhone || null, description: description || null })
     .select("id").single();
   if (error || !merchant) redirect("/merchant/apply?error=application");
 
@@ -34,10 +37,11 @@ const VEHICLES = ["Motorcycle", "Bicycle", "Car", "Other"];
 
 // Validates and uploads the applicant's documents to the private driver-documents bucket.
 async function uploadDriverDocuments(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, formData: FormData, vehicleType: string, errorPath: string) {
+  // Documents are optional. Upload any that are provided.
   const spec = [
-    { field: "id_document", key: "id", required: true },
-    { field: "selfie_document", key: "selfie", required: true },
-    { field: "license_document", key: "license", required: vehicleType !== "Bicycle" },
+    { field: "id_document", key: "id", required: false },
+    { field: "selfie_document", key: "selfie", required: false },
+    { field: "license_document", key: "license", required: false },
   ] as const;
   const files: Record<string, File> = {};
   for (const item of spec) {
@@ -67,11 +71,16 @@ export async function applyAsDriver(formData: FormData) {
   const { supabase, user } = await requireUser();
   const vehicleType = String(formData.get("vehicle_type") ?? "").trim();
   const vehiclePlate = String(formData.get("vehicle_plate") ?? "").trim().slice(0, 20);
+  const ageRaw = String(formData.get("age") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim().slice(0, 500);
+  const age = ageRaw ? Number(ageRaw) : null;
   if (!VEHICLES.includes(vehicleType)) redirect("/driver/apply?error=details");
+  if (age !== null && (Number.isNaN(age) || age < 18 || age > 80)) redirect("/driver/apply?error=details");
 
   const { paths, uploaded } = await uploadDriverDocuments(supabase, user.id, formData, vehicleType, "/driver/apply");
   const { error } = await supabase.from("driver_profiles").insert({
     user_id: user.id, vehicle_type: vehicleType, vehicle_plate: vehiclePlate || null, status: "pending",
+    age, address: address || null,
     id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license,
   });
   if (error) {
