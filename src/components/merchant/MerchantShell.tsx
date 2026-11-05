@@ -23,7 +23,7 @@ export default function MerchantShell({ active, store, newCount = 0, width = "ma
   const white = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
   return <main className="min-h-screen bg-[#fff7ef] px-4 pb-28 pt-5 text-[#102e57] sm:px-6 sm:pb-10 sm:pt-7">
     <div className={`mx-auto ${width}`}>
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <Link href="/merchant" className="flex min-w-0 items-center gap-3">
           <StoreAvatar name={store?.name ?? "Store"} logoUrl={store?.logoUrl} />
           <span className="min-w-0"><span className="block truncate text-base font-black leading-tight sm:text-lg">{store?.name ?? "Your store"}</span><span className="block text-[11px] font-bold uppercase tracking-wider text-orange-600">SUGOMATE Merchant</span></span>
