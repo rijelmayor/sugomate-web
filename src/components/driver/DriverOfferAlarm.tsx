@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import SoundToggle from "@/components/alerts/SoundToggle";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
 
-// Rings a loud alarm (with voice and vibration) while a delivery offer is waiting for the rider.
+// Keeps the driver order board live and rings for direct dispatch offers.
 // The ringing state comes from the server list of offered orders, so it stops by itself
 // the moment the rider accepts or declines.
 export default function DriverOfferAlarm({ userId, offeredIds }: { userId: string; offeredIds: string[] }) {
@@ -23,7 +23,7 @@ export default function DriverOfferAlarm({ userId, offeredIds }: { userId: strin
     const supabase = createClient();
     const channel = supabase
       .channel(`driver-offers-${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `driver_user_id=eq.${userId}` }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => router.refresh())
       .subscribe(status => { liveRef.current = status === "SUBSCRIBED"; });
     // Fallback poll only if the live connection is down, so riders never miss an offer.
     const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") router.refresh(); }, 20000);
