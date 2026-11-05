@@ -60,8 +60,9 @@ begin
       updated_at = now()
   where id = p_order_id;
 
-  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
-  values (p_order_id,v_order.status,v_order.status,v_actor,'Delivery partner claimed the order; merchant may begin preparation');
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values (v_actor,'driver_claimed_order','orders',p_order_id::text,
+    jsonb_build_object('order_number',v_order.order_number,'merchant_may_prepare',true));
 end;
 $$;
 
