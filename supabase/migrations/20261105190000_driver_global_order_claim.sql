@@ -142,7 +142,7 @@ begin
   if not found then raise exception 'Assigned order not found.'; end if;
 
   v_valid :=
-    (v_order.status='ready_for_pickup' and v_order.driver_assignment_status='accepted' and p_next_status='picked_up')
+    (v_order.status='ready_for_pickup' and v_order.driver_assignment_status='accepted' and p_next_status='picked_up')\n    or (v_order.status='assigned' and v_order.driver_assignment_status='accepted' and p_next_status='picked_up')
     or (v_order.status='picked_up' and p_next_status='in_transit')
     or (v_order.status='in_transit' and p_next_status='delivered');
   if not v_valid then raise exception 'Wait for the merchant to mark the order ready, or check the current delivery status.'; end if;
