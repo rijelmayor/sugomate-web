@@ -57,12 +57,12 @@ export function useAlertSound() {
   useEffect(() => {
     let pref: string | null = null;
     try { pref = window.localStorage.getItem(PREF_KEY); } catch { /* ignore */ }
-    if (pref !== "on") return;
+    if (pref === "off") return; // only an explicit opt-out stays silent; everyone else is armed by their first tap
     setNeedsTap(true);
-    const unlock = () => { void enable(); };
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
+    const events = ["pointerdown", "pointerup", "touchend", "click", "keydown"] as const;
+    const unlock = () => { events.forEach(name => window.removeEventListener(name, unlock)); void enable(); };
+    events.forEach(name => window.addEventListener(name, unlock));
+    return () => events.forEach(name => window.removeEventListener(name, unlock));
   }, [enable]);
 
   useEffect(() => () => {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { MapPin, Minus, Plus, Search, ShoppingBasket, Store, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Minus, Plus, Search, ShoppingBasket, Store, X } from "lucide-react";
 import { placeOrder } from "@/app/customer/actions";
 import PendingLink from "@/components/PendingLink";
 import { CART_KEY } from "@/lib/cart";
@@ -18,6 +18,7 @@ type Product = {
   merchant: { name: string; slug: string; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
+type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
@@ -40,10 +41,26 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
   </div>;
 }
 
-export default function CustomerMarketplace({ products, categories, selectedCategory, selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
+function StoreCard({ item, href }: { item: Store; href: string }) {
+  const [failed, setFailed] = useState(false);
+  return <PendingLink href={href} className="flex min-w-0 items-center gap-3 rounded-3xl border border-orange-100/90 bg-white p-3 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+    <span className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+      {item.image && !failed ? <img src={item.image} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <Store aria-hidden="true" size={30} strokeWidth={1.5} />}
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-base font-extrabold text-[#102e57]">{item.name}</span>
+      {item.branchName && item.branchName !== item.name && <span className="block truncate text-xs text-slate-500">{item.branchName}</span>}
+      <span className="mt-1 flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} className="shrink-0" /><span className="truncate">{item.area || "Leyte"}</span></span>
+      <span className="mt-1.5 inline-block rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-bold text-orange-700">{item.count} {item.count === 1 ? "item" : "items"}</span>
+    </span>
+    <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-slate-300" />
+  </PendingLink>;
+}
+
+export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
   products: Product[];
-  categories: { id: string; name: string; slug: string; icon: string }[];
-  selectedCategory: string;
+  stores: Store[];
+  selectedStore?: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
   merchantCategories?: { id: string; name: string; slug: string; icon: string }[];
@@ -104,13 +121,20 @@ export default function CustomerMarketplace({ products, categories, selectedCate
     return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
   }, [sheetOpen]);
 
+  // A search typed on the home or store list should not silently filter the next store's menu.
+  useEffect(() => { setSearch(""); }, [selectedStore]);
+
   const items = Object.values(cart);
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return products.filter(p => (!q || p.name.toLowerCase().includes(q) || p.merchant?.name.toLowerCase().includes(q)) && (!selectedMerchantCategory || p.merchant?.store_category?.slug === selectedMerchantCategory));
-  }, [products, search, selectedMerchantCategory]);
+  const q = search.trim().toLowerCase();
+  const currentStore = stores.find(item => item.id === selectedStore);
+  const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
+  const storeMatches = stores.filter(item => (!selectedMerchantCategory || item.categorySlug === selectedMerchantCategory) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
+  const uncategorised = stores.filter(item => item.categorySlug === "other").length;
+  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", count: uncategorised }] : [])];
+  const activeCategory = tiles.find(item => item.slug === selectedMerchantCategory);
+  const view: "store" | "stores" | "home" = currentStore ? "store" : selectedMerchantCategory || q ? "stores" : "home";
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId);
@@ -118,13 +142,13 @@ export default function CustomerMarketplace({ products, categories, selectedCate
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
 
-  function href(next: { category?: string; storeCategory?: string; municipality?: string }) {
+  function href(next: { storeCategory?: string; store?: string; municipality?: string }) {
     const params = new URLSearchParams();
-    const category = next.category ?? selectedCategory;
     const storeCategory = next.storeCategory ?? selectedMerchantCategory;
+    const store = next.store ?? "";
     const municipality = next.municipality ?? selectedMunicipality;
-    if (category) params.set("category", category);
     if (storeCategory) params.set("storeCategory", storeCategory);
+    if (store) params.set("store", store);
     if (municipality) params.set("municipality", municipality);
     const query = params.toString();
     return query ? `/customer?${query}` : "/customer";
@@ -149,35 +173,54 @@ export default function CustomerMarketplace({ products, categories, selectedCate
       <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
         <div className="relative">
           <Search aria-hidden="true" size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search food, stores, groceries…" aria-label="Search food, stores, and groceries" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-10 pr-10 text-sm text-[#102e57] shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-200" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "store" ? "Search this store's items…" : "Search stores or areas…"} aria-label="Search" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-10 pr-10 text-sm text-[#102e57] shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-200" />
           {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 active:scale-90"><X size={16} /></button>}
         </div>
         <div className="relative">
           <MapPin aria-hidden="true" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-orange-500" />
-          <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
+          <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value, store: view === "store" ? "" : undefined })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
             <option value="">All service areas</option>
             {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
       </div>
 
-      {merchantCategories.length > 0 && <div aria-label="Store categories" className="mt-4 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
-        <PendingLink href={href({ storeCategory: "" })} className={chip(!selectedMerchantCategory, "sm")} style={!selectedMerchantCategory ? activeStyle : undefined}>All stores</PendingLink>
-        {merchantCategories.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}>{item.icon} {item.name}</PendingLink>; })}
-      </div>}
+      <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
+      {view === "home" && <>
+        <div className="mt-6"><h2 className="text-xl font-black text-[#102e57]">Browse by category</h2><p className="mt-0.5 text-sm text-slate-500">Pick what you need — we&apos;ll show the stores.</p></div>
+        {tiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {tiles.map(item => <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className="flex min-h-28 flex-col items-center justify-center gap-1.5 rounded-3xl border border-orange-100/90 bg-white p-4 text-center shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg active:scale-[.98]">
+            <span aria-hidden="true" className="text-3xl">{item.icon}</span>
+            <span className="text-sm font-extrabold text-[#102e57]">{item.name}</span>
+            <span className="text-[11px] font-semibold text-slate-400">{item.count} {item.count === 1 ? "store" : "stores"}</span>
+          </PendingLink>)}
+        </div> : null}
+        {stores.length > 0 && <>
+          <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
+          <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ storeCategory: item.categorySlug === "other" ? "" : item.categorySlug, store: item.id })} />)}</div>
+        </>}
+        {!stores.length && <div className="mt-6 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">Your local marketplace is getting ready</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">We&apos;re preparing merchant catalogs in Hilongos, Bato, Hindang, Inopacan, and Matalom. Approved stores will appear here as they join.</p></div>}
+      </>}
 
-      <div aria-label="Product categories" className="mt-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
-        <PendingLink href={href({ category: "" })} aria-current={!selectedCategory ? "page" : undefined} className={chip(!selectedCategory, "md")} style={!selectedCategory ? activeStyle : undefined}>All</PendingLink>
-        {categories.map(category => { const active = selectedCategory === category.slug; return <PendingLink key={category.id} href={href({ category: category.slug })} aria-current={active ? "page" : undefined} className={chip(active, "md")} style={active ? activeStyle : undefined}>{category.icon} {category.name}</PendingLink>; })}
-      </div>
+      {view === "stores" && <>
+        <div className="mt-5 flex items-center gap-2">
+          <PendingLink href={href({ storeCategory: "" })} aria-label="Back to categories" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
+          <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{q ? "Search results" : `${activeCategory?.icon ?? ""} ${activeCategory?.name ?? "Stores"}`}</h2><p className="text-xs text-slate-400">{isFiltering ? "Updating…" : `${storeMatches.length} ${storeMatches.length === 1 ? "store" : "stores"}`}</p></div>
+        </div>
+        {tiles.length > 1 && <div aria-label="Store categories" className="mt-3 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
+          <PendingLink href={href({ storeCategory: "" })} className={chip(false, "sm")}>All categories</PendingLink>
+          {tiles.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}>{item.icon} {item.name}</PendingLink>; })}
+        </div>}
+        {storeMatches.length ? <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{storeMatches.map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><Store aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching stores" : "No stores here yet"}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{q ? "Try another store or area name." : "Stores in this category will appear here once they are approved."}</p></div>}
+      </>}
 
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <div><h2 className="text-xl font-black text-[#102e57]">Popular near you</h2><p className="mt-0.5 text-sm text-slate-500">Local merchants approved by SUGOMATE</p></div>
-        <span className="text-xs font-semibold text-slate-400">{isFiltering ? "Updating…" : `${visible.length} items`}</span>
-      </div>
-
-      {visible.length ? <div className={`mt-4 grid min-w-0 grid-cols-1 gap-3 transition-opacity duration-200 sm:grid-cols-2 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
-        {visible.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+      {view === "store" && currentStore && <>
+        <div className="mt-5 flex items-center gap-2">
+          <PendingLink href={href({ store: "" })} aria-label="Back to stores" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
+          <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{currentStore.name}</h2><p className="flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} />{currentStore.branchName && currentStore.branchName !== currentStore.name ? `${currentStore.branchName} · ` : ""}{currentStore.area || "Leyte"} · {productMatches.length} {productMatches.length === 1 ? "item" : "items"}</p></div>
+        </div>
+        {productMatches.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          {productMatches.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
           <ProductImage src={product.image_url} alt={product.name} />
           <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3">
             <div className="min-w-0">
@@ -195,10 +238,9 @@ export default function CustomerMarketplace({ products, categories, selectedCate
             </div>
           </div>
         </article>; })}
-      </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12">
-        <ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{search ? "No matching items" : "Your local marketplace is getting ready"}</h3>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{search ? "Try another product or store name." : "We’re preparing merchant catalogs in Hilongos, Bato, Hindang, Inopacan, and Matalom. Approved stores and products will appear here as they join."}</p>
-      </div>}
+        </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching items" : "No items available right now"}</h3><p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{q ? "Try another item name." : "Please check back soon."}</p></div>}
+      </>}
+      </div>
     </section>
 
     {sheetOpen && <div onClick={() => setSheetOpen(false)} aria-hidden="true" className="animate-fade-in fixed inset-0 z-40 bg-slate-900/50 lg:hidden" />}

@@ -7,11 +7,26 @@ import SoundToggle from "@/components/alerts/SoundToggle";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
 
 type IncomingOrder = { id: string; order_number: string | null; merchant_id: string };
+type OrderRow = IncomingOrder & { status: string };
+type DeliveryUpdate = { key: string; orderNumber: string; message: string };
+
+// Changes made by riders or the system. The store's own steps (accept, preparing, ready) refresh the list silently.
+const deliveryMessages: Record<string, string> = {
+  assigned: "A rider took this order and is heading to your store.",
+  picked_up: "The rider picked up this order.",
+  in_transit: "The rider is on the way to the customer.",
+  delivered: "This order was delivered to the customer.",
+  cancelled: "This order was cancelled.",
+};
 
 export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: string[] }) {
   const router = useRouter();
   const sound = useAlertSound();
   const [queue, setQueue] = useState<IncomingOrder[]>([]);
+  const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
+  const soundRef = useRef(sound);
+  useEffect(() => { soundRef.current = sound; });
+  const statusRef = useRef<Record<string, string>>({});
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
   // Stable key: the array prop changes identity on every refresh, the ids do not.
@@ -21,8 +36,24 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
   const push = useCallback((row: IncomingOrder) => {
     if (!row?.id || seenRef.current.has(row.id)) return;
     seenRef.current.add(row.id);
+    statusRef.current[row.id] = "pending_merchant";
     setQueue(current => [...current, row]);
     router.refresh(); // show the new order in the list straight away
+  }, [router]);
+
+  // Compares against the last known status, so a status change is announced once whether it arrives live or on catch-up.
+  const trackStatus = useCallback((row: OrderRow) => {
+    const prev = statusRef.current[row.id];
+    statusRef.current[row.id] = row.status;
+    if (prev === undefined || prev === row.status) return;
+    router.refresh();
+    const message = deliveryMessages[row.status];
+    if (!message) return;
+    setUpdates(current => [{ key: `${row.id}:${row.status}`, orderNumber: row.order_number || "Order", message }, ...current.filter(item => item.key !== `${row.id}:${row.status}`)].slice(0, 6));
+    const s = soundRef.current;
+    s.chime();
+    window.setTimeout(() => s.speak(`${row.order_number ? "Order " + row.order_number + ". " : ""}${message}`), 600);
+    s.vibrate([150, 80, 150]);
   }, [router]);
 
   useEffect(() => {
@@ -33,10 +64,17 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
 
     // Safety net: realtime can miss events (phone slept, network dropped), so also look for waiting orders.
     const checkPending = async () => {
-      const { data } = await supabase.from("orders").select("id,order_number,merchant_id").eq("status", "pending_merchant").in("merchant_id", ids).order("placed_at", { ascending: true }).limit(20);
+      const { data } = await supabase.from("orders").select("id,order_number,merchant_id,status").in("merchant_id", ids).order("placed_at", { ascending: false }).limit(60);
       if (!data) return;
-      if (!primedRef.current) { data.forEach(row => seenRef.current.add(row.id)); primedRef.current = true; return; }
-      data.forEach(row => push(row as IncomingOrder));
+      const first = !primedRef.current;
+      for (const row of [...data].reverse() as OrderRow[]) {
+        if (row.status === "pending_merchant") {
+          if (first) { seenRef.current.add(row.id); statusRef.current[row.id] = row.status; } else push(row);
+        }
+        trackStatus(row);
+        if (first) statusRef.current[row.id] = row.status;
+      }
+      primedRef.current = true;
     };
 
     const channel = supabase
@@ -45,13 +83,17 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
         const row = payload.new as IncomingOrder;
         if (row && ids.includes(row.merchant_id)) push(row);
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter }, payload => {
+        const row = payload.new as OrderRow;
+        if (row?.id && row.status && ids.includes(row.merchant_id)) trackStatus(row);
+      })
       .subscribe(status => { if (status === "SUBSCRIBED") void checkPending(); });
 
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void checkPending(); }, 30000);
     const onVisible = () => { if (document.visibilityState === "visible") void checkPending(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); void supabase.removeChannel(channel); };
-  }, [idsKey, push]);
+  }, [idsKey, push, trackStatus]);
 
   const ringing = queue.length > 0 && sound.enabled;
   // Chime plus a spoken "New order received" until the store confirms.
@@ -81,6 +123,16 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
         </div>
         <SoundToggle sound={sound} label="order alerts" testMessage="New order received." />
       </div>
+
+      {updates.length > 0 && (
+        <div role="status" className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-black uppercase tracking-[.16em] text-sky-800">Delivery updates</p>
+            <button type="button" onClick={() => setUpdates([])} className="text-xs font-bold text-sky-800 underline">Dismiss all</button>
+          </div>
+          <ul className="mt-2 space-y-1.5">{updates.map(item => <li key={item.key} className="text-sm text-[#102e57]"><strong>{item.orderNumber}</strong> · {item.message}</li>)}</ul>
+        </div>
+      )}
 
       {queue.length > 0 && (
         <div role="alert" className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-4 shadow-md sm:p-5">

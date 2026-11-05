@@ -5,6 +5,7 @@ import { updateMerchantOrderStatus } from "./actions";
 import FormSubmitButton from "@/components/FormSubmitButton";
 import MerchantNewOrderAlert from "@/components/merchant/MerchantNewOrderAlert";
 import PortalSignOut from "@/components/PortalSignOut";
+import OrderProgress from "@/components/orders/OrderProgress";
 
 const statusLabels: Record<string, string> = {
   pending_merchant: "New order",
@@ -80,6 +81,7 @@ export default async function MerchantPortal({ searchParams }: {
               <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{order.order_number}</p><h2 className="mt-1 text-lg font-black">{address?.recipient_name || "Customer"}</h2><p className="mt-1 text-xs text-slate-500">{new Date(order.placed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</p></div>
               <span className="rounded-full bg-orange-100 px-3 py-1.5 text-xs font-extrabold text-orange-800">{statusLabels[order.status] ?? order.status}</span>
             </div>
+            <OrderProgress status={order.status} />
             <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
               <div><h3 className="text-xs font-black uppercase tracking-wide text-slate-400">Items</h3><div className="mt-2 space-y-2">{(order.order_items ?? []).map((item: {id:string;product_name:string;quantity:number;line_total:number}) => <div key={item.id} className="flex justify-between gap-3 text-sm"><span>{item.quantity} × {item.product_name}</span><strong>₱{Number(item.line_total).toFixed(2)}</strong></div>)}</div></div>
               <div><h3 className="text-xs font-black uppercase tracking-wide text-slate-400">Delivery details</h3><p className="mt-2 text-sm font-semibold">{address?.address_line || "Address unavailable"}</p><p className="mt-1 text-sm text-slate-500">{address?.recipient_phone || ""}{address?.landmark ? " · Near " + address.landmark : ""}</p><p className="mt-3 text-xs text-slate-500">Payment: {order.payment_method.toUpperCase()} · {order.payment_status}</p>{order.customer_note && <p className="mt-2 rounded-lg bg-orange-50 p-2 text-xs text-slate-600">Note: {order.customer_note}</p>}</div>

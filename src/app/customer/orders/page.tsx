@@ -1,40 +1,13 @@
-import { Bike } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import PendingLink from "@/components/PendingLink";
 import PortalSignOut from "@/components/PortalSignOut";
 import ClearCartOnPlaced from "@/components/customer/ClearCartOnPlaced";
 import OrderLive from "@/components/customer/OrderLive";
+import OrderProgress from "@/components/orders/OrderProgress";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const labels: Record<string,string> = {pending_merchant:"Awaiting store",accepted:"Accepted",preparing:"Preparing",ready_for_pickup:"Ready for pickup",assigned:"Driver assigned",picked_up:"Picked up",in_transit:"On the way",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
-const steps = [
-  { label: "Placed", statuses: ["pending_merchant"] },
-  { label: "Accepted", statuses: ["accepted"] },
-  { label: "Preparing", statuses: ["preparing", "ready_for_pickup"] },
-  { label: "On the way", statuses: ["assigned", "picked_up", "in_transit"] },
-  { label: "Delivered", statuses: ["delivered"] },
-];
 const finished = new Set(["delivered", "cancelled", "rejected"]);
-
-function OrderProgress({ status }: { status: string }) {
-  const current = steps.findIndex(step => step.statuses.includes(status));
-  if (current < 0) return null;
-  const delivered = status === "delivered";
-  return <ol aria-label="Order progress" className="mt-4 flex items-start">{steps.map((step, index) => {
-    const done = index < current || delivered;
-    const active = index === current && !delivered;
-    const lineDone = index <= current || delivered;          // the line leading into this step is complete
-    const lineMoving = !delivered && index === current + 1;  // the line leading to the next step keeps moving
-    return <li key={step.label} className="relative flex flex-1 flex-col items-center text-center">
-      {index > 0 && <span aria-hidden="true" className="absolute right-1/2 top-[9px] h-0.5 w-full">
-        <span className={`absolute inset-0 rounded-full ${lineDone ? "bg-orange-400" : "bg-slate-200"}`} />
-        {lineMoving && <span className="track-flow absolute inset-0 rounded-full" />}
-        {lineMoving && index >= 3 && <span className="rider-go absolute -top-[7px] text-orange-600"><Bike size={16} strokeWidth={2.5} /></span>}
-      </span>}
-      <span className={`relative z-10 grid h-5 w-5 place-items-center rounded-full text-[10px] font-black ${done ? "bg-orange-500 text-white" : active ? "bg-orange-500 text-white ring-4 ring-orange-200 animate-pulse" : "bg-slate-200 text-slate-400"}`}>{done ? "✓" : index + 1}</span>
-      <span className={`mt-1.5 text-[10px] leading-3 sm:text-[11px] ${done || active ? "font-bold text-[#102e57]" : "text-slate-400"}`}>{step.label}</span>
-    </li>;
-  })}</ol>;
-}
 
 export default async function CustomerOrders({searchParams}:{searchParams:Promise<{placed?:string}>}) {
   const params=await searchParams;
@@ -56,8 +29,8 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
   const hasActive=(orders??[]).some(order=>!finished.has(order.status));
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">
     {params.placed&&<ClearCartOnPlaced/>}
-    <div className="flex items-center justify-between gap-3"><PendingLink href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</PendingLink><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div>
-    <div className="mt-5 flex flex-wrap items-center justify-between gap-2"><h1 className="text-3xl font-black">My orders</h1><OrderLive userId={user.id} hasActive={hasActive} statuses={Object.fromEntries((orders??[]).map(o=>[o.id,o.status]))}/></div><p className="mt-2 text-sm text-slate-500">Follow your orders from store confirmation through delivery.</p>
+    <div className="flex items-center justify-between gap-3"><PendingLink href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</PendingLink><div className="flex items-center gap-2"><NotificationBell userId={user.id}/><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div></div>
+    <div className="mt-5 flex flex-wrap items-center justify-between gap-2"><h1 className="text-3xl font-black">My orders</h1><OrderLive userId={user.id} hasActive={hasActive}/></div><p className="mt-2 text-sm text-slate-500">Follow your orders from store confirmation through delivery.</p>
     {params.placed&&<div role="status" className="animate-fade-in mt-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">Your order was submitted. The store will review and confirm it shortly.</div>}
     <div className="mt-6 space-y-4">{(orders??[]).length?(orders??[]).map(o=><article key={o.id} className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{o.order_number}</p><h2 className="mt-1 text-lg font-black">{(o.merchants as unknown as {name:string}|null)?.name ?? "Local merchant"}</h2><p className="mt-1 text-xs text-slate-500">{new Date(o.placed_at).toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short"})}</p></div><span className="rounded-full bg-orange-100 px-3 py-1.5 text-xs font-extrabold text-orange-800">{labels[o.status] ?? o.status}</span></div>
