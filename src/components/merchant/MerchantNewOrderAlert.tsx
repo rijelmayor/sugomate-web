@@ -9,6 +9,7 @@ import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useA
 
 type IncomingOrder = { id: string; order_number: string | null; merchant_id: string };
 type OrderRow = IncomingOrder & { status: string };
+type Snapshot = Record<string, { status: string; sig: string }>;
 type DeliveryUpdate = { key: string; orderNumber: string; message: string };
 
 // Changes made by riders or the system. The store's own steps (accept, preparing, ready) refresh the list silently.
@@ -20,20 +21,41 @@ const deliveryMessages: Record<string, string> = {
   cancelled: "This order was cancelled.",
 };
 
-export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: string[] }) {
+export default function MerchantNewOrderAlert({ merchantIds, snapshot }: { merchantIds: string[]; snapshot: Snapshot }) {
   const router = useRouter();
   const sound = useAlertSound();
   const [queue, setQueue] = useState<IncomingOrder[]>([]);
   const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
-  const [live, setLive] = useState(false);
+  const [channelUp, setChannelUp] = useState(false);
+  const [pollOk, setPollOk] = useState(false);
   const soundRef = useRef(sound);
   useEffect(() => { soundRef.current = sound; });
   const statusRef = useRef<Record<string, string>>({});
   const seenRef = useRef<Set<string>>(new Set());
-  const primedRef = useRef(false);
+  // Seed from the exact server-rendered rows. This catches changes between SSR and the first poll.
+  const sigRef = useRef<Record<string, string>>({});
+  const seededRef = useRef(false);
+  if (!seededRef.current) {
+    seededRef.current = true;
+    for (const [id, value] of Object.entries(snapshot)) {
+      sigRef.current[id] = value.sig;
+      statusRef.current[id] = value.status;
+      if (value.status === "pending_merchant") seenRef.current.add(id);
+    }
+  }
+  const refreshTimerRef = useRef<number | null>(null);
   const pollInFlightRef = useRef(false);
   // Stable key: the array prop changes identity on every refresh, the ids do not.
   const idsKey = merchantIds.slice().sort().join(",");
+
+  // Coalesce bursts of realtime and polling events into one server refresh.
+  const refreshSoon = useCallback(() => {
+    if (refreshTimerRef.current !== null) return;
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      router.refresh();
+    }, 400);
+  }, [router]);
 
   const acknowledge = useCallback(() => setQueue(current => current.slice(1)), []);
   const push = useCallback((row: IncomingOrder) => {
@@ -55,7 +77,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     s.chime();
     window.setTimeout(() => s.speak(`${row.order_number ? "Order " + row.order_number + ". " : ""}${message}`), 600);
     s.vibrate([150, 80, 150]);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const ids = idsKey ? idsKey.split(",") : [];
@@ -63,52 +85,72 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     const supabase = createClient();
     const filter = ids.length === 1 ? `merchant_id=eq.${ids[0]}` : `merchant_id=in.(${ids.join(",")})`;
 
-    // Safety net: realtime can miss events (phone slept, network dropped), so also look for waiting orders.
+    // updated_at changes for rider claims, on-the-way confirmation, payment updates,
+    // expiry, and delivery transitions even when orders.status remains unchanged.
     const checkPending = async () => {
-      // Do not let a slow request overlap the next five-second safety poll.
       if (pollInFlightRef.current) return;
       pollInFlightRef.current = true;
       try {
-      const { data } = await supabase.from("orders").select("id,order_number,merchant_id,status").in("merchant_id", ids).order("placed_at", { ascending: false }).limit(60);
-      if (!data) return;
-      const first = !primedRef.current;
-      let needsRefresh = false;
-      for (const row of [...data].reverse() as OrderRow[]) {
-        const previousStatus = statusRef.current[row.id];
-        if (row.status === "pending_merchant") {
-          if (first) { seenRef.current.add(row.id); statusRef.current[row.id] = row.status; }
-          else if (!seenRef.current.has(row.id)) { push(row); needsRefresh = true; }
+        const { data, error } = await supabase
+          .from("orders")
+          .select("id,order_number,merchant_id,status,updated_at")
+          .in("merchant_id", ids)
+          .order("placed_at", { ascending: false })
+          .limit(100);
+        if (error || !data) { setPollOk(false); return; }
+        setPollOk(true);
+        let needsRefresh = false;
+        for (const row of [...data].reverse() as (OrderRow & { updated_at: string })[]) {
+          const known = sigRef.current[row.id];
+          if (row.status === "pending_merchant" && !seenRef.current.has(row.id)) push(row);
+          trackStatus(row);
+          if (known !== row.updated_at) {
+            sigRef.current[row.id] = row.updated_at;
+            needsRefresh = true;
+          }
         }
-        if (previousStatus !== undefined && previousStatus !== row.status) needsRefresh = true;
-        trackStatus(row);
-        if (first) statusRef.current[row.id] = row.status;
-      }
-      primedRef.current = true;
-      // Refresh server-rendered cards only when an order actually changed.
-      if (needsRefresh) router.refresh();
+        if (needsRefresh) refreshSoon();
       } finally {
         pollInFlightRef.current = false;
       }
     };
 
+    // Keep Realtime authorised after initial load and token refreshes; merchant RLS depends on auth.uid().
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+    });
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) supabase.realtime.setAuth(session.access_token);
+    });
+
     const channel = supabase
       .channel(`merchant-new-orders-${idsKey.replace(/,/g, "-")}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter }, payload => {
         const row = payload.new as IncomingOrder;
-        if (row && ids.includes(row.merchant_id)) { push(row); router.refresh(); }
+        if (row && ids.includes(row.merchant_id)) { push(row); refreshSoon(); }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter }, payload => {
         const row = payload.new as OrderRow;
-        if (row?.id && row.status && ids.includes(row.merchant_id)) { trackStatus(row); router.refresh(); }
+        if (row?.id && row.status && ids.includes(row.merchant_id)) { trackStatus(row); sigRef.current[row.id] = (payload.new as { updated_at?: string }).updated_at ?? sigRef.current[row.id]; refreshSoon(); }
       })
-      .subscribe(status => { const connected = status === "SUBSCRIBED"; setLive(connected); if (connected) void checkPending(); });
+      .subscribe(status => { const connected = status === "SUBSCRIBED"; setChannelUp(connected); if (connected) void checkPending(); });
 
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void checkPending(); }, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") void checkPending(); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); void supabase.removeChannel(channel); };
-  }, [idsKey, push, trackStatus, router]);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      authSub.subscription.unsubscribe();
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [idsKey, push, trackStatus, refreshSoon]);
 
+  const live = channelUp && pollOk;
   const ringing = queue.length > 0 && sound.enabled;
   // Chime plus a spoken "New order received" until the store confirms.
   useRepeat(ringing, () => {
