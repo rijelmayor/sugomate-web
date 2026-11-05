@@ -31,6 +31,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
   const statusRef = useRef<Record<string, string>>({});
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
+  const pollInFlightRef = useRef(false);
   // Stable key: the array prop changes identity on every refresh, the ids do not.
   const idsKey = merchantIds.slice().sort().join(",");
 
@@ -64,6 +65,10 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
 
     // Safety net: realtime can miss events (phone slept, network dropped), so also look for waiting orders.
     const checkPending = async () => {
+      // Do not let a slow request overlap the next five-second safety poll.
+      if (pollInFlightRef.current) return;
+      pollInFlightRef.current = true;
+      try {
       const { data } = await supabase.from("orders").select("id,order_number,merchant_id,status").in("merchant_id", ids).order("placed_at", { ascending: false }).limit(60);
       if (!data) return;
       const first = !primedRef.current;
@@ -81,13 +86,16 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
       primedRef.current = true;
       // Refresh server-rendered cards only when an order actually changed.
       if (needsRefresh) router.refresh();
+      } finally {
+        pollInFlightRef.current = false;
+      }
     };
 
     const channel = supabase
       .channel(`merchant-new-orders-${idsKey.replace(/,/g, "-")}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter }, payload => {
         const row = payload.new as IncomingOrder;
-        if (row && ids.includes(row.merchant_id)) push(row);
+        if (row && ids.includes(row.merchant_id)) { push(row); router.refresh(); }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter }, payload => {
         const row = payload.new as OrderRow;
