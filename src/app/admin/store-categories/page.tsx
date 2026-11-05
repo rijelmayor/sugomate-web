@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import PortalSignOut from "@/components/PortalSignOut";
 import { assignMerchantCategory, saveMerchantCategory } from "./actions";
 import FormSubmitButton from "@/components/FormSubmitButton";
+import CategoryImagePicker from "@/components/admin/CategoryImagePicker";
 
 type Params = { error?: string; saved?: string; assigned?: string };
 
@@ -25,14 +26,14 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
         <div><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">SUGOMATE / Admin</p><h1 className="mt-1 text-3xl font-black">Store categories</h1><p className="mt-1 text-sm text-slate-500">Create the types of businesses that can join the marketplace, then assign each merchant to a category.</p></div>
         <div className="flex flex-wrap items-center gap-2"><Link href="/admin" className="rounded-full bg-[#102b4e] px-5 py-3 text-sm font-bold text-white">Back to operations</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-bold"/></div>
       </header>
-      {(params.error || params.saved || params.assigned) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{params.error ? "The change could not be saved. Check that the name is unique and the fields are valid." : params.assigned ? "Merchant category updated." : "Store category saved."}</p>}
+      {(params.error || params.saved || params.assigned) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{params.error === "image" ? "The photo could not be uploaded. Choose a JPG, PNG or WebP image under 20 MB and try again." : params.error ? "The change could not be saved. Check that the name is unique and the fields are valid." : params.assigned ? "Merchant category updated." : "Store category saved."}</p>}
       <section className="mt-6 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
           <h2 className="text-lg font-black">Add a store category</h2>
           <form action={saveMerchantCategory} className="mt-4 space-y-3">
             <label className="block text-xs font-bold">Category name<input name="name" required minLength={2} maxLength={80} placeholder="e.g. Flower Shop" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
             <label className="block text-xs font-bold">Icon / emoji<input name="icon" defaultValue="🏪" maxLength={12} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
-            <label className="block text-xs font-bold">Photo URL (https:// or /images/categories/…)<input name="image_url" placeholder="/images/categories/flower-shop.jpg" maxLength={500} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
+            <CategoryImagePicker slug="" />
             <label className="block text-xs font-bold">Display order<input name="sort_order" type="number" min="0" step="1" defaultValue="0" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" defaultChecked/> Active in marketplace</label>
             <FormSubmitButton pendingLabel="Creating…" className="w-full rounded-full bg-[#ff8a00] px-5 py-3 text-sm font-black text-white">Create category</FormSubmitButton>
@@ -41,13 +42,13 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
         <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
           <h2 className="text-lg font-black">Existing store categories</h2>
           <div className="mt-4 space-y-3">
-            {(categories ?? []).map(c => <form key={c.id} action={saveMerchantCategory} className="grid gap-2 rounded-2xl border border-slate-100 p-3 sm:grid-cols-[1fr_110px_1fr_90px_auto] sm:items-end">
+            {(categories ?? []).map(c => <form key={c.id} action={saveMerchantCategory} className="grid gap-2 rounded-2xl border border-slate-100 p-3 sm:grid-cols-[1fr_110px_90px_auto] sm:items-end">
               <input type="hidden" name="category_id" value={c.id}/>
               <label className="text-[11px] font-bold">Name<input name="name" required defaultValue={c.name} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
               <label className="text-[11px] font-bold">Icon<input name="icon" defaultValue={c.icon} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
-              <label className="text-[11px] font-bold">Photo URL<input name="image_url" defaultValue={c.image_url ?? ""} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
               <label className="text-[11px] font-bold">Order<input name="sort_order" type="number" min="0" defaultValue={c.sort_order} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
               <div className="flex items-center gap-2"><label className="flex items-center gap-1 text-[11px]"><input type="checkbox" name="is_active" defaultChecked={c.is_active}/> Active</label><FormSubmitButton pendingLabel="Saving…" className="rounded-full bg-[#102b4e] px-3 py-2 text-xs font-bold text-white">Save</FormSubmitButton></div>
+              <CategoryImagePicker slug={c.slug} initialUrl={c.image_url ?? ""} />
             </form>)}
             {!categories?.length && <p className="text-sm text-slate-500">No categories created yet.</p>}
           </div>

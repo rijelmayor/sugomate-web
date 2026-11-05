@@ -199,10 +199,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
         {tiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {tiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
         </div> : null}
-        {stores.length > 0 && <>
-          <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
-          <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ storeCategory: item.categorySlug === "other" ? "" : item.categorySlug, store: item.id })} />)}</div>
-        </>}
+        <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
+        {stores.length > 0 && <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ storeCategory: item.categorySlug === "other" ? "" : item.categorySlug, store: item.id })} />)}</div>}
         {!stores.length && <div className="mt-6 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">Your local marketplace is getting ready</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">We&apos;re preparing merchant catalogs in Hilongos, Bato, Hindang, Inopacan, and Matalom. Approved stores will appear here as they join.</p></div>}
       </>}
 

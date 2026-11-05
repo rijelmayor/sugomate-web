@@ -82,7 +82,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
 
       <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={merchantCategories ?? []} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} /></section>
 
-      <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, among ihatod.</footer>
+      <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, kami bahala.</footer>
     </div>
   </main>;
 }
