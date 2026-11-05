@@ -265,7 +265,7 @@ create or replace function public.driver_update_order_status(
 ) returns void language plpgsql security definer set search_path=''
 as $$
 declare
-  v_actor uuid:=auth.uid(); v_order public.orders%rowtype; v_valid boolean:=false; v_res record;
+  v_actor uuid:=auth.uid(); v_order public.orders%rowtype; v_valid boolean:=false; v_res record; v_stock integer;
 begin
   if v_actor is null then raise exception 'Sign in required.'; end if;
   if not exists(select 1 from public.driver_profiles where user_id=v_actor and status='active') then
@@ -291,9 +291,12 @@ begin
   if p_next_status='picked_up' then
     for v_res in select r.id,r.product_id,r.quantity from public.order_stock_reservations r
       where r.order_id=p_order_id and r.status='reserved' order by r.product_id for update loop
-      update public.products set stock_quantity=stock_quantity-v_res.quantity,updated_at=now()
-      where id=v_res.product_id and stock_quantity is not null and stock_quantity>=v_res.quantity;
-      if not found then raise exception 'Reserved stock could not be committed. Contact support before pickup.'; end if;
+      select stock_quantity into v_stock from public.products where id=v_res.product_id for update;
+      if not found then raise exception 'Reserved product no longer exists. Contact support before pickup.'; end if;
+      if v_stock is not null then
+        if v_stock < v_res.quantity then raise exception 'Reserved stock could not be committed. Contact support before pickup.'; end if;
+        update public.products set stock_quantity=stock_quantity-v_res.quantity,updated_at=now() where id=v_res.product_id;
+      end if;
       update public.order_stock_reservations set status='consumed',resolved_at=now() where id=v_res.id;
     end loop;
   end if;
