@@ -36,7 +36,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
     const supabase = createClient();
     const refreshOnce = () => {
       // Coalesce bursts of row changes into one server refresh.
-      if (refreshTimer.current) return;
+      if (refreshTimer.current !== null) return;
       refreshTimer.current = window.setTimeout(() => {
         refreshTimer.current = null;
         if (document.visibilityState === "visible") router.refresh();
@@ -45,18 +45,18 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
     const channel = supabase
       .channel(`driver-offers-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, payload => {
-        const row = (payload.new ?? payload.old) as { driver_user_id?: string | null; status?: string } | null;
-        if (!row || row.driver_user_id === userId || row.status === "accepted" || row.status === "ready_for_pickup") refreshOnce();
+        // Always refresh: merchant cancellation clears driver_user_id, so filtering by the new row misses it.
+        refreshOnce();
       })
       .subscribe(status => { liveRef.current = status === "SUBSCRIBED"; });
-    // Realtime first; poll only while the connection is unavailable.
-    const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") refreshOnce(); }, 20000);
+    // Realtime plus a light foreground safety poll catches events hidden by RLS or cleared rider assignment.
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") refreshOnce(); }, 10000);
     const onVisible = () => { if (document.visibilityState === "visible") refreshOnce(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
-      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+      if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
       refreshTimer.current = null;
       void supabase.removeChannel(channel);
     };
