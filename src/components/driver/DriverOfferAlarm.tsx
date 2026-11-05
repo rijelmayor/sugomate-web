@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import AlertControlBar from "@/components/alerts/AlertControlBar";
+import BellAlertControl from "@/components/alerts/BellAlertControl";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
 
 // Keeps the driver order board live and rings for direct dispatch offers.
@@ -49,7 +49,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   useKeepAwake(sound.enabled);
 
   return <section aria-live="assertive" className="mt-3 space-y-2">
-    <AlertControlBar sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." />
+    <div className="flex justify-end"><BellAlertControl sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." /></div>
     {ringing && <div role="alert" className="animate-pulse rounded-2xl border-2 border-rose-400 bg-rose-50 p-4 shadow-lg sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-full bg-rose-500 text-white"><BellRing size={22} aria-hidden="true" /></span><div><p className="text-xs font-black uppercase tracking-[.16em] text-rose-700">New delivery request</p><p className="text-lg font-black text-[#102e57]">{ringingIds.length > 1 ? `${ringingIds.length} deliveries are waiting for you` : "A delivery is waiting for you"}</p></div></div>
