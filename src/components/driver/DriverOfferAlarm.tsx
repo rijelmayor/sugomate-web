@@ -14,9 +14,20 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   const router = useRouter();
   const sound = useAlertSound();
   const [silenced, setSilenced] = useState<Set<string>>(new Set());
+  const [newAvailableIds, setNewAvailableIds] = useState<string[]>([]);
+  const previousAvailableRef = useRef<Set<string>>(new Set(availableIds));
+  const availableKey = availableIds.join("|");
   const liveRef = useRef(false);
 
-  const ringingIds = offeredIds.filter(id => !silenced.has(id));
+  useEffect(() => {
+    const previous = previousAvailableRef.current;
+    const newlyAvailable = availableIds.filter(id => !previous.has(id));
+    previousAvailableRef.current = new Set(availableIds);
+    setNewAvailableIds(current => [...new Set([...current.filter(id => availableIds.includes(id)), ...newlyAvailable])]);
+    if (newlyAvailable.length) setSilenced(current => { const next = new Set(current); newlyAvailable.forEach(id => next.delete(id)); return next; });
+  }, [availableKey]);
+
+  const ringingIds = [...offeredIds, ...newAvailableIds].filter(id => !silenced.has(id));
   const ringing = ringingIds.length > 0;
 
   useEffect(() => {
