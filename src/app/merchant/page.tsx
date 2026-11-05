@@ -52,7 +52,7 @@ export default async function MerchantPortal({ searchParams }: {
     <div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard" className="text-sm font-black tracking-wide">SUGOMATE <span className="font-medium text-slate-400">/ Merchant</span></Link>
-        <nav aria-label="Merchant navigation" className="flex flex-wrap items-center gap-2"><Link href="/merchant/products" className="rounded-full bg-[#ffbd18] px-4 py-2 text-sm font-bold text-[#102e57]">Products</Link><Link href="/merchant/products" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]">Manage products</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]"/></nav>
+        <nav aria-label="Merchant navigation" className="flex flex-wrap items-center gap-2"><Link href="/merchant/products" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]">Products</Link><Link href="/merchant/storefront" className="rounded-full bg-[#ffbd18] px-4 py-2 text-sm font-bold text-[#102e57]">Store settings</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]"/></nav>
       </header>
 
       <MerchantNewOrderAlert merchantIds={approvedIds} />
