@@ -39,9 +39,8 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
   <div className="mx-auto max-w-5xl">
    <header className="flex flex-wrap items-center justify-between gap-3">
     <Link href="/" className="flex items-center gap-2 text-sm font-black"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-white">S</span>SUGOMATE <span className="font-medium text-slate-400">/ Delivery partner</span></Link>
-    <div className="flex items-center gap-2"><form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></form></div>
+    <div className="flex items-center gap-2">{active&&<DriverOfferAlarm userId={user.id} offeredIds={offered.map(o=>o.id)} availableIds={(readyOrders??[]).map(o=>o.id)}/>}<form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></form></div>
    </header>
-   {active&&<DriverOfferAlarm userId={user.id} offeredIds={offered.map(o=>o.id)} availableIds={(readyOrders??[]).map(o=>o.id)}/>}
    <section className="mt-4 rounded-2xl bg-[#102e57] px-4 py-3 text-white shadow-md">
     <div className="flex items-center justify-between gap-3">
      <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#ffbd18]">Driver workspace</p><h1 className="truncate text-lg font-black">Maayong adlaw, {(profile?.display_name||"Partner").split(/\s+/)[0]}!</h1><p className="truncate text-[11px] text-white/65">{driver.vehicle_type}{driver.vehicle_plate?" · "+driver.vehicle_plate:""} · {profile?.phone||"Contact not set"}</p></div>
