@@ -22,6 +22,6 @@ export async function updateMerchantOrderStatus(formData: FormData) {
     p_next_status: nextStatus,
     p_note: note || null,
   });
-  if (error) throw new Error("Could not update this order. Please try again.");
+  if (error) redirect("/merchant?error=update");
   revalidatePath("/merchant");
 }
