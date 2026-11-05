@@ -76,7 +76,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const [newMunicipalityId, setNewMunicipalityId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cod");
 
-  // Restore the basket after a refresh, a failed checkout, or leaving and returning.
+  // Recheck server-calculated store hours periodically so a storefront closes without a manual reload.\n  useEffect(() => { const timer = window.setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 60000); return () => window.clearInterval(timer); }, [router]);\n\n  // Restore the basket after a refresh, a failed checkout, or leaving and returning.
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(CART_KEY);
@@ -237,7 +237,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
             </div>
           </div>
         </article>; })}
-        </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching items" : "No items available right now"}</h3><p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{q ? "Try another item name." : "Please check back soon."}</p></div>}
+        </div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{!currentStore.isOpen ? "This store is currently closed" : q ? "No matching items" : "No items available right now"}</h3><p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{!currentStore.isOpen ? "Ordering is disabled outside the store’s operating hours. Please check back when the store reopens." : q ? "Try another item name." : "Please check back soon."}</p></div>}
       </>}
       </div>
     </section>
