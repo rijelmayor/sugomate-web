@@ -22,6 +22,15 @@ export async function setDriverAvailability(formData: FormData) {
   redirect("/driver?updated=availability");
 }
 
+export async function claimReadyOrder(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=claim");
+  const { error } = await supabase.rpc("driver_claim_order", { p_order_id: orderId });
+  if (error) redirect("/driver?error=claim");
+  redirect("/driver?updated=claimed");
+}
+
 export async function respondToDriverAssignment(formData: FormData) {
   const { supabase } = await requireActiveDriver();
   const orderId = String(formData.get("order_id") ?? "");
