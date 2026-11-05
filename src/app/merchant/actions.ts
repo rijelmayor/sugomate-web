@@ -24,4 +24,9 @@ export async function updateMerchantOrderStatus(formData: FormData) {
   });
   if (error) redirect("/merchant?error=update");
   revalidatePath("/merchant");
+  // After accepting, take the merchant straight to the active order board.
+  // Other status changes stay in the In progress workflow as well.
+  redirect(nextStatus === "rejected" || nextStatus === "cancelled"
+    ? "/merchant?tab=history&updated=1"
+    : "/merchant?tab=active&updated=1");
 }
