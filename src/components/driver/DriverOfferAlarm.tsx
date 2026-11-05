@@ -20,10 +20,11 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   const liveRef = useRef(false);
 
   useEffect(() => {
+    const currentAvailableIds = availableKey ? availableKey.split("|") : [];
     const previous = previousAvailableRef.current;
-    const newlyAvailable = availableIds.filter(id => !previous.has(id));
-    previousAvailableRef.current = new Set(availableIds);
-    setNewAvailableIds(current => [...new Set([...current.filter(id => availableIds.includes(id)), ...newlyAvailable])]);
+    const newlyAvailable = currentAvailableIds.filter(id => !previous.has(id));
+    previousAvailableRef.current = new Set(currentAvailableIds);
+    setNewAvailableIds(current => [...new Set([...current.filter(id => currentAvailableIds.includes(id)), ...newlyAvailable])]);
     if (newlyAvailable.length) setSilenced(current => { const next = new Set(current); newlyAvailable.forEach(id => next.delete(id)); return next; });
   }, [availableKey]);
 
