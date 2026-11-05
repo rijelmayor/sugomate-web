@@ -121,7 +121,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
   if (!merchantIds.length) return null;
 
   return (
-    <section aria-live="polite" className="mt-4 space-y-2">
+    <section aria-live="polite" className="min-w-0 space-y-2">
       <div className="flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700`}><span className={`h-2 w-2 rounded-full bg-emerald-500 ${live ? "animate-pulse" : "opacity-50"}`} />{live ? "Live updates" : "Reconnecting…"}</span><BellAlertControl sound={sound} label="merchant alerts" testMessage="New order received." /></div>
 
       {updates.length > 0 && (
