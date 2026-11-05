@@ -67,7 +67,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   useRepeat(ringing && sound.enabled, () => sound.speak("New delivery order available. Check the order board."), 9000);
   useKeepAwake(sound.enabled);
 
-  return <section aria-live="assertive" className="mt-3 space-y-2">
+  return <section aria-live="assertive" className="min-w-0 space-y-2">
     <div className="flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700`}><span className={`h-2 w-2 rounded-full bg-emerald-500 ${live ? "animate-pulse" : "opacity-50"}`} />{live ? "Live updates" : "Reconnecting…"}</span><BellAlertControl sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." /></div>
     {ringing && <div role="alert" className="animate-pulse rounded-2xl border-2 border-rose-400 bg-rose-50 p-4 shadow-lg sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
