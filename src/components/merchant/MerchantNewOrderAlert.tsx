@@ -47,7 +47,6 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     const prev = statusRef.current[row.id];
     statusRef.current[row.id] = row.status;
     if (prev === undefined || prev === row.status) return;
-    router.refresh();
     const message = deliveryMessages[row.status];
     if (!message) return;
     setUpdates(current => [{ key: `${row.id}:${row.status}`, orderNumber: row.order_number || "Order", message }, ...current.filter(item => item.key !== `${row.id}:${row.status}`)].slice(0, 6));
@@ -68,15 +67,20 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
       const { data } = await supabase.from("orders").select("id,order_number,merchant_id,status").in("merchant_id", ids).order("placed_at", { ascending: false }).limit(60);
       if (!data) return;
       const first = !primedRef.current;
+      let needsRefresh = false;
       for (const row of [...data].reverse() as OrderRow[]) {
+        const previousStatus = statusRef.current[row.id];
         if (row.status === "pending_merchant") {
-          if (first) { seenRef.current.add(row.id); statusRef.current[row.id] = row.status; } else push(row);
+          if (first) { seenRef.current.add(row.id); statusRef.current[row.id] = row.status; }
+          else if (!seenRef.current.has(row.id)) { push(row); needsRefresh = true; }
         }
+        if (previousStatus !== undefined && previousStatus !== row.status) needsRefresh = true;
         trackStatus(row);
         if (first) statusRef.current[row.id] = row.status;
       }
       primedRef.current = true;
-      router.refresh(); // refreshes the five-minute rider-assignment warning even when no realtime event arrives
+      // Refresh server-rendered cards only when an order actually changed.
+      if (needsRefresh) router.refresh();
     };
 
     const channel = supabase

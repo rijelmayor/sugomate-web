@@ -18,6 +18,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   const previousAvailableRef = useRef<Set<string>>(new Set(availableIds));
   const availableKey = availableIds.join("|");
   const liveRef = useRef(false);
+  const refreshTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const currentAvailableIds = availableKey ? availableKey.split("|") : [];
@@ -33,15 +34,32 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
 
   useEffect(() => {
     const supabase = createClient();
+    const refreshOnce = () => {
+      // Coalesce bursts of row changes into one server refresh.
+      if (refreshTimer.current) return;
+      refreshTimer.current = window.setTimeout(() => {
+        refreshTimer.current = null;
+        if (document.visibilityState === "visible") router.refresh();
+      }, 500);
+    };
     const channel = supabase
       .channel(`driver-offers-${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, payload => {
+        const row = (payload.new ?? payload.old) as { driver_user_id?: string | null; status?: string } | null;
+        if (!row || row.driver_user_id === userId || row.status === "accepted" || row.status === "ready_for_pickup") refreshOnce();
+      })
       .subscribe(status => { liveRef.current = status === "SUBSCRIBED"; });
-    // Fallback poll only if the live connection is down, so riders never miss an offer.
-    const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") router.refresh(); }, 20000);
-    const onVisible = () => { if (document.visibilityState === "visible") router.refresh(); };
+    // Realtime first; poll only while the connection is unavailable.
+    const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") refreshOnce(); }, 20000);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshOnce(); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); void supabase.removeChannel(channel); };
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+      void supabase.removeChannel(channel);
+    };
   }, [userId, router]);
 
   useRepeat(ringing && sound.enabled, () => { sound.alarmBeep(); sound.vibrate([300, 150, 300, 150, 500]); }, 1500);
