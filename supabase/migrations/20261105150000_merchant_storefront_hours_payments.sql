@@ -159,7 +159,7 @@ begin
   end if;
 
   v_local := now() at time zone 'Asia/Manila';
-  v_day := lower(to_char(v_local, 'Dy'));
+  v_day := (array['sun','mon','tue','wed','thu','fri','sat'])[extract(dow from v_local)::integer + 1];
   v_slot := v_branch.store_hours -> v_day;
   if v_slot is null then
     -- Existing/testing branches use the approved 8 AM-8 PM daily default.
