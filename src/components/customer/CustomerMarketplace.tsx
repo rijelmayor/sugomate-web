@@ -266,13 +266,6 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between text-slate-600"><span>Items subtotal</span><span>{peso(total)}</span></div>
           <div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{fee !== undefined ? peso(fee) : "Calculated at checkout"}</span></div>
-          <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/60 p-3">
-            <label htmlFor="promo-code-preview" className="block text-xs font-extrabold text-[#102e57]">Promo code</label>
-            <div className="mt-2 flex gap-2">
-              <input id="promo-code-preview" type="text" disabled placeholder="Promo codes coming soon" className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 placeholder:text-slate-400" />
-              <span className="rounded-lg bg-slate-200 px-3 py-2 text-xs font-bold text-slate-500">Soon</span>
-            </div>
-          </div>
           {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total before promotions</span><span>{peso(total + fee)}</span></div>}
         </div>
         {items.length > 0 && storeClosed && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">This store is closed. You can keep your basket, but checkout will be available when it reopens.</p>}
