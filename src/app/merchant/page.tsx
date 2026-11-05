@@ -70,8 +70,7 @@ export default async function MerchantPortal({ searchParams }: {
   const visible = all.filter(o => (groups[tab] as readonly string[]).includes(o.status));
   const white = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
-  return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new}>
-    <MerchantNewOrderAlert merchantIds={approvedIds} />
+  return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new} headerActions={<MerchantNewOrderAlert merchantIds={approvedIds} />}>
 
     {params.updated && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">Order status updated.</p>}
     {params.error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">We could not update that order. Refresh and try again.</p>}
