@@ -12,7 +12,7 @@ export async function updateMerchantOrderStatus(formData: FormData) {
   const nextStatus = String(formData.get("next_status") ?? "");
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (!/^[0-9a-f-]{36}$/i.test(orderId) ||
-      !["accepted", "rejected", "preparing", "ready_for_pickup"].includes(nextStatus)) {
+      !["accepted", "rejected", "preparing", "ready_for_pickup", "cancelled"].includes(nextStatus)) {
     redirect("/merchant?error=invalid");
   }
 
