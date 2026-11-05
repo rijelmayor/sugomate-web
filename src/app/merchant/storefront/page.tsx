@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { saveMerchantStorefront } from "./settings-actions";
-import PortalSignOut from "@/components/PortalSignOut";
+import MerchantShell from "@/components/merchant/MerchantShell";
+import StoreLogoPicker from "@/components/merchant/StoreLogoPicker";
 import FormSubmitButton from "@/components/FormSubmitButton";
 
 const days = [
@@ -17,11 +18,11 @@ export default async function MerchantStorefrontPage({ searchParams }: { searchP
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   const { data: memberships } = await supabase.from("merchant_members")
-    .select("merchant_id,merchants(id,name,status,accepted_payment_methods,gcash_qr_url)")
+    .select("merchant_id,merchants(id,name,status,logo_url,accepted_payment_methods,gcash_qr_url)")
     .eq("user_id", user.id);
   const stores = (memberships ?? []).map(row => ({
     id: row.merchant_id,
-    merchant: row.merchants as unknown as {id:string;name:string;status:string;accepted_payment_methods:string[];gcash_qr_url:string|null}|null,
+    merchant: row.merchants as unknown as {id:string;name:string;status:string;logo_url:string|null;accepted_payment_methods:string[];gcash_qr_url:string|null}|null,
   })).filter(row => row.merchant?.status === "approved");
   const ids = stores.map(row => row.id);
   const { data: branches } = ids.length ? await supabase.from("merchant_branches")
@@ -34,20 +35,18 @@ export default async function MerchantStorefrontPage({ searchParams }: { searchP
   const errorText: Record<string,string> = {
     branch:"No valid branch was selected.", permission:"You do not have access to update this store.",
     hours:"Please check the opening and closing times. Closing time must be later than opening time.",
-    payment:"Select at least one accepted payment method.", qr:"QR upload failed. Use a PNG, JPG or WebP image up to 5 MB.",
+    payment:"Select at least one accepted payment method.", logo:"Logo upload failed. Use a JPG, PNG or WebP image. Other settings were saved.", qr:"QR upload failed. Use a PNG, JPG or WebP image up to 5 MB.",
     "qr-required":"Upload the GCash QR image before enabling GCash.", save:"We could not save the storefront settings. Please try again.",
   };
-  return <main className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6">
-    <div className="mx-auto max-w-4xl">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><Link href="/merchant" className="text-sm font-black">SUGOMATE <span className="font-medium text-slate-400">/ Merchant</span></Link><h1 className="mt-2 text-2xl font-black">Store settings</h1><p className="mt-1 text-sm text-slate-500">Keep your hours and payment options up to date.</p></div>
-        <nav className="flex gap-2"><Link href="/merchant" className="rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold">Orders</Link><Link href="/merchant/products" className="rounded-full border border-orange-100 bg-white px-4 py-2 text-sm font-bold">Products</Link><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold"/></nav>
-      </header>
+  const shellStore = merchant ?? stores[0]?.merchant ?? null;
+  return <MerchantShell active="settings" width="max-w-4xl" store={shellStore ? { name: shellStore.name, logoUrl: shellStore.logo_url } : null}>
+      <div className="mt-5"><h1 className="text-2xl font-black sm:text-3xl">Store settings</h1><p className="mt-1 text-sm text-slate-500">Your logo, opening hours and payment options.</p></div>
       {params.saved && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Store settings saved.</p>}
       {params.error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{errorText[params.error] ?? "Unable to save settings."}</p>}
       {(branches ?? []).length > 1 && <nav aria-label="Choose branch" className="mt-5 flex flex-wrap gap-2">{(branches ?? []).map(item => <Link key={item.id} href={"/merchant/storefront?branch="+item.id} className={"rounded-full px-4 py-2 text-sm font-bold "+(item.id===selected?.id?"bg-[#102e57] text-white":"border border-orange-100 bg-white text-[#102e57]")}>{item.name}</Link>)}</nav>}
       {!selected || !merchant ? <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6"><h2 className="font-black">No approved branch available</h2><p className="mt-2 text-sm">Create a branch and wait for store approval before configuring its storefront.</p><Link href="/merchant/products" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Manage branches</Link></section> : <form action={saveMerchantStorefront} encType="multipart/form-data" className="mt-6 space-y-5">
         <input type="hidden" name="merchant_id" value={merchant.id}/><input type="hidden" name="branch_id" value={selected.id}/><input type="hidden" name="existing_gcash_qr_url" value={merchant.gcash_qr_url ?? ""}/>
+        <section className="rounded-3xl border border-orange-100 bg-white p-5 sm:p-6"><h2 className="text-lg font-black">Store logo</h2><p className="mt-1 text-sm text-slate-500">Shown to customers next to your store name.</p><StoreLogoPicker name={merchant.name} initialUrl={merchant.logo_url ?? ""} /></section>
         <section className="rounded-3xl border border-orange-100 bg-white p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wider text-orange-600">Store branch</p><h2 className="mt-1 text-xl font-black">{merchant.name}</h2><p className="mt-1 text-sm text-slate-500">{selected.name}</p></div><span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">Philippine time · UTC+8</span></div>
           <label className="mt-5 flex items-start gap-3 rounded-2xl border border-orange-100 bg-orange-50/70 p-4"><input type="checkbox" name="temporarily_closed" defaultChecked={selected.is_temporarily_closed} className="mt-1 h-4 w-4 accent-orange-500"/><span><strong className="block text-sm">Temporarily close my store</strong><span className="mt-1 block text-xs leading-5 text-slate-600">Customers can still see your store, but they cannot place orders until you reopen it.</span></span></label>
@@ -59,6 +58,5 @@ export default async function MerchantStorefrontPage({ searchParams }: { searchP
         </section>
         <FormSubmitButton pendingLabel="Saving store settings…" className="w-full rounded-full bg-[#102e57] px-6 py-4 text-sm font-black text-white sm:w-auto">Save store settings</FormSubmitButton>
       </form>}
-    </div>
-  </main>;
+    </MerchantShell>;
 }

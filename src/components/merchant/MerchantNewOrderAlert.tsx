@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import SoundToggle from "@/components/alerts/SoundToggle";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
@@ -115,38 +116,38 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
   if (!merchantIds.length) return null;
 
   return (
-    <section aria-live="polite" className="mt-5 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="min-w-0">
-          <p className="font-extrabold text-[#102e57]">New order sound and voice alerts</p>
-          <p className="mt-1 text-sm text-slate-500">{sound.enabled ? "Your store will chime and announce “New order received” until you confirm. Keep this page open." : "Enable sound so incoming orders alert your store."}</p>
-        </div>
-        <SoundToggle sound={sound} label="order alerts" testMessage="New order received." />
+    <section aria-live="polite" className="mt-4 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
+        <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-[#102e57]">
+          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${sound.enabled ? "bg-emerald-500" : "bg-amber-500"}`} />
+          {sound.enabled ? "Order alerts on" : "Order alerts off"}
+          <span className="hidden text-xs font-medium text-slate-500 sm:inline">{sound.enabled ? "· chime and voice until you confirm" : "· turn on sound to hear new orders"}</span>
+        </p>
+        <SoundToggle sound={sound} label="sound" testMessage="New order received." compact />
       </div>
 
       {updates.length > 0 && (
-        <div role="status" className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase tracking-[.16em] text-sky-800">Delivery updates</p>
-            <button type="button" onClick={() => setUpdates([])} className="text-xs font-bold text-sky-800 underline">Dismiss all</button>
-          </div>
-          <ul className="mt-2 space-y-1.5">{updates.map(item => <li key={item.key} className="text-sm text-[#102e57]"><strong>{item.orderNumber}</strong> · {item.message}</li>)}</ul>
+        <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5">
+          <ul className="min-w-0 space-y-1">{updates.slice(0, 3).map(item => <li key={item.key} className="text-sm text-[#102e57]"><strong>{item.orderNumber}</strong> · {item.message}</li>)}</ul>
+          <button type="button" onClick={() => setUpdates([])} className="shrink-0 text-xs font-bold text-sky-800 underline">Dismiss</button>
         </div>
       )}
 
       {queue.length > 0 && (
-        <div role="alert" className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-4 shadow-md sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[.16em] text-orange-700">Incoming order</p>
-              <h2 className="mt-1 text-xl font-black text-[#102e57]">{queue[0].order_number || "New customer order"}</h2>
-              <p className="mt-1 text-sm text-slate-600">{queue.length > 1 ? `${queue.length} new orders are waiting for acknowledgement.` : "A customer has just placed an order with your store."}</p>
+        <div role="alert" className="animate-fade-in fixed inset-x-3 top-3 z-50 mx-auto max-w-xl rounded-2xl border-2 border-orange-300 bg-orange-50 p-4 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff8a00] text-white"><Bell size={21} className="animate-pulse" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black uppercase tracking-wider text-orange-700">{queue.length > 1 ? `${queue.length} new orders waiting` : "New order"}</p>
+              <p className="truncate text-lg font-black text-[#102e57]">{queue[0].order_number || "New customer order"}</p>
             </div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-orange-200 px-3 py-1.5 text-xs font-extrabold text-orange-900"><span className="h-2 w-2 animate-pulse rounded-full bg-orange-700" /> Needs acknowledgement</span>
           </div>
-          {!sound.enabled && <p className="mt-3 text-sm font-semibold text-orange-900">Tap “Enable order alerts” above to hear the chime and voice. The visual alert stays visible.</p>}
-          <button type="button" onClick={acknowledge} className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ffbd18] px-5 py-3 text-sm font-black text-[#102e57] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffd04a] hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2"><span aria-hidden="true">✓</span> Confirm order received</button>
-          <p className="mt-2 text-xs text-slate-500">This only silences and acknowledges the alert. You must still Accept or Reject the order below.</p>
+          {!sound.enabled && <p className="mt-2 text-xs font-semibold text-orange-900">Sound is off. Turn it on in the alerts bar to hear new orders.</p>}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => { acknowledge(); router.push("/merchant?tab=new"); }} className="min-h-11 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#102e57] transition active:scale-[.97]">Review order</button>
+            <button type="button" onClick={acknowledge} className="min-h-11 rounded-xl bg-[#ffbd18] px-3 text-sm font-black text-[#102e57] shadow-sm transition hover:bg-[#ffd04a] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2">✓ Confirm received</button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">Confirming only silences the alert. You still need to accept or reject the order.</p>
         </div>
       )}
     </section>

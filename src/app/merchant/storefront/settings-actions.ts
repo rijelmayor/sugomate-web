@@ -44,6 +44,24 @@ export async function saveMerchantStorefront(formData: FormData) {
   }
   if (methods.includes("gcash") && !/^https:\/\//i.test(qrUrl)) redirect(`/merchant/storefront?branch=${branchId}&error=qr-required`);
 
+  // Store logo (optional): keep the current one unless a new WebP is uploaded or removal is ticked.
+  const existingLogo = String(formData.get("existing_logo_url") ?? "").trim();
+  let logoUrl: string | null = /^https:\/\//i.test(existingLogo) ? existingLogo : null;
+  let logoChanged = false;
+  const logoFile = formData.get("store_logo");
+  if (logoFile instanceof File && logoFile.size > 0) {
+    const head = new Uint8Array(await logoFile.slice(0, 12).arrayBuffer());
+    const tag = (from: number) => String.fromCharCode(...head.slice(from, from + 4));
+    if (logoFile.type !== "image/webp" || logoFile.size > 1024 * 1024 || tag(0) !== "RIFF" || tag(8) !== "WEBP") redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    const logoPath = `${merchantId}/${randomUUID()}.webp`;
+    const { error: logoUploadError } = await supabase.storage.from("merchant-logos").upload(logoPath, logoFile, { contentType: "image/webp", cacheControl: "3600", upsert: false });
+    if (logoUploadError) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    logoUrl = supabase.storage.from("merchant-logos").getPublicUrl(logoPath).data.publicUrl;
+    logoChanged = true;
+  } else if (formData.get("remove_logo") === "on" && logoUrl) {
+    logoUrl = null; logoChanged = true;
+  }
+
   const { error } = await supabase.rpc("merchant_save_storefront_settings", {
     p_merchant_id: merchantId,
     p_branch_id: branchId,
@@ -53,5 +71,11 @@ export async function saveMerchantStorefront(formData: FormData) {
     p_gcash_qr_url: qrUrl || null,
   });
   if (error) redirect(`/merchant/storefront?branch=${branchId}&error=save`);
+  if (logoChanged) {
+    const { error: logoError } = await supabase.rpc("merchant_set_logo", { p_merchant_id: merchantId, p_logo_url: logoUrl });
+    if (logoError) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    const marker = "/merchant-logos/";
+    if (existingLogo.includes(marker)) await supabase.storage.from("merchant-logos").remove([existingLogo.split(marker)[1]]);
+  }
   redirect(`/merchant/storefront?branch=${branchId}&saved=1`);
 }

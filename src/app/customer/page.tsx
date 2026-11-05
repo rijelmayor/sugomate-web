@@ -13,10 +13,16 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const { user, supabase } = await requireCustomer();
 
   // One lightweight pass over available products; stores and category counts are derived from it.
-  let productQuery = supabase.from("products").select(`id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
-  if (municipality) productQuery = productQuery.eq("branch.municipality_id", municipality);
+  // Needs 20261105150000_merchant_storefront_hours_payments.sql. Without it the full query errors, so we retry with the older columns instead of showing no stores.
+  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
+  const buildProductQuery = (legacy: boolean) => {
+    let query = supabase.from("products").select(productSelect(legacy)).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
+    if (municipality) query = query.eq("branch.municipality_id", municipality);
+    return query;
+  };
+  const productQuery = buildProductQuery(false);
 
-  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: productRows, error: productError }] = await Promise.all([
+  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: firstProductRows, error: firstProductError }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
@@ -25,6 +31,14 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
   ]);
+  let productRows = firstProductRows;
+  let productError = firstProductError;
+  if (firstProductError) {
+    console.error("[customer] product query failed, retrying without storefront columns:", firstProductError.message);
+    const retry = await buildProductQuery(true);
+    productRows = retry.data; productError = retry.error;
+    if (retry.error) console.error("[customer] legacy product query failed:", retry.error.message);
+  }
   // If the photo migration has not run yet, fall back to the original columns so tiles still appear.
   const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
   // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
