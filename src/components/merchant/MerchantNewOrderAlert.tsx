@@ -76,6 +76,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
         if (first) statusRef.current[row.id] = row.status;
       }
       primedRef.current = true;
+      router.refresh(); // refreshes the five-minute rider-assignment warning even when no realtime event arrives
     };
 
     const channel = supabase
