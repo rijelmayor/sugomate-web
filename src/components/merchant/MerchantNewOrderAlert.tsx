@@ -25,6 +25,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
   const sound = useAlertSound();
   const [queue, setQueue] = useState<IncomingOrder[]>([]);
   const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
+  const [live, setLive] = useState(false);
   const soundRef = useRef(sound);
   useEffect(() => { soundRef.current = sound; });
   const statusRef = useRef<Record<string, string>>({});
@@ -93,9 +94,9 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
         const row = payload.new as OrderRow;
         if (row?.id && row.status && ids.includes(row.merchant_id)) trackStatus(row);
       })
-      .subscribe(status => { if (status === "SUBSCRIBED") void checkPending(); });
+      .subscribe(status => { const connected = status === "SUBSCRIBED"; setLive(connected); if (connected) void checkPending(); });
 
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void checkPending(); }, 30000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void checkPending(); }, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") void checkPending(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); void supabase.removeChannel(channel); };
@@ -122,7 +123,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
 
   return (
     <section aria-live="polite" className="mt-4 space-y-2">
-      <div className="flex justify-end"><BellAlertControl sound={sound} label="merchant alerts" testMessage="New order received." /></div>
+      <div className="flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700`}><span className={`h-2 w-2 rounded-full bg-emerald-500 ${live ? "animate-pulse" : "opacity-50"}`} />{live ? "Live updates" : "Reconnecting…"}</span><BellAlertControl sound={sound} label="merchant alerts" testMessage="New order received." /></div>
 
       {updates.length > 0 && (
         <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5">
