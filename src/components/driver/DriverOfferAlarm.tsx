@@ -18,7 +18,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   const previousAvailableRef = useRef<Set<string>>(new Set(availableIds));
   const availableKey = availableIds.join("|");
   const liveRef = useRef(false);
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const currentAvailableIds = availableKey ? availableKey.split("|") : [];
