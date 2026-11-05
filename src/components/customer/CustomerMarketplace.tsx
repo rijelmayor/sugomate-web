@@ -143,8 +143,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const selectedAddress = addresses.find(a => a.id === addressId);
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
-  const acceptedPaymentMethods = currentStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
-  const gcashQrUrl = currentStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
+  const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
+  const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
 
   function href(next: { storeCategory?: string; store?: string; municipality?: string }) {
     const params = new URLSearchParams();
