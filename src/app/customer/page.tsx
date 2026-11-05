@@ -42,7 +42,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null }>();
   for (const row of rows) {
     const existing = storeMap.get(row.branch_id);
-    if (existing) { existing.count += 1; if (!existing.image && row.image_url) existing.image = row.image_url; continue; }
+    if (existing) { existing.count += 1; continue; }
     const schedule = (row.branch?.store_hours ?? {}) as Record<string, {open?:string;close?:string;closed?:boolean}>;
     const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
     const part = (type: string) => parts.find(item => item.type === type)?.value ?? "";
