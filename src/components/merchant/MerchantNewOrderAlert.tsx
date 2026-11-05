@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import SoundToggle from "@/components/alerts/SoundToggle";
+import AlertControlBar from "@/components/alerts/AlertControlBar";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
 
 type IncomingOrder = { id: string; order_number: string | null; merchant_id: string };
@@ -117,14 +117,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
 
   return (
     <section aria-live="polite" className="mt-4 space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
-        <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-[#102e57]">
-          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${sound.enabled ? "bg-emerald-500" : "bg-amber-500"}`} />
-          {sound.enabled ? "Order alerts on" : "Order alerts off"}
-          <span className="hidden text-xs font-medium text-slate-500 sm:inline">{sound.enabled ? "· chime and voice until you confirm" : "· turn on sound to hear new orders"}</span>
-        </p>
-        <SoundToggle sound={sound} label="sound" testMessage="New order received." compact />
-      </div>
+      <AlertControlBar sound={sound} label="merchant alerts" testMessage="New order received." />
 
       {updates.length > 0 && (
         <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5">
