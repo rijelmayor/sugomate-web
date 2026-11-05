@@ -48,9 +48,9 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   useRepeat(ringing && sound.enabled, () => sound.speak("New delivery order available. Check the order board."), 9000);
   useKeepAwake(sound.enabled);
 
-  return <section aria-live="assertive" className="mt-5 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="min-w-0"><p className="font-extrabold text-[#102e57]">Delivery request alarm</p><p className="mt-1 text-sm text-slate-500">{sound.enabled ? "Alarm and voice are on. Keep this page open while you are online." : "Turn this on so a loud alarm rings when a delivery is offered to you."}</p></div>
+  return <section aria-live="assertive" className="mt-3 space-y-2">
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+      <div className="flex min-w-0 items-center gap-2"><BellRing size={16} className="shrink-0 text-[#102e57]" aria-hidden="true" /><p className="truncate text-xs font-extrabold text-[#102e57]">Order alerts <span className="font-medium text-slate-500">· {sound.enabled ? "Sound on" : "Sound off"}</span></p></div>
       <SoundToggle sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." />
     </div>
     {ringing && <div role="alert" className="animate-pulse rounded-2xl border-2 border-rose-400 bg-rose-50 p-4 shadow-lg sm:p-5">
