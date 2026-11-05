@@ -58,7 +58,7 @@ export default async function MerchantPortal({ searchParams }: {
   const storeInfo = (approvedRows[0] ?? merchantRows[0])?.merchant;
   const { data: orders } = approvedIds.length
     ? await supabase.from("orders")
-        .select("id,order_number,status,driver_user_id,driver_assignment_status,rider_claim_deadline_at,rider_assignment_expired_at,rider_on_way_at,stock_reserved_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,gcash_payment_verified_at,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,order_items(id,product_name,quantity,line_total)")
+        .select("id,updated_at,order_number,status,driver_user_id,driver_assignment_status,rider_claim_deadline_at,rider_assignment_expired_at,rider_on_way_at,stock_reserved_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,gcash_payment_verified_at,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,order_items(id,product_name,quantity,line_total)")
         .in("merchant_id", approvedIds)
         .order("placed_at", { ascending: false })
         .limit(100)
@@ -78,7 +78,7 @@ export default async function MerchantPortal({ searchParams }: {
   const visible = all.filter(o => (groups[tab] as readonly string[]).includes(o.status));
   const white = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
-  return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new} headerActions={<MerchantNewOrderAlert merchantIds={approvedIds} />}>
+  return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new} headerActions={<MerchantNewOrderAlert merchantIds={approvedIds} snapshot={Object.fromEntries((orders ?? []).map(o => [o.id, { status: o.status as string, sig: String(o.updated_at ?? "") }]))} />}>
 
     {params.updated && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">Order status updated.</p>}
     {params.paymentConfirmed && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">GCash payment confirmed and marked as paid.</p>}
