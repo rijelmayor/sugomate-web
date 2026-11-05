@@ -6,7 +6,7 @@ import OrderLive from "@/components/customer/OrderLive";
 import OrderProgress from "@/components/orders/OrderProgress";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
-const labels: Record<string,string> = {pending_merchant:"Awaiting store",accepted:"Accepted",preparing:"Preparing",ready_for_pickup:"Ready for pickup",assigned:"Driver assigned",picked_up:"Picked up",in_transit:"On the way",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
+const labels: Record<string,string> = {pending_merchant:"Awaiting store",accepted:"Accepted · finding rider",preparing:"Preparing",ready_for_pickup:"Ready for pickup",assigned:"Driver assigned",picked_up:"Picked up",in_transit:"On the way",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
 const finished = new Set(["delivered", "cancelled", "rejected"]);
 
 export default async function CustomerOrders({searchParams}:{searchParams:Promise<{placed?:string}>}) {
@@ -34,7 +34,7 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
     {params.placed&&<div role="status" className="animate-fade-in mt-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">Your order was submitted. The store will review and confirm it shortly.</div>}
     <div className="mt-6 space-y-4">{(orders??[]).length?(orders??[]).map(o=><article key={o.id} className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{o.order_number}</p><h2 className="mt-1 text-lg font-black">{(o.merchants as unknown as {name:string}|null)?.name ?? "Local merchant"}</h2><p className="mt-1 text-xs text-slate-500">{new Date(o.placed_at).toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short"})}</p></div><span className="rounded-full bg-orange-100 px-3 py-1.5 text-xs font-extrabold text-orange-800">{labels[o.status] ?? o.status}</span></div>
-      <OrderProgress status={o.status}/>
+      <OrderProgress status={o.status}/>{o.status==="accepted"&&<p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">The store reserved your items and is waiting for a rider to claim the delivery. Preparation starts after the rider confirms they are on the way.</p>}
       <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{(o.order_items??[]).map((item:{id:string;product_name:string;quantity:number;line_total:number})=><div key={item.id} className="flex justify-between gap-3 text-sm"><span className="text-slate-600">{item.quantity} × {item.product_name}</span><span className="font-semibold">₱{Number(item.line_total).toFixed(2)}</span></div>)}</div>
       <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Subtotal + delivery</span><strong>₱{Number(o.total).toFixed(2)}</strong></div>
       <p className="mt-2 text-xs text-slate-400">Payment: {o.payment_method.toUpperCase()} · {o.payment_status}</p>
