@@ -18,6 +18,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   const previousAvailableRef = useRef<Set<string>>(new Set(availableIds));
   const availableKey = availableIds.join("|");
   const liveRef = useRef(false);
+  const [live, setLive] = useState(false);
   const refreshTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
     const supabase = createClient();
     const refreshOnce = () => {
       // Coalesce bursts of row changes into one server refresh.
-      if (refreshTimer.current) return;
+      if (refreshTimer.current !== null) return;
       refreshTimer.current = window.setTimeout(() => {
         refreshTimer.current = null;
         if (document.visibilityState === "visible") router.refresh();
@@ -45,18 +46,18 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
     const channel = supabase
       .channel(`driver-offers-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, payload => {
-        const row = (payload.new ?? payload.old) as { driver_user_id?: string | null; status?: string } | null;
-        if (!row || row.driver_user_id === userId || row.status === "accepted" || row.status === "ready_for_pickup") refreshOnce();
+        // Always refresh: merchant cancellation clears driver_user_id, so filtering by the new row misses it.
+        refreshOnce();
       })
-      .subscribe(status => { liveRef.current = status === "SUBSCRIBED"; });
-    // Realtime first; poll only while the connection is unavailable.
-    const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") refreshOnce(); }, 20000);
+      .subscribe(status => { const connected = status === "SUBSCRIBED"; liveRef.current = connected; setLive(connected); if (connected) refreshOnce(); });
+    // Realtime plus a light foreground safety poll catches events hidden by RLS or cleared rider assignment.
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") refreshOnce(); }, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") refreshOnce(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
-      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+      if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
       refreshTimer.current = null;
       void supabase.removeChannel(channel);
     };
@@ -66,8 +67,8 @@ export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: {
   useRepeat(ringing && sound.enabled, () => sound.speak("New delivery order available. Check the order board."), 9000);
   useKeepAwake(sound.enabled);
 
-  return <section aria-live="assertive" className="mt-3 space-y-2">
-    <div className="flex justify-end"><BellAlertControl sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." /></div>
+  return <section aria-live="assertive" className="min-w-0 space-y-2">
+    <div className="flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700`}><span className={`h-2 w-2 rounded-full bg-emerald-500 ${live ? "animate-pulse" : "opacity-50"}`} />{live ? "Live updates" : "Reconnecting…"}</span><BellAlertControl sound={sound} label="delivery alarm" testMessage="New delivery request. Please accept or decline." /></div>
     {ringing && <div role="alert" className="animate-pulse rounded-2xl border-2 border-rose-400 bg-rose-50 p-4 shadow-lg sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-full bg-rose-500 text-white"><BellRing size={22} aria-hidden="true" /></span><div><p className="text-xs font-black uppercase tracking-[.16em] text-rose-700">New delivery request</p><p className="text-lg font-black text-[#102e57]">{ringingIds.length > 1 ? `${ringingIds.length} deliveries are waiting for you` : "A delivery is waiting for you"}</p></div></div>

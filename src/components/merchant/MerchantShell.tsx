@@ -12,11 +12,12 @@ const TABS = [
   { key: "settings", href: "/merchant/storefront", label: "Store settings", Icon: Settings },
 ] as const;
 
-export default function MerchantShell({ active, store, newCount = 0, width = "max-w-6xl", children }: {
+export default function MerchantShell({ active, store, newCount = 0, width = "max-w-6xl", headerActions, children }: {
   active: TabKey;
   store: { name: string; logoUrl?: string | null } | null;
   newCount?: number;
   width?: string;
+  headerActions?: ReactNode;
   children: ReactNode;
 }) {
   const white = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
@@ -27,7 +28,7 @@ export default function MerchantShell({ active, store, newCount = 0, width = "ma
           <StoreAvatar name={store?.name ?? "Store"} logoUrl={store?.logoUrl} />
           <span className="min-w-0"><span className="block truncate text-base font-black leading-tight sm:text-lg">{store?.name ?? "Your store"}</span><span className="block text-[11px] font-bold uppercase tracking-wider text-orange-600">SUGOMATE Merchant</span></span>
         </Link>
-        <PortalSignOut className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]" />
+        <div className="flex shrink-0 items-center gap-2">{headerActions}<PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#102e57]" /></div>
       </header>
 
       <nav aria-label="Merchant navigation" className="mt-4 hidden gap-2 sm:flex">

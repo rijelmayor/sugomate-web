@@ -24,7 +24,7 @@ type Store = { id: string; name: string; branchName: string; categorySlug: strin
 type Cart = Record<string, { product: Product; quantity: number }>;
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
-const peso = (value: number) => `₱${value.toFixed(2)}`;
+const peso = (value: number) => `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const activeStyle = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
 function CheckoutSubmitButton({ disabled, paymentMethod }: { disabled: boolean; paymentMethod: string }) {
@@ -266,7 +266,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between text-slate-600"><span>Items subtotal</span><span>{peso(total)}</span></div>
           <div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{fee !== undefined ? peso(fee) : "Calculated at checkout"}</span></div>
-          {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total (COD)</span><span>{peso(total + fee)}</span></div>}
+          {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total before promotions</span><span>{peso(total + fee)}</span></div>}
         </div>
         {items.length > 0 && storeClosed && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">This store is closed. You can keep your basket, but checkout will be available when it reopens.</p>}
         {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue. <button type="button" onClick={clearBasket} className="font-extrabold underline">Start a fresh basket</button></p>}

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function updateMerchantOrderStatus(formData: FormData) {
@@ -22,5 +23,5 @@ export async function updateMerchantOrderStatus(formData: FormData) {
     p_note: note || null,
   });
   if (error) redirect("/merchant?error=update");
-  redirect("/merchant?updated=1");
+  revalidatePath("/merchant");
 }

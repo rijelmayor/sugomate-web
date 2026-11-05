@@ -99,7 +99,7 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
   const unread = notes.filter(note => !note.read).length;
   const markAllRead = () => setNotes(current => current.map(note => ({ ...note, read: true })));
 
-  return <div ref={wrapRef} className="relative mt-3 flex items-center gap-2">
+  return <div ref={wrapRef} className="relative flex items-center gap-2">
     <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="dialog" aria-expanded={open} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} className="relative grid h-10 w-10 place-items-center rounded-full border border-orange-100 bg-white text-[#102e57] transition hover:border-orange-300 hover:text-orange-600 active:scale-95">
       <Bell size={18} aria-hidden="true" className={ring ? "origin-top animate-bounce text-orange-600" : ""} />
       {unread > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">{unread > 9 ? "9+" : unread}</span>}

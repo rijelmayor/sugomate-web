@@ -2,6 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireActiveDriver() {
@@ -19,7 +20,7 @@ export async function setDriverAvailability(formData: FormData) {
   const available = String(formData.get("is_available")) === "true";
   const { error } = await supabase.rpc("driver_set_availability", { p_is_available: available });
   if (error) redirect("/driver?error=availability");
-  redirect("/driver?updated=availability");
+  revalidatePath("/driver");
 }
 
 export async function claimReadyOrder(formData: FormData) {
@@ -28,7 +29,7 @@ export async function claimReadyOrder(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=claim");
   const { error } = await supabase.rpc("driver_claim_order", { p_order_id: orderId });
   if (error) redirect("/driver?error=claim");
-  redirect("/driver?updated=claimed");
+  revalidatePath("/driver");
 }
 
 export async function respondToDriverAssignment(formData: FormData) {
@@ -40,7 +41,7 @@ export async function respondToDriverAssignment(formData: FormData) {
     p_order_id: orderId, p_accept: accept,
   });
   if (error) redirect("/driver?error=assignment");
-  redirect(accept ? "/driver?updated=accepted" : "/driver?updated=declined");
+  revalidatePath("/driver");
 }
 
 
@@ -50,7 +51,7 @@ export async function confirmRiderOnTheWay(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=commitment");
   const { error } = await supabase.rpc("driver_confirm_on_the_way", { p_order_id: orderId });
   if (error) redirect("/driver?error=commitment");
-  redirect("/driver?updated=on-the-way");
+  revalidatePath("/driver");
 }
 
 export async function releaseDriverClaim(formData: FormData) {
@@ -59,7 +60,7 @@ export async function releaseDriverClaim(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/driver?error=release");
   const { error } = await supabase.rpc("driver_release_order_claim", { p_order_id: orderId });
   if (error) redirect("/driver?error=release");
-  redirect("/driver?updated=released");
+  revalidatePath("/driver");
 }
 
 export async function updateDriverOrderStatus(formData: FormData) {
@@ -94,5 +95,5 @@ export async function updateDriverOrderStatus(formData: FormData) {
     if (proofPath) await supabase.storage.from("delivery-proofs").remove([proofPath]);
     redirect("/driver?error=delivery");
   }
-  redirect("/driver?updated=" + nextStatus);
+  revalidatePath("/driver");
 }

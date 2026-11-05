@@ -21,7 +21,8 @@ export default function OrderLive({ userId, hasActive }: { userId: string; hasAc
 
   useEffect(() => {
     if (!hasActive) return;
-    const timer = window.setInterval(() => { if (!liveRef.current && document.visibilityState === "visible") router.refresh(); }, 45000);
+    // Keep a short foreground safety refresh even when Realtime reports SUBSCRIBED; a healthy channel can still miss row events under RLS or transient network conditions.
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 5000);
     return () => window.clearInterval(timer);
   }, [hasActive, router]);
 
