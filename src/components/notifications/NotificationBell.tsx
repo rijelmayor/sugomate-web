@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import SoundToggle from "@/components/alerts/SoundToggle";
+import AlertControlBar from "@/components/alerts/AlertControlBar";
 import { useAlertSound } from "@/components/alerts/useAlertSound";
 
 type Note = { id: string; orderNumber: string; message: string; at: number; read: boolean };
@@ -99,7 +99,7 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
   const unread = notes.filter(note => !note.read).length;
   const markAllRead = () => setNotes(current => current.map(note => ({ ...note, read: true })));
 
-  return <div ref={wrapRef} className="relative">
+  return <div ref={wrapRef} className="relative mt-3 flex items-center gap-2"><div className="min-w-0 flex-1"><AlertControlBar sound={sound} label="customer alerts" testMessage="Your order has an update." /></div>
     <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="dialog" aria-expanded={open} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} className="relative grid h-10 w-10 place-items-center rounded-full border border-orange-100 bg-white text-[#102e57] transition hover:border-orange-300 hover:text-orange-600 active:scale-95">
       <Bell size={18} aria-hidden="true" className={ring ? "origin-top animate-bounce text-orange-600" : ""} />
       {unread > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">{unread > 9 ? "9+" : unread}</span>}
@@ -118,7 +118,7 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
         </li>) : <li className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No updates yet. Order progress will show up here.</li>}
       </ul>
       <div className="mt-3 border-t border-slate-100 pt-3">
-        <SoundToggle sound={sound} label="order sound" testMessage="Order updates will be announced." />
+        <p className="text-[11px] text-slate-500">Sound preference is saved on this device.</p>
         <Link href={ordersHref} onClick={() => setOpen(false)} className="mt-3 block text-center text-xs font-bold text-orange-600">View my orders →</Link>
       </div>
     </div>}

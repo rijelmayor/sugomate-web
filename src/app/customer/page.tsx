@@ -90,10 +90,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-wide text-[#102e57]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-lg text-white">S</span>SUGOMATE</Link>
         <div className="flex items-center gap-2">
           <PendingLink href="/customer/orders" aria-label="My orders" className="rounded-full border border-orange-100 bg-white px-3.5 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md"><ClipboardList aria-hidden="true" size={16} /><span>Orders</span></PendingLink>
-          <NotificationBell userId={user.id} />
           <form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-600 hover:shadow-md" /></form>
         </div>
       </header>
+      <NotificationBell userId={user.id} />
 
       <section className="mt-6 mb-5">
         <p className="text-sm font-bold text-orange-600">Maayong adlaw, {firstName}!</p>
