@@ -95,7 +95,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
     const onVisible = () => { if (document.visibilityState === "visible") void checkPending(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); void supabase.removeChannel(channel); };
-  }, [idsKey, push, trackStatus]);
+  }, [idsKey, push, trackStatus, router]);
 
   const ringing = queue.length > 0 && sound.enabled;
   // Chime plus a spoken "New order received" until the store confirms.
