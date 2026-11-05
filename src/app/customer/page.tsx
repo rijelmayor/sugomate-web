@@ -9,7 +9,7 @@ import { signOut } from "../dashboard/actions";
 
 // The select string is chosen at run time (full or legacy), so the row shape is declared here instead of inferred.
 type Cat = { id: string; name: string; slug: string; icon: string };
-type MerchantRel = { name: string; slug: string; logo_url: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; store_category: Cat | Cat[] | null };
+type MerchantRel = { name: string; slug: string; logo_url: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; gcash_payment_type?: string; gcash_account_name?: string | null; gcash_mobile_number?: string | null; store_category: Cat | Cat[] | null };
 type BranchRel = { name: string; municipality_id: string; store_hours?: unknown; is_temporarily_closed?: boolean; municipalities: { name: string } | { name: string }[] | null };
 type ProductRow = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: MerchantRel | MerchantRel[] | null; branch: BranchRel | BranchRel[] | null };
 
@@ -20,7 +20,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
 
   // One lightweight pass over available products; stores and category counts are derived from it.
   // Needs 20261105150000_merchant_storefront_hours_payments.sql. Without it the full query errors, so we retry with the older columns instead of showing no stores.
-  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
+  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,gcash_payment_type,gcash_account_name,gcash_mobile_number,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
   const buildProductQuery = (legacy: boolean) => {
     let query = supabase.from("products").select(productSelect(legacy)).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
     if (municipality) query = query.eq("branch.municipality_id", municipality);
@@ -61,7 +61,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   });
 
   // A "store" is one merchant branch, matching the one-store-per-order rule at checkout.
-  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null }>();
+  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null; gcashPaymentType: string; gcashAccountName: string | null; gcashMobileNumber: string | null }>();
   for (const row of rows) {
     const existing = storeMap.get(row.branch_id);
     if (existing) { existing.count += 1; continue; }
@@ -74,7 +74,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     const openMinutes = Number((slot.open ?? "08:00").slice(0,2)) * 60 + Number((slot.open ?? "08:00").slice(3,5));
     const closeMinutes = Number((slot.close ?? "20:00").slice(0,2)) * 60 + Number((slot.close ?? "20:00").slice(3,5));
     const isOpen = !row.branch?.is_temporarily_closed && !slot.closed && nowMinutes >= openMinutes && nowMinutes < closeMinutes;
-    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlug: row.merchant?.store_category?.slug ?? "other", area: row.branch?.municipalities?.name ?? "", count: 1, image: row.merchant?.logo_url ?? null, isOpen, acceptedPaymentMethods: row.merchant?.accepted_payment_methods ?? ["cod"], gcashQrUrl: row.merchant?.gcash_qr_url ?? null });
+    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlug: row.merchant?.store_category?.slug ?? "other", area: row.branch?.municipalities?.name ?? "", count: 1, image: row.merchant?.logo_url ?? null, isOpen, acceptedPaymentMethods: row.merchant?.accepted_payment_methods ?? ["cod"], gcashQrUrl: row.merchant?.gcash_qr_url ?? null, gcashPaymentType: row.merchant?.gcash_payment_type ?? "qr", gcashAccountName: row.merchant?.gcash_account_name ?? null, gcashMobileNumber: row.merchant?.gcash_mobile_number ?? null });
   }
   const stores = [...storeMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   // Only the open store's menu is sent to the browser, which keeps the home page light.

@@ -29,12 +29,18 @@ export async function saveMerchantStorefront(formData: FormData) {
     hours[day] = { open, close, closed };
   }
 
-  const methods = formData.getAll("payment_method").map(String).filter(v => v === "cod" || v === "gcash");
-  if (!methods.length) redirect(`/merchant/storefront?branch=${branchId}&error=payment`);
+  const acceptCod = formData.getAll("payment_method").map(String).includes("cod");
+  const gcashEnabled = formData.get("gcash_enabled") === "on";
+  const gcashPaymentType = String(formData.get("gcash_payment_type") ?? "qr");
+  const gcashAccountName = String(formData.get("gcash_account_name") ?? "").trim().slice(0,100);
+  const gcashMobileNumber = String(formData.get("gcash_mobile_number") ?? "").trim().replace(/[\s()-]/g,"");
+  if (!acceptCod && !gcashEnabled) redirect(`/merchant/storefront?branch=${branchId}&error=payment`);
+  if (gcashEnabled && gcashPaymentType === "number" && (!gcashAccountName || !/^(09[0-9]{9}|\+639[0-9]{9})$/.test(gcashMobileNumber))) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
+  if (gcashEnabled && !["number","qr"].includes(gcashPaymentType)) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
 
   let qrUrl = String(formData.get("existing_gcash_qr_url") ?? "").trim();
   const qrFile = formData.get("gcash_qr") as File | null;
-  if (qrFile && qrFile.size > 0) {
+  if (gcashEnabled && gcashPaymentType === "qr" && qrFile && qrFile.size > 0) {
     if (!["image/png","image/jpeg","image/webp"].includes(qrFile.type) || qrFile.size > 5 * 1024 * 1024) redirect(`/merchant/storefront?branch=${branchId}&error=qr`);
     const ext = qrFile.type === "image/png" ? "png" : qrFile.type === "image/webp" ? "webp" : "jpg";
     const path = `${merchantId}/${user.id}/${randomUUID()}.${ext}`;
@@ -42,7 +48,8 @@ export async function saveMerchantStorefront(formData: FormData) {
     if (uploadError) redirect(`/merchant/storefront?branch=${branchId}&error=qr`);
     qrUrl = supabase.storage.from("merchant-payment-qr").getPublicUrl(path).data.publicUrl;
   }
-  if (methods.includes("gcash") && !/^https:\/\//i.test(qrUrl)) redirect(`/merchant/storefront?branch=${branchId}&error=qr-required`);
+  if (gcashEnabled && gcashPaymentType === "qr" && !/^https:\/\//i.test(qrUrl)) redirect(`/merchant/storefront?branch=${branchId}&error=qr-required`);
+  if (gcashEnabled && gcashPaymentType === "number") qrUrl = "";
 
   // Store logo (optional): keep the current one unless a new WebP is uploaded or removal is ticked.
   const existingLogo = String(formData.get("existing_logo_url") ?? "").trim();
@@ -67,10 +74,20 @@ export async function saveMerchantStorefront(formData: FormData) {
     p_branch_id: branchId,
     p_store_hours: hours,
     p_temporarily_closed: formData.get("temporarily_closed") === "on",
-    p_payment_methods: methods,
+    p_payment_methods: ["cod"],
     p_gcash_qr_url: qrUrl || null,
   });
   if (error) redirect(`/merchant/storefront?branch=${branchId}&error=save`);
+  const { error: gcashSettingsError } = await supabase.rpc("merchant_save_gcash_payment_settings", {
+    p_merchant_id: merchantId,
+    p_gcash_enabled: gcashEnabled,
+    p_payment_type: gcashPaymentType,
+    p_account_name: gcashAccountName || null,
+    p_mobile_number: gcashMobileNumber || null,
+    p_qr_url: qrUrl || null,
+    p_accept_cod: acceptCod,
+  });
+  if (gcashSettingsError) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
   if (logoChanged) {
     const { error: logoError } = await supabase.rpc("merchant_set_logo", { p_merchant_id: merchantId, p_logo_url: logoUrl });
     if (logoError) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);

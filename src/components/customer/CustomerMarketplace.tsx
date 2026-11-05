@@ -17,10 +17,10 @@ type Product = {
   description: string | null;
   price: number | string;
   image_url: string | null;
-  merchant: { name: string; slug: string; logo_url?: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
+  merchant: { name: string; slug: string; logo_url?: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; gcash_payment_type?: string; gcash_account_name?: string | null; gcash_mobile_number?: string | null; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
-type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null };
+type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null; gcashPaymentType: string; gcashAccountName: string | null; gcashMobileNumber: string | null };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
@@ -148,6 +148,10 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
   const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
   const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
+  const gcashPaymentType = cartStore?.gcashPaymentType ?? firstItem?.merchant?.gcash_payment_type ?? "qr";
+  const gcashAccountName = cartStore?.gcashAccountName ?? firstItem?.merchant?.gcash_account_name ?? null;
+  const gcashMobileNumber = cartStore?.gcashMobileNumber ?? firstItem?.merchant?.gcash_mobile_number ?? null;
+  const gcashConfigured = gcashPaymentType === "number" ? Boolean(gcashAccountName && gcashMobileNumber) : Boolean(gcashQrUrl);
 
   function href(next: { storeCategory?: string; store?: string; municipality?: string }) {
     const params = new URLSearchParams();
@@ -294,9 +298,9 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
             {acceptedPaymentMethods.includes("gcash") && <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="radio" name="payment_method_choice" value="gcash" checked={paymentMethod === "gcash"} onChange={() => setPaymentMethod("gcash")} className="accent-orange-500"/>GCash</label>}
           </fieldset>
           <input type="hidden" name="payment_method" value={paymentMethod}/>
-          {paymentMethod === "gcash" && gcashQrUrl && <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-center"><p className="text-xs font-bold text-sky-900">Scan the merchant GCash QR to pay</p><img src={gcashQrUrl} alt="Merchant GCash payment QR" className="mx-auto mt-2 h-40 w-40 rounded-xl border border-slate-200 bg-white object-contain p-2"/><p className="mt-2 text-[11px] text-sky-800">Keep your payment confirmation. The store will verify the payment.</p></div>}
+          {paymentMethod === "gcash" && gcashConfigured && <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-center"><p className="text-xs font-bold text-sky-900">GCash payment details</p>{gcashPaymentType === "qr" && gcashQrUrl ? <img src={gcashQrUrl} alt="Merchant GCash payment QR" className="mx-auto mt-2 h-40 w-40 rounded-xl border border-slate-200 bg-white object-contain p-2"/> : <div className="mt-2 rounded-xl bg-white p-3 text-left"><p className="text-xs text-slate-500">Account name</p><p className="font-extrabold text-[#102e57]">{gcashAccountName}</p><p className="mt-2 text-xs text-slate-500">GCash number</p><p className="text-lg font-black tracking-wide text-[#102e57]">{gcashMobileNumber}</p></div>}<p className="mt-2 text-[11px] leading-5 text-sky-800">Place your order first. Your exact amount, including delivery fee, and the payment upload form will appear in My Orders.</p></div>}
           <div className="rounded-xl bg-orange-50 p-3 text-xs leading-5 text-orange-900"><strong>Payment: {paymentMethod === "gcash" ? "GCash" : "Cash on delivery"}</strong><br />The store will confirm your order.{fee === undefined && " Delivery fee is calculated by SUGOMATE at checkout."}</div>
-          <CheckoutSubmitButton disabled={!canCheckout || !acceptedPaymentMethods.includes(paymentMethod) || (paymentMethod === "gcash" && !gcashQrUrl)} paymentMethod={paymentMethod} />
+          <CheckoutSubmitButton disabled={!canCheckout || !acceptedPaymentMethods.includes(paymentMethod) || (paymentMethod === "gcash" && !gcashConfigured)} paymentMethod={paymentMethod} />
           <p className="text-center text-[11px] leading-4 text-slate-400">Prices, stock, store approval and delivery fees are verified securely when you place the order.</p>
         </form>
         <Link href="/customer/addresses" className="block text-center text-xs font-bold text-slate-500 underline">Manage saved addresses</Link>
