@@ -7,6 +7,12 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import CustomerMarketplace from "@/components/customer/CustomerMarketplace";
 import { signOut } from "../dashboard/actions";
 
+// The select string is chosen at run time (full or legacy), so the row shape is declared here instead of inferred.
+type Cat = { id: string; name: string; slug: string; icon: string };
+type MerchantRel = { name: string; slug: string; logo_url: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; store_category: Cat | Cat[] | null };
+type BranchRel = { name: string; municipality_id: string; store_hours?: unknown; is_temporarily_closed?: boolean; municipalities: { name: string } | { name: string }[] | null };
+type ProductRow = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: MerchantRel | MerchantRel[] | null; branch: BranchRel | BranchRel[] | null };
+
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; municipality?: string; storeCategory?: string; store?: string }> }) {
   const { error, municipality, storeCategory, store } = await searchParams;
   // Shared with the layout through React cache(): one auth + roles lookup per request.
@@ -31,7 +37,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
   ]);
-  let productRows = firstProductRows;
+  let productRows: unknown = firstProductRows;
   let productError = firstProductError;
   if (firstProductError) {
     console.error("[customer] product query failed, retrying without storefront columns:", firstProductError.message);
@@ -43,7 +49,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
   // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
   const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
-  const rows = productError ? [] : (productRows ?? []).map(row => {
+  const rows = productError ? [] : ((productRows ?? []) as ProductRow[]).map(row => {
     const merchant = one(row.merchant);
     const branch = one(row.branch);
     return {
