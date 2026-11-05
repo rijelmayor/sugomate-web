@@ -99,13 +99,16 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
   const unread = notes.filter(note => !note.read).length;
   const markAllRead = () => setNotes(current => current.map(note => ({ ...note, read: true })));
 
-  return <div ref={wrapRef} className="relative mt-3 flex items-center gap-2"><div className="min-w-0 flex-1"><AlertControlBar sound={sound} label="customer alerts" testMessage="Your order has an update." /></div>
+  return <div ref={wrapRef} className="relative mt-3 flex items-center gap-2">
     <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="dialog" aria-expanded={open} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} className="relative grid h-10 w-10 place-items-center rounded-full border border-orange-100 bg-white text-[#102e57] transition hover:border-orange-300 hover:text-orange-600 active:scale-95">
       <Bell size={18} aria-hidden="true" className={ring ? "origin-top animate-bounce text-orange-600" : ""} />
       {unread > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">{unread > 9 ? "9+" : unread}</span>}
       <span aria-hidden="true" className={`absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full border border-white ${live ? "bg-emerald-500" : "bg-slate-300"}`} />
     </button>
-    {open && <div role="dialog" aria-label="Order notifications" className="animate-fade-in fixed inset-x-4 top-[4.25rem] z-50 rounded-2xl border border-orange-100 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
+    {open && <div role="dialog" aria-label="Order notifications and alert settings" className="animate-fade-in fixed inset-x-4 top-[4.25rem] z-50 max-h-[min(80vh,42rem)] overflow-y-auto rounded-2xl border border-orange-100 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
+      <div className="mb-4 border-b border-slate-100 pb-4">
+        <AlertControlBar sound={sound} label="customer alerts" testMessage="Your order has an update." />
+      </div>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-black text-[#102e57]">Notifications</h2>
         {unread > 0 && <button type="button" onClick={markAllRead} className="text-xs font-bold text-orange-600">Mark all read</button>}

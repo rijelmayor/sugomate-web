@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import AlertControlBar from "@/components/alerts/AlertControlBar";
+import BellAlertControl from "@/components/alerts/BellAlertControl";
 import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useAlertSound";
 
 type IncomingOrder = { id: string; order_number: string | null; merchant_id: string };
@@ -118,7 +118,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
 
   return (
     <section aria-live="polite" className="mt-4 space-y-2">
-      <AlertControlBar sound={sound} label="merchant alerts" testMessage="New order received." />
+      <div className="flex justify-end"><BellAlertControl sound={sound} label="merchant alerts" testMessage="New order received." /></div>
 
       {updates.length > 0 && (
         <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5">
@@ -136,7 +136,7 @@ export default function MerchantNewOrderAlert({ merchantIds }: { merchantIds: st
               <p className="truncate text-lg font-black text-[#102e57]">{queue[0].order_number || "New customer order"}</p>
             </div>
           </div>
-          {!sound.enabled && <p className="mt-2 text-xs font-semibold text-orange-900">Sound is off. Turn it on in the alerts bar to hear new orders.</p>}
+          {!sound.enabled && <p className="mt-2 text-xs font-semibold text-orange-900">Sound is off. Turn it on from the bell settings to hear new orders.</p>}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" onClick={() => { acknowledge(); router.push("/merchant?tab=new"); }} className="min-h-11 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#102e57] transition active:scale-[.97]">Review order</button>
             <button type="button" onClick={acknowledge} className="min-h-11 rounded-xl bg-[#ffbd18] px-3 text-sm font-black text-[#102e57] shadow-sm transition hover:bg-[#ffd04a] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#102e57] focus-visible:ring-offset-2">✓ Confirm received</button>
