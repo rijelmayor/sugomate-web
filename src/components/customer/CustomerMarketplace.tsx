@@ -11,6 +11,7 @@ import { CART_KEY } from "@/lib/cart";
 
 type Product = {
   id: string;
+  branch_id: string;
   name: string;
   description: string | null;
   price: number | string;
@@ -134,7 +135,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const view: "store" | "stores" | "home" = currentStore ? "store" : selectedMerchantCategory || q ? "stores" : "home";
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
-  const canCheckout = items.length > 0 && sameStore && Boolean(addressId);
+  const cartStore = stores.find(item => item.id === firstItem?.branch_id);\n  const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && Boolean(cartStore?.isOpen);
   const selectedAddress = addresses.find(a => a.id === addressId);
   const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
   const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
@@ -265,7 +266,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{fee !== undefined ? peso(fee) : "Calculated at checkout"}</span></div>
           {fee !== undefined && <div className="flex justify-between border-t border-slate-100 pt-2 font-black text-[#102e57]"><span>Total (COD)</span><span>{peso(total + fee)}</span></div>}
         </div>
-        {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
+        {items.length > 0 && !cartStore?.isOpen && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">This store is closed. You can keep your basket, but checkout will be available when it reopens.</p>}\n        {!sameStore && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Please place separate orders for each store or branch. Remove items from other stores to continue.</p>}
         <form action={placeOrder} className="space-y-3 border-t border-slate-100 pt-4">
           <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
           <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Delivery address <span className="text-rose-600">· required</span></label>
