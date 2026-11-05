@@ -25,7 +25,18 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
   ]);
-  const rows = productError ? [] : (productRows ?? []).map(row => ({ ...row, price: Number(row.price), merchant: Array.isArray(row.merchant) ? row.merchant[0] : row.merchant, branch: Array.isArray(row.branch) ? row.branch[0] : row.branch }));
+  // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
+  const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
+  const rows = productError ? [] : (productRows ?? []).map(row => {
+    const merchant = one(row.merchant);
+    const branch = one(row.branch);
+    return {
+      ...row,
+      price: Number(row.price),
+      merchant: merchant ? { ...merchant, store_category: one(merchant.store_category) } : null,
+      branch: branch ? { ...branch, municipalities: one(branch.municipalities) } : null,
+    };
+  });
 
   // A "store" is one merchant branch, matching the one-store-per-order rule at checkout.
   const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null }>();
