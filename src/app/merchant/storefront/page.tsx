@@ -11,7 +11,7 @@ const days = [
 ] as const;
 const defaultHours = { open: "08:00", close: "20:00", closed: false };
 
-export default async function MerchantStorefrontPage({ searchParams }: { searchParams: Promise<{saved?:string;error?:string}> }) {
+export default async function MerchantStorefrontPage({ searchParams }: { searchParams: Promise<{saved?:string;error?:string;branch?:string}> }) {
   const params = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -27,7 +27,7 @@ export default async function MerchantStorefrontPage({ searchParams }: { searchP
   const { data: branches } = ids.length ? await supabase.from("merchant_branches")
     .select("id,merchant_id,name,store_hours,is_temporarily_closed,is_active")
     .in("merchant_id", ids).order("created_at") : {data:[]};
-  const selected = branches?.[0];
+  const selected = branches?.find(item => item.id === params.branch) ?? branches?.[0];
   const merchant = stores.find(row => row.id === selected?.merchant_id)?.merchant;
   const hours = (selected?.store_hours ?? {}) as Record<string,{open?:string;close?:string;closed?:boolean}>;
   const methods = merchant?.accepted_payment_methods ?? ["cod"];
@@ -45,7 +45,7 @@ export default async function MerchantStorefrontPage({ searchParams }: { searchP
       </header>
       {params.saved && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Store settings saved.</p>}
       {params.error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{errorText[params.error] ?? "Unable to save settings."}</p>}
-      {!selected || !merchant ? <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6"><h2 className="font-black">No approved branch available</h2><p className="mt-2 text-sm">Create a branch and wait for store approval before configuring its storefront.</p><Link href="/merchant/products" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Manage branches</Link></section> : <form action={saveMerchantStorefront} encType="multipart/form-data" className="mt-6 space-y-5">
+      {(branches ?? []).length > 1 && <nav aria-label="Choose branch" className="mt-5 flex flex-wrap gap-2">{(branches ?? []).map(item => <Link key={item.id} href={"/merchant/storefront?branch="+item.id} className={"rounded-full px-4 py-2 text-sm font-bold "+(item.id===selected?.id?"bg-[#102e57] text-white":"border border-orange-100 bg-white text-[#102e57]")}>{item.name}</Link>)}</nav>}\n      {!selected || !merchant ? <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6"><h2 className="font-black">No approved branch available</h2><p className="mt-2 text-sm">Create a branch and wait for store approval before configuring its storefront.</p><Link href="/merchant/products" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">Manage branches</Link></section> : <form action={saveMerchantStorefront} encType="multipart/form-data" className="mt-6 space-y-5">
         <input type="hidden" name="merchant_id" value={merchant.id}/><input type="hidden" name="branch_id" value={selected.id}/><input type="hidden" name="existing_gcash_qr_url" value={merchant.gcash_qr_url ?? ""}/>
         <section className="rounded-3xl border border-orange-100 bg-white p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wider text-orange-600">Store branch</p><h2 className="mt-1 text-xl font-black">{merchant.name}</h2><p className="mt-1 text-sm text-slate-500">{selected.name}</p></div><span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">Philippine time · UTC+8</span></div>
