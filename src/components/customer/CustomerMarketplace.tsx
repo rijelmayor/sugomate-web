@@ -137,7 +137,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const activeCategory = tiles.find(item => item.slug === selectedMerchantCategory);
   const view: "store" | "stores" | "home" = currentStore ? "store" : selectedMerchantCategory || q ? "stores" : "home";
   const firstItem = items[0]?.product;
-  const sameStore = items.every(({ product }) => product.merchant?.slug === firstItem?.merchant?.slug && product.branch?.name === firstItem?.branch?.name);
+  const sameStore = items.every(({ product }) => product.branch_id === firstItem?.branch_id);
   const cartStore = stores.find(item => item.id === firstItem?.branch_id);
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && Boolean(cartStore?.isOpen);
   const selectedAddress = addresses.find(a => a.id === addressId);
