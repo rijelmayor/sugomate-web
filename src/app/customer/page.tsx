@@ -28,7 +28,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   };
   const productQuery = buildProductQuery(false);
 
-  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: firstProductRows, error: firstProductError }] = await Promise.all([
+  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: firstProductRows, error: firstProductError }, { data: financialSettings }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
@@ -36,6 +36,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     // Optional: needs 20261105110000_customer_read_delivery_fees.sql. Without it this returns nothing and checkout shows "Calculated at checkout".
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
+    supabase.from("platform_financial_settings").select("merchant_usage_enabled,merchant_usage_method,merchant_usage_value").eq("id",1).maybeSingle(),
   ]);
   let productRows: unknown = firstProductRows;
   let productError = firstProductError;
@@ -100,7 +101,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Unsa imong sugo karon?</h1>
       </section>
 
-      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={merchantCategories ?? []} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} /></section>
+      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={merchantCategories ?? []} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} merchantUsageEnabled={financialSettings?.merchant_usage_enabled??false} merchantUsageMethod={financialSettings?.merchant_usage_method??"percentage"} merchantUsageValue={Number(financialSettings?.merchant_usage_value??0)} /></section>
 
       <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, kami bahala.</footer>
     </div>
