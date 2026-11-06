@@ -26,7 +26,7 @@
 
 /* --- Loading, motion and mobile polish --- */
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-.skeleton{background:linear-gradient(90deg,#ffe9d6 25%,#fff4ea 50%,#ffe9d6 75%);background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite}
+.skeleton{background:linear-gradient(90deg,#e6ebf2 25%,#f5f7fa 50%,#e6ebf2 75%);background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite}
 @keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
 .animate-pop{animation:pop .28s ease-out}
 @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
