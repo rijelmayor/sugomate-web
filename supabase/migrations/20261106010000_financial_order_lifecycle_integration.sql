@@ -406,6 +406,9 @@ begin
     raise exception 'Admin access required.';
   end if;
   if p_next_status not in ('approved','rejected','paid') then raise exception 'Invalid payout status.'; end if;
+  if p_next_status='paid' and nullif(left(coalesce(p_payment_reference,''),120),'') is null then
+    raise exception 'A payment reference is required before marking a payout as paid.';
+  end if;
   select * into v_request from public.driver_payout_requests where id=p_request_id for update;
   if not found then raise exception 'Payout request not found.'; end if;
   if (p_next_status='approved' and v_request.status<>'pending')
