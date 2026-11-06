@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 
 type Category = { id: string; name: string; slug: string; icon: string; image_url?: string | null };
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
-type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; merchants: any };
+type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type Tab = "market" | "orders" | "account";
@@ -63,6 +65,9 @@ export default function App() {
   const [cart, setCart] = useState<Cart>({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [gcashReference, setGcashReference] = useState<Record<string, string>>({});
+  const [gcashProof, setGcashProof] = useState<Record<string, { uri: string; mimeType: string; fileName: string; size: number }>>({});
+  const [gcashSubmitting, setGcashSubmitting] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
@@ -143,7 +148,7 @@ export default function App() {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,merchants(name)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
       if (error) throw error;
       setOrders((data ?? []) as unknown as Order[]);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
@@ -205,7 +210,82 @@ export default function App() {
     setBusy(false);
   }
 
-  async function signOut() { await supabase.auth.signOut(); setCart({}); setOrders([]); setProducts([]); setStores([]); }
+  async function chooseGcashProof(orderId: string) {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+        Alert.alert("Unsupported image", "Choose a JPG, PNG or WebP receipt image.");
+        return;
+      }
+      const file = new File(asset.uri);
+      const size = asset.fileSize ?? file.size;
+      if (!size || size > 5 * 1024 * 1024) {
+        Alert.alert("Image too large", "The receipt image must be smaller than 5 MB.");
+        return;
+      }
+      setGcashProof(current => ({ ...current, [orderId]: {
+        uri: asset.uri, mimeType,
+        fileName: asset.fileName ?? "gcash-receipt." + (mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg"),
+        size
+      }}));
+    } catch (e: any) {
+      Alert.alert("Unable to select image", e?.message ?? "Please try again.");
+    }
+  }
+
+  async function submitNativeGcashPayment(order: Order) {
+    const reference = (gcashReference[order.id] ?? "").trim();
+    const proof = gcashProof[order.id];
+    if (!/^[A-Za-z0-9-]{6,40}$/.test(reference)) {
+      Alert.alert("Invalid reference", "Enter the 6–40 character GCash transaction reference shown on your receipt.");
+      return;
+    }
+    if (!proof) {
+      Alert.alert("Receipt required", "Choose your GCash receipt screenshot before submitting.");
+      return;
+    }
+    if (order.payment_method !== "gcash" || order.payment_status === "paid" ||
+        ["cancelled", "rejected", "delivered"].includes(order.status)) {
+      Alert.alert("Payment submission unavailable", "This order can no longer accept a GCash payment submission.");
+      return;
+    }
+    setGcashSubmitting(order.id);
+    let uploadedPath: string | null = null;
+    try {
+      const extension = proof.mimeType === "image/png" ? "png" : proof.mimeType === "image/webp" ? "webp" : "jpg";
+      const fileName = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + "." + extension;
+      uploadedPath = order.id + "/" + session.user.id + "/" + fileName;
+      const bytes = await new File(proof.uri).arrayBuffer();
+      const { error: uploadError } = await supabase.storage.from("gcash-payment-proofs").upload(uploadedPath, bytes, {
+        contentType: proof.mimeType, cacheControl: "3600", upsert: false
+      });
+      if (uploadError) throw uploadError;
+      const { error: submitError } = await supabase.rpc("customer_submit_gcash_payment", {
+        p_order_id: order.id,
+        p_transaction_reference: reference,
+        p_proof_path: uploadedPath
+      });
+      if (submitError) throw submitError;
+      setGcashProof(current => { const next = { ...current }; delete next[order.id]; return next; });
+      setGcashReference(current => ({ ...current, [order.id]: reference }));
+      await loadOrders();
+      Alert.alert("Payment proof submitted", "The merchant will verify the transaction against their GCash wallet. Your order will not be prepared until the merchant confirms payment.");
+    } catch (e: any) {
+      if (uploadedPath) {
+        await supabase.storage.from("gcash-payment-proofs").remove([uploadedPath]).catch(() => undefined);
+      }
+      Alert.alert("Unable to submit payment proof", e?.message ?? "Please check your connection and try again.");
+    } finally { setGcashSubmitting(null); }
+  }
+
+  async function signOut() { await supabase.auth.signOut(); setCart({}); setOrders([]); setProducts([]); setStores([]); setGcashProof({}); setGcashReference({}); }
   function addToCart(product: Product) {
     if (cartItems.length && cartItems[0].product.branch_id !== product.branch_id) {
       Alert.alert("One store per order", "Your basket can contain items from one store branch at a time.", [
