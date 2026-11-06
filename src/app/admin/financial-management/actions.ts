@@ -73,7 +73,7 @@ export async function createMerchantBillingStatement(formData:FormData){
  const periodStart=String(formData.get("period_start")??"");
  const periodEnd=String(formData.get("period_end")??"");
  const note=String(formData.get("admin_note")??"").trim().slice(0,500);
- if(!/^[0-9a-f-]{36}$/i.test(merchantId)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(periodStart)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(periodEnd)||periodEnd<periodStart){
+ if(!/^[0-9a-f-]{36}$/i.test(merchantId)||!/^\d{4}-\d{2}-\d{2}$/.test(periodStart)||!/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)||periodEnd<periodStart){
   redirect("/admin/financial-management?error=billing-period");
  }
  const {error}=await db.rpc("admin_create_merchant_billing_statement",{
