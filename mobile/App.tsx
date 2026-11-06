@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import * as Linking from "expo-linking";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Linking, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; merchant: { name: string } | { name: string }[] | null; branch: { name: string; municipalities: { name: string } | { name: string }[] | null } | { name: string; municipalities: { name: string } | { name: string }[] | null }[] | null };
