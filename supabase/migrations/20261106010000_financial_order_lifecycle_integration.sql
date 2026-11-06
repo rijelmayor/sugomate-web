@@ -284,6 +284,32 @@ $$;
 revoke all on function public.driver_update_order_status(uuid,text,text,text) from public,anon;
 grant execute on function public.driver_update_order_status(uuid,text,text,text) to authenticated;
 
+-- Authoritative full-history balance for the signed-in active driver.
+create or replace function public.driver_available_balance()
+returns numeric(12,2)
+language plpgsql security definer set search_path=''
+as $
+declare
+  v_actor uuid:=auth.uid();
+  v_balance numeric(12,2);
+  v_reserved numeric(12,2);
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if not exists(select 1 from public.driver_profiles dp where dp.user_id=v_actor and dp.status='active') then
+    raise exception 'Only active delivery partners can view a payout balance.';
+  end if;
+  select coalesce(sum(e.net_delivery_earnings),0) into v_balance
+    from public.driver_earnings_entries e where e.driver_user_id=v_actor and e.status in ('earned','adjusted');
+  select v_balance+coalesce(sum(b.amount),0) into v_balance
+    from public.driver_benefit_entries b where b.driver_user_id=v_actor and b.status in ('approved','paid');
+  select coalesce(sum(r.requested_amount),0) into v_reserved
+    from public.driver_payout_requests r where r.driver_user_id=v_actor and r.status in ('pending','approved','paid');
+  return greatest(v_balance-v_reserved,0);
+end;
+$;
+revoke all on function public.driver_available_balance() from public,anon;
+grant execute on function public.driver_available_balance() to authenticated;
+
 -- Driver balance is computed from delivered earnings and approved benefits, less all outstanding/paid payouts.
 -- Lock the driver's profile to serialize concurrent requests and prevent over-withdrawal.
 create or replace function public.driver_request_payout(
@@ -297,7 +323,6 @@ as $$
 declare
   v_actor uuid:=auth.uid();
   v_balance numeric(12,2);
-  v_reserved numeric(12,2);
   v_request_id uuid;
 begin
   if v_actor is null then raise exception 'Sign in required.'; end if;
@@ -305,15 +330,9 @@ begin
   perform 1 from public.driver_profiles dp where dp.user_id=v_actor and dp.status='active' for update;
   if not found then raise exception 'Only active delivery partners can request payouts.'; end if;
 
-  select coalesce(sum(e.net_delivery_earnings),0) into v_balance
-    from public.driver_earnings_entries e where e.driver_user_id=v_actor and e.status in ('earned','adjusted');
-  select v_balance+coalesce(sum(b.amount),0) into v_balance
-    from public.driver_benefit_entries b where b.driver_user_id=v_actor and b.status in ('approved','paid');
-  select coalesce(sum(r.requested_amount),0) into v_reserved
-    from public.driver_payout_requests r where r.driver_user_id=v_actor and r.status in ('pending','approved','paid');
-
-  if p_amount>greatest(v_balance-v_reserved,0) then
-    raise exception 'Requested payout exceeds your available balance of ₱%.',to_char(greatest(v_balance-v_reserved,0),'FM999,999,990.00');
+  v_balance:=public.driver_available_balance();
+  if p_amount>v_balance then
+    raise exception 'Requested payout exceeds your available balance of ₱%.',to_char(v_balance,'FM999,999,990.00');
   end if;
 
   insert into public.driver_payout_requests(
