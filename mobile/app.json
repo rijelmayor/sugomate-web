@@ -6,9 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "sugomate",
-    "splash": {
-      "backgroundColor": "#fff7ef"
-    },
     "android": {
       "package": "com.sugomate.app"
     },
@@ -22,6 +19,12 @@
         {
           "photosPermission": "SUGOMATE needs photo access so you can upload your GCash payment receipt.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#fff7ef"
         }
       ]
     ]
