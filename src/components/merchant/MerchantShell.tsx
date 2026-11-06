@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ClipboardList, Package, Settings } from "lucide-react";
+import { ClipboardList, Package, Settings, Wallet } from "lucide-react";
 import PendingLink from "@/components/PendingLink";
 import StoreAvatar from "@/components/merchant/StoreAvatar";
 import PortalSignOut from "@/components/PortalSignOut";
 
-type TabKey = "orders" | "products" | "settings";
+type TabKey = "orders" | "products" | "settings" | "finance";
 const TABS = [
   { key: "orders", href: "/merchant", label: "Orders", Icon: ClipboardList },
   { key: "products", href: "/merchant/products", label: "Products", Icon: Package },
   { key: "settings", href: "/merchant/storefront", label: "Store settings", Icon: Settings },
+  { key: "finance", href: "/merchant/financials", label: "System Usage & billing", Icon: Wallet },
 ] as const;
 
 export default function MerchantShell({ active, store, newCount = 0, width = "max-w-6xl", headerActions, children }: {
@@ -42,7 +43,7 @@ export default function MerchantShell({ active, store, newCount = 0, width = "ma
     </div>
 
     <nav aria-label="Merchant navigation" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-orange-100 bg-white/95 backdrop-blur sm:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-3">
+      <div className="mx-auto grid max-w-md grid-cols-4">
         {TABS.map(({ key, href, label, Icon }) => <PendingLink key={key} href={href} aria-current={key === active ? "page" : undefined} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${key === active ? "text-[#e95718]" : "text-slate-500"}`}>
           <span className="relative"><Icon aria-hidden="true" size={21} strokeWidth={key === active ? 2.4 : 1.9} />{key === "orders" && newCount > 0 && <span className="absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#ff8a00] px-1 text-[10px] font-black" style={white}>{newCount}</span>}</span>
           {label}
