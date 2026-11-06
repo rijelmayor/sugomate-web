@@ -264,8 +264,7 @@ begin
     ) values(
       v_order.id,v_order.merchant_id,(now() at time zone 'Asia/Manila')::date,
       v_order.merchant_srp_subtotal,
-      case when v_order.merchant_system_usage_total=0 then 'percentage'
-        else coalesce((select oi.merchant_usage_method from public.order_items oi where oi.order_id=v_order.id limit 1),'percentage') end,
+      coalesce((select oi.merchant_usage_method from public.order_items oi where oi.order_id=v_order.id limit 1),'percentage'),
       coalesce((select oi.merchant_usage_rate from public.order_items oi where oi.order_id=v_order.id limit 1),0),
       v_order.merchant_system_usage_total,'unbilled'
     ) on conflict(order_id) do nothing;
@@ -341,6 +340,7 @@ declare
   v_actor uuid:=auth.uid();
   v_statement_id uuid;
   v_total numeric(12,2);
+  v_entry_ids uuid[];
 begin
   if v_actor is null or not app_private.has_role(v_actor,'admin'::public.app_role) then
     raise exception 'Admin access required.';
@@ -351,10 +351,14 @@ begin
   perform 1 from public.merchants where id=p_merchant_id and status='approved' for update;
   if not found then raise exception 'Approved merchant not found.'; end if;
 
-  select coalesce(sum(e.system_usage_amount),0) into v_total
-    from public.merchant_system_usage_entries e
-    where e.merchant_id=p_merchant_id and e.status='unbilled'
-      and e.order_date between p_period_start and p_period_end;
+  select coalesce(sum(e.system_usage_amount),0),array_agg(e.id) into v_total,v_entry_ids
+    from (
+      select e.id,e.system_usage_amount
+      from public.merchant_system_usage_entries e
+      where e.merchant_id=p_merchant_id and e.status='unbilled'
+        and e.order_date between p_period_start and p_period_end
+      for update
+    ) e;
   if v_total<=0 then raise exception 'No unbilled System Usage entries exist for this merchant and period.'; end if;
 
   insert into public.merchant_billing_statements(
@@ -363,8 +367,7 @@ begin
     nullif(left(coalesce(p_admin_note,''),500),'')) returning id into v_statement_id;
 
   update public.merchant_system_usage_entries set statement_id=v_statement_id,status='billed'
-    where merchant_id=p_merchant_id and status='unbilled'
-      and order_date between p_period_start and p_period_end;
+    where id=any(v_entry_ids);
   return v_statement_id;
 end;
 $$;
