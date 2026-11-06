@@ -19,4 +19,5 @@ export default async function DriverManagementPage() {
  const profileMap=new Map((profiles??[]).map(x=>[x.id,x]));
  const active=drivers.filter(x=>x.status==="active");
  const online=active.filter(x=>x.is_available);
- return <m¶»§q«^
+ return <main className="min-h-screen bg-[#071321] px-4 py-6 text-white sm:px-7 sm:py-8"><div className="mx-auto max-w-[1400px]">
+  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5"><div><Link href="/admin" className="inline-flex items-center gap-2 text-xs font-bold text-orange-200"><ArrowLeft size={14}/>Admin command center</Link><p className="mt-4 text-[9px] font-black uppercase tracking-[.2em] text-orange-300">Partner network / delivery</p><h1 className...[truncated]
