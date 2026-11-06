@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 
 type Category = { id: string; name: string; slug: string; icon: string; image_url?: string | null };
@@ -8,6 +8,7 @@ type Product = { id: string; name: string; description: string | null; price: nu
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
 type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
+type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type Tab = "market" | "orders" | "account";
 
 const NAVY = "#102e57";
@@ -62,6 +63,21 @@ export default function App() {
   const [cart, setCart] = useState<Cart>({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [deliveryFeePreview, setDeliveryFeePreview] = useState<number | null>(null);
+  const [deliveryFees, setDeliveryFees] = useState<Record<string, number>>({});
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "gcash">("cod");
+  const [customerNote, setCustomerNote] = useState("");
+  const [newAddress, setNewAddress] = useState(false);
+  const [addressLabel, setAddressLabel] = useState("Home");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [addressMunicipality, setAddressMunicipality] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [addressLandmark, setAddressLandmark] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -209,6 +225,87 @@ export default function App() {
       return next;
     });
   }
+  async function openCheckout() {
+    if (!cartItems.length || !currentStore) return;
+    setCheckoutBusy(true);
+    setCheckoutOpen(true);
+    setNewAddress(false);
+    setCustomerNote("");
+    try {
+      const [addressResult, feeResult] = await Promise.all([
+        supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,municipalities(name)").eq("customer_id", session.user.id).order("created_at", { ascending: false }),
+        supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true)
+      ]);
+      if (addressResult.error) throw addressResult.error;
+      const saved = (addressResult.data ?? []) as unknown as CustomerAddress[];
+      setAddresses(saved);
+      setSelectedAddressId(saved[0]?.id ?? "");
+      const feeMap: Record<string, number> = {};
+      if (!feeResult.error) for (const zone of (feeResult.data ?? []) as any[]) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      setDeliveryFees(feeMap);
+      setDeliveryFeePreview(saved[0] && feeMap[saved[0].municipality_id] !== undefined ? feeMap[saved[0].municipality_id] : null);
+      const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
+      setPaymentMethod(methods.includes("cod") ? "cod" : "gcash");
+      if (!saved.length) setNewAddress(true);
+    } catch (e: any) {
+      setCheckoutOpen(false);
+      Alert.alert("Unable to open checkout", e?.message ?? "Please try again.");
+    } finally { setCheckoutBusy(false); }
+  }
+
+  async function placeNativeOrder() {
+    if (!cartItems.length || !session?.user?.id) return;
+    const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
+    if (!methods.includes(paymentMethod)) {
+      Alert.alert("Payment method unavailable", "This store does not accept the selected payment method.");
+      return;
+    }
+    if (!newAddress && !selectedAddressId) {
+      Alert.alert("Delivery address required", "Choose a saved address or add a new one.");
+      return;
+    }
+    if (newAddress && (!recipientName.trim() || !recipientPhone.trim() || !addressMunicipality || addressLine.trim().length < 5)) {
+      Alert.alert("Complete delivery details", "Enter the recipient, mobile number, municipality, and complete street/barangay address.");
+      return;
+    }
+    setCheckoutBusy(true);
+    try {
+      let addressId = selectedAddressId;
+      if (newAddress) {
+        const { data: address, error: addressError } = await supabase.from("customer_addresses").insert({
+          customer_id: session.user.id,
+          label: addressLabel.trim().slice(0, 40) || "Home",
+          recipient_name: recipientName.trim().slice(0, 120),
+          recipient_phone: recipientPhone.trim().slice(0, 40),
+          municipality_id: addressMunicipality,
+          address_line: addressLine.trim().slice(0, 300),
+          landmark: addressLandmark.trim().slice(0, 200) || null
+        }).select("id").single();
+        if (addressError || !address) throw addressError ?? new Error("Unable to save delivery address.");
+        addressId = address.id;
+      }
+      const safeItems = cartItems.map(item => ({ product_id: item.product.id, quantity: item.quantity }));
+      const { data: orderId, error } = await supabase.rpc("place_customer_order", {
+        p_address_id: addressId,
+        p_items: safeItems,
+        p_payment_method: paymentMethod,
+        p_customer_note: customerNote.trim().slice(0, 500) || null
+      });
+      if (error || !orderId) throw error ?? new Error("Order was not created.");
+      const { data: order } = await supabase.from("orders")
+        .select("id,order_number,subtotal,delivery_fee,total")
+        .eq("id", orderId).eq("customer_id", session.user.id).maybeSingle();
+      setCart({});
+      setCheckoutOpen(false);
+      setTab("orders");
+      setSelectedStore("");
+      await loadOrders();
+      Alert.alert("Order placed!", (order?.order_number ?? "Order " + String(orderId).slice(0, 8)) + (order ? "\nTotal: " + peso(order.total) : "") + (paymentMethod === "gcash" ? "\nGCash payment is awaiting your payment proof and merchant verification." : "\nPlease prepare the exact COD amount for the rider."));
+    } catch (e: any) {
+      Alert.alert("Unable to place order", e?.message ?? "Please refresh your basket and try again.");
+    } finally { setCheckoutBusy(false); }
+  }
+
   function showBasket() {
     const lines = cartItems.map(x => x.quantity + " × " + x.product.name + " — " + peso(Number(x.product.price) * x.quantity)).join("\n");
     Alert.alert("Your basket", lines + "\n\nItems subtotal: " + peso(cartTotal) + "\n\nDelivery fee is calculated at checkout.", [
@@ -275,7 +372,48 @@ export default function App() {
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => Linking.openURL("https://sugomate.com/customer/addresses")}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
-    {tab === "market" && cartCount > 0 && <TouchableOpacity style={styles.basketBar} onPress={showBasket}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
+    {tab === "market" && cartCount > 0 && <TouchableOpacity style={styles.basketBar} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
+    <Modal visible={checkoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => !checkoutBusy && setCheckoutOpen(false)}>
+      <SafeAreaView style={styles.checkoutSafe}>
+        <ScrollView contentContainerStyle={styles.checkoutContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.checkoutHeader}><TouchableOpacity disabled={checkoutBusy} onPress={() => setCheckoutOpen(false)}><Text style={styles.backLinkText}>‹  Back</Text></TouchableOpacity><Text style={styles.checkoutTitle}>Checkout</Text></View>
+          <View style={styles.checkoutCard}>
+            <Text style={styles.checkoutSection}>Delivery address</Text>
+            {!newAddress && addresses.map(a => <TouchableOpacity key={a.id} style={[styles.addressOption, selectedAddressId === a.id && styles.addressOptionActive]} onPress={() => { setSelectedAddressId(a.id); setDeliveryFeePreview(deliveryFees[a.municipality_id] ?? null); }}>
+              <Text style={styles.addressOptionTitle}>{selectedAddressId === a.id ? "● " : "○ "}{a.label} · {a.recipient_name}</Text>
+              <Text style={styles.addressOptionText}>{a.address_line}, {one(a.municipalities)?.name ?? ""}</Text>
+              <Text style={styles.addressOptionText}>{a.recipient_phone}{a.landmark ? " · Near " + a.landmark : ""}</Text>
+            </TouchableOpacity>)}
+            <TouchableOpacity onPress={() => { setNewAddress(v => { const next = !v; if (next) setDeliveryFeePreview(null); else { const selected = addresses.find(a => a.id === selectedAddressId); setDeliveryFeePreview(selected ? deliveryFees[selected.municipality_id] ?? null : null); } return next; }); }} style={styles.addressToggle}><Text style={styles.addressToggleText}>{newAddress ? "Choose a saved address" : "+ Add a new delivery address"}</Text></TouchableOpacity>
+            {newAddress && <>
+              <TextInput style={styles.checkoutInput} placeholder="Address label (Home, Work)" value={addressLabel} onChangeText={setAddressLabel}/>
+              <TextInput style={styles.checkoutInput} placeholder="Recipient full name" value={recipientName} onChangeText={setRecipientName}/>
+              <TextInput style={styles.checkoutInput} placeholder="Mobile number" keyboardType="phone-pad" value={recipientPhone} onChangeText={setRecipientPhone}/>
+              <Text style={styles.checkoutHint}>Select municipality</Text>
+              {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => { setAddressMunicipality(m.id); setDeliveryFeePreview(deliveryFees[m.id] ?? null); }} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
+              <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="House no., street, purok / sitio, barangay" multiline value={addressLine} onChangeText={setAddressLine}/>
+              <TextInput style={styles.checkoutInput} placeholder="Nearby landmark (optional)" value={addressLandmark} onChangeText={setAddressLandmark}/>
+            </>}
+          </View>
+          <View style={styles.checkoutCard}>
+            <Text style={styles.checkoutSection}>Order summary</Text>
+            {cartItems.map(item => <View key={item.product.id} style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>{item.quantity} × {item.product.name}</Text><Text style={styles.checkoutAmountValue}>{peso(Number(item.product.price) * item.quantity)}</Text></View>)}
+            <View style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>Items subtotal</Text><Text style={styles.checkoutAmountValue}>{peso(cartTotal)}</Text></View>
+            <View style={styles.checkoutAmountRow}><Text style={styles.checkoutDeliveryLabel}>Delivery fee</Text><Text style={styles.checkoutDeliveryLabel}>{deliveryFeePreview === null ? "Calculated at checkout" : peso(deliveryFeePreview)}</Text></View>
+            <View style={[styles.checkoutAmountRow, styles.checkoutTotalRow]}><Text style={styles.checkoutTotalLabel}>Estimated total</Text><Text style={styles.checkoutTotalLabel}>{deliveryFeePreview === null ? "Confirmed after placement" : peso(cartTotal + deliveryFeePreview)}</Text></View>
+            <Text style={styles.checkoutHint}>Final prices, stock, delivery fee and total are validated securely when you place the order.</Text>
+          </View>
+          <View style={styles.checkoutCard}>
+            <Text style={styles.checkoutSection}>Payment method</Text>
+            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"]).includes("cod") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "cod" && styles.addressOptionActive]} onPress={() => setPaymentMethod("cod")}><Text style={styles.paymentTitle}>{paymentMethod === "cod" ? "● " : "○ "}Cash on Delivery (COD)</Text><Text style={styles.checkoutHint}>Pay the displayed order total in cash on delivery. Rider cash capacity and assignment safeguards are handled in the order workflow.</Text></TouchableOpacity>}
+            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? []).includes("gcash") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "gcash" && styles.addressOptionActive]} onPress={() => setPaymentMethod("gcash")}><Text style={styles.paymentTitle}>{paymentMethod === "gcash" ? "● " : "○ "}GCash</Text><Text style={styles.checkoutHint}>Pay the full order total, including the delivery fee. Merchant confirmation is required before preparation.</Text></TouchableOpacity>}
+            <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="Delivery instructions (optional)" multiline value={customerNote} onChangeText={setCustomerNote}/>
+          </View>
+          <TouchableOpacity disabled={checkoutBusy || !cartItems.length} style={[styles.primary, checkoutBusy && styles.disabled]} onPress={placeNativeOrder}><Text style={styles.primaryText}>{checkoutBusy ? "Placing order…" : deliveryFeePreview === null ? "Place order · Confirm total at placement" : "Place order · " + peso(cartTotal + deliveryFeePreview)}</Text></TouchableOpacity>
+          <Text style={styles.checkoutFootnote}>For GCash, your order stays unprepared until the merchant verifies payment in their GCash wallet. Do not treat an uploaded receipt as payment confirmation.</Text>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
     <View style={styles.tabbar}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "◉"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "Account"}</Text></TouchableOpacity>)}</View>
   </SafeAreaView>;
 }
@@ -303,5 +441,6 @@ const styles = StyleSheet.create({
   basketBar: { position: "absolute", bottom: 72, left: 15, right: 15, backgroundColor: ORANGE, borderRadius: 25, paddingHorizontal: 18, paddingVertical: 13, flexDirection: "row", justifyContent: "space-between", alignItems: "center", elevation: 5 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" },
   tabbar: { height: 62, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", paddingTop: 7, paddingBottom: 5 }, tab: { flex: 1, alignItems: "center", justifyContent: "center" }, activeTab: {}, tabIcon: { fontSize: 19, color: "#8995a7" }, tabText: { fontSize: 9, fontWeight: "700", color: "#8995a7", marginTop: 2 }, activeTabText: { color: RED },
   orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
-  accountCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#ffead8", padding: 19 }, accountLink: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f1eee9" }, accountLinkText: { fontSize: 12, fontWeight: "800", color: NAVY }
+  accountCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#ffead8", padding: 19 }, accountLink: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f1eee9" }, accountLinkText: { fontSize: 12, fontWeight: "800", color: NAVY },
+  checkoutSafe: { flex: 1, backgroundColor: BG }, checkoutContent: { padding: 18, paddingBottom: 36 }, checkoutHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }, checkoutTitle: { fontSize: 22, fontWeight: "900", color: NAVY }, checkoutCard: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ffead8", padding: 15, marginBottom: 13 }, checkoutSection: { fontSize: 15, fontWeight: "900", color: NAVY, marginBottom: 10 }, addressOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 11, marginBottom: 8 }, addressOptionActive: { borderColor: ORANGE, backgroundColor: "#fff7ef" }, addressOptionTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, addressOptionText: { fontSize: 10, color: "#738096", marginTop: 4 }, addressToggle: { paddingVertical: 10 }, addressToggleText: { fontSize: 11, fontWeight: "900", color: RED }, checkoutInput: { marginTop: 9, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#e5eaf0", backgroundColor: "#fff", color: NAVY, fontSize: 12 }, checkoutMultiline: { minHeight: 72, textAlignVertical: "top" }, checkoutHint: { fontSize: 10, color: "#738096", lineHeight: 15, marginTop: 6 }, municipalityOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 10, padding: 9, marginTop: 5 }, checkoutAmountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginTop: 8 }, checkoutAmountLabel: { flex: 1, fontSize: 11, color: "#738096" }, checkoutAmountValue: { fontSize: 11, fontWeight: "800", color: NAVY }, checkoutDeliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, checkoutTotalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 10, marginTop: 12 }, checkoutTotalLabel: { fontSize: 13, fontWeight: "900", color: NAVY }, paymentOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 12, marginBottom: 8 }, paymentTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, checkoutFootnote: { fontSize: 10, lineHeight: 16, color: "#738096", textAlign: "center", marginTop: 10 }
 });
