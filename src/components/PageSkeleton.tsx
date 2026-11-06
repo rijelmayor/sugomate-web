@@ -1,5 +1,5 @@
 export default function PageSkeleton({ variant = "list" }: { variant?: "market" | "list" }) {
-  return <main aria-busy="true" aria-label="Loading" className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
+  return <main aria-busy="true" aria-label="Loading" className="min-h-screen bg-[#f3f5f9] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
     <div className="mx-auto max-w-6xl">
       <div className="flex items-center justify-between"><div className="skeleton h-9 w-36 rounded-xl" /><div className="skeleton h-9 w-24 rounded-full" /></div>
       <div className="skeleton mt-6 h-8 w-64 rounded-lg" />
