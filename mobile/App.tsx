@@ -271,11 +271,10 @@ export default function App() {
       return;
     }
     setGcashSubmitting(order.id);
-    let uploadedPath: string | null = null;
     try {
       const extension = proof.mimeType === "image/png" ? "png" : proof.mimeType === "image/webp" ? "webp" : "jpg";
       const fileName = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + "." + extension;
-      uploadedPath = order.id + "/" + session.user.id + "/" + fileName;
+      const uploadedPath = order.id + "/" + session.user.id + "/" + fileName;
       const bytes = await new File(proof.uri).arrayBuffer();
       const { error: uploadError } = await supabase.storage.from("gcash-payment-proofs").upload(uploadedPath, bytes, {
         contentType: proof.mimeType, cacheControl: "3600", upsert: false
@@ -292,10 +291,7 @@ export default function App() {
       await loadOrders();
       Alert.alert("Payment proof submitted", "The merchant will verify the transaction against their GCash wallet. Your order will not be prepared until the merchant confirms payment.");
     } catch (e: any) {
-      if (uploadedPath) {
-        await supabase.storage.from("gcash-payment-proofs").remove([uploadedPath]).catch(() => undefined);
-      }
-      Alert.alert("Unable to submit payment proof", e?.message ?? "Please check your connection and try again.");
+      Alert.alert("Unable to submit payment proof", e?.message ?? "Please check your connection and try again. If upload completed before the error, the private receipt file may remain unattached to the order.");
     } finally { setGcashSubmitting(null); }
   }
 
