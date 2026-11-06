@@ -65,8 +65,10 @@ export async function assignMerchantCategory(formData: FormData) {
       (categoryId && !/^[0-9a-f-]{36}$/i.test(categoryId))) {
     redirect("/admin/store-categories?error=invalid");
   }
-  const { error } = await supabase.from("merchants")
-    .update({ category_id: categoryId }).eq("id", merchantId);
+  const { error } = await supabase.rpc("admin_assign_merchant_category", {
+    p_merchant_id: merchantId,
+    p_category_id: categoryId,
+  });
   if (error) redirect("/admin/store-categories?error=assign");
   redirect("/admin/store-categories?assigned=1");
 }
