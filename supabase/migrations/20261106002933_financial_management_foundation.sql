@@ -126,6 +126,8 @@ create policy "Admin manages platform financial settings" on public.platform_fin
 for all to authenticated
 using ((select app_private.has_role((select auth.uid()), 'admin'::app_role)))
 with check ((select app_private.has_role((select auth.uid()), 'admin'::app_role)));
+create policy "Authenticated users read active pricing configuration" on public.platform_financial_settings
+for select to authenticated using (true);
 
 create policy "Admin manages merchant billing statements" on public.merchant_billing_statements
 for all to authenticated
