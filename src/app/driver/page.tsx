@@ -40,7 +40,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
   <div className="mx-auto max-w-5xl">
    <header className="flex flex-wrap items-center justify-between gap-3">
     <Link href="/" className="flex items-center gap-2 text-sm font-black"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff8a00] to-[#ed3e17] text-white">S</span>SUGOMATE <span className="font-medium text-slate-400">/ Delivery partner</span></Link>
-    <div className="flex items-center gap-2">{active&&<Link href="/driver/earnings" className="rounded-full border border-orange-200 bg-white px-3 py-2 text-[11px] font-black text-[#102e57]">Earnings & payouts</Link>}{active&&<DriverOfferAlarm userId={user.id} offeredIds={offered.map(o=>o.id)} availableIds={(readyOrders??[]).map(o=>o.id)}/>}<form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></form></div>
+    <div className="flex items-center gap-2">{active&&<Link href="/driver/earnings" className="rounded-full border border-orange-200 bg-white px-3 py-2 text-[11px] font-black text-[#102e57]">Earnings & System Usage</Link>}{active&&<DriverOfferAlarm userId={user.id} offeredIds={offered.map(o=>o.id)} availableIds={(readyOrders??[]).map(o=>o.id)}/>}<form action={signOut}><SignOutSubmitButton className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></form></div>
    </header>
    <section className="mt-4 rounded-2xl bg-[#102e57] px-4 py-3 text-white shadow-md">
     <div className="flex items-center justify-between gap-3">
