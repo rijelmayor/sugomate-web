@@ -3,21 +3,17 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, CircleDollarSign, Gift, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import PortalSignOut from "@/components/PortalSignOut";
-
-const statusTone=(status:string)=>status==="active"||status==="approved"?"border-emerald-300/20 bg-emerald-300/10 text-emerald-200":status==="pending"?"border-amber-300/20 bg-amber-300/10 text-amber-200":status==="suspended"||status==="rejected"?"border-rose-300/20 bg-rose-300/10 text-rose-200":"border-white/10 bg-white/[.04] text-slate-300";
-
-export default async function DriverManagementPage() {
- const supabase=await createClient();
- const {data:{user}}=await supabase.auth.getUser();
- if(!user) redirect("/login");
- const {data:role}=await supabase.from("user_roles").select("role").eq("user_id",user.id).eq("role","admin").maybeSingle();
- if(!role) redirect("/dashboard?error=admin-access");
- const {data}=await supabase.from("driver_profiles").select("user_id,status,vehicle_type,vehicle_plate,is_available,created_at").order("created_at",{ascending:false}).limit(250);
- const drivers=data??[];
- const ids=drivers.map(x=>x.user_id);
- const {data:profiles}=ids.length?await supabase.from("profiles").select("id,display_name,phone").in("id",ids):{data:[]};
- const profileMap=new Map((profiles??[]).map(x=>[x.id,x]));
- const active=drivers.filter(x=>x.status==="active");
- const online=active.filter(x=>x.is_available);
- return <main className="min-h-screen bg-[#071321] px-4 py-6 text-white sm:px-7 sm:py-8"><div className="mx-auto max-w-[1400px]">
-  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5"><div><Link href="/admin" className="inline-flex items-center gap-2 text-xs font-bold text-orange-200"><ArrowLeft size={14}/>Admin command center</Link><p className="mt-4 text-[9px] font-black uppercase tracking-[.2em] text-orange-300">Partner network / delivery</p><h1 className...[truncated]
+export default async function DriverManagementPage(){
+ const db=await createClient(); const {data:{user}}=await db.auth.getUser(); if(!user) redirect("/login");
+ const {data:role}=await db.from("user_roles").select("role").eq("user_id",user.id).eq("role","admin").maybeSingle(); if(!role) redirect("/dashboard?error=admin-access");
+ const {data}=await db.from("driver_profiles").select("user_id,status,vehicle_type,vehicle_plate,is_available,created_at").order("created_at",{ascending:false}).limit(250);
+ const drivers=data??[]; const ids=drivers.map(x=>x.user_id);
+ const {data:profiles}=ids.length?await db.from("profiles").select("id,display_name,phone").in("id",ids):{data:[]};
+ const people=new Map((profiles??[]).map(x=>[x.id,x]));
+ const active=drivers.filter(x=>x.status==="active"); const online=active.filter(x=>x.is_available);
+ return <main className="min-h-screen bg-[#071321] px-4 py-7 text-white sm:px-8"><div className="mx-auto max-w-7xl"><header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5"><div><Link href="/admin/command-center" className="inline-flex items-center gap-2 text-xs font-bold text-orange-200"><ArrowLeft size={14}/>Command Center</Link><p className="mt-4 text-[9px] font-black uppercase tracking-[.2em] text-orange-300">Partner network</p><h1 className="mt-1 text-3xl font-black">Driver management</h1><p className="mt-2 text-sm text-slate-400">Driver roster, availability and financial program foundation.</p></div><PortalSignOut className="rounded-full border border-white/10 px-4 py-2 text-xs font-bold text-slate-300"/></header>
+ <div className="mt-6 grid gap-3 sm:grid-cols-3">{[[drivers.length,"Registered"],[active.length,"Active"],[online.length,"Online & available"]].map(([v,l])=><div key={String(l)} className="rounded-2xl border border-white/10 bg-[#10243c] p-5"><p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{l}</p><p className="mt-2 text-3xl font-black">{v}</p></div>)}</div>
+ <div className="mt-6 grid gap-3 lg:grid-cols-2"><article className="rounded-2xl border border-white/10 bg-[#10243c] p-5"><CircleDollarSign className="text-cyan-200"/><h2 className="mt-3 font-extrabold">Driver earnings & payouts</h2><p className="mt-2 text-xs leading-5 text-slate-400">Future ledger: Driver Base Rate, System Usage deduction, net earnings, adjustments, available balance, withdrawals and released payouts. No unverified balances are displayed.</p><span className="mt-3 inline-block text-[9px] font-bold uppercase text-amber-200">Financial ledger · Planned</span></article><article className="rounded-2xl border border-white/10 bg-[#10243c] p-5"><Gift className="text-violet-200"/><h2 className="mt-3 font-extrabold">Benefits & incentives</h2><p className="mt-2 text-xs leading-5 text-slate-400">Daily, weekly and monthly bonuses, referral rewards, attendance incentives and allowances. Each program will be independently configurable and inactive by default.</p><span className="mt-3 inline-block text-[9px] font-bold uppercase text-violet-200">Programs inactive by default</span></article></div>
+ <section className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-[#10243c]"><div className="border-b border-white/10 p-5"><h2 className="font-extrabold">Registered delivery partners</h2><p className="mt-1 text-[10px] text-slate-500">Latest 250 records</p></div><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="text-[9px] uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Driver</th><th className="px-5 py-3">Vehicle</th><th className="px-5 py-3">Availability</th><th className="px-5 py-3">Status</th></tr></thead><tbody>{drivers.map(x=>{const p=people.get(x.user_id);return <tr key={x.user_id} className="border-t border-white/[.06]"><td className="px-5 py-4"><b>{p?.display_name||"Driver"}</b><p className="mt-1 text-[10px] text-slate-500">{p?.phone||"No phone"}</p></td><td className="px-5 py-4 text-slate-300">{x.vehicle_type||"Not specified"}{x.vehicle_plate?" · "+x.vehicle_plate:""}</td><td className="px-5 py-4">{x.is_available?"Online":"Offline"}</td><td className="px-5 py-4 capitalize">{x.status}</td></tr>})}{!drivers.length&&<tr><td colSpan={4} className="px-5 py-10 text-center text-slate-500">No driver records found.</td></tr>}</tbody></table></div></section>
+ <div className="mt-5 flex gap-3 rounded-xl border border-emerald-300/15 bg-emerald-300/[.04] p-4"><ShieldCheck size={17} className="shrink-0 text-emerald-200"/><p className="text-[10px] leading-5 text-slate-400">Read-only first phase. Financial actions will be enabled after the secure ledger, approval controls and audit trail are implemented.</p></div></div></main>;
+}
