@@ -69,6 +69,7 @@ export default function App() {
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [deliveryFeePreview, setDeliveryFeePreview] = useState<number | null>(null);
+  const [deliveryFees, setDeliveryFees] = useState<Record<string, number>>({});
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "gcash">("cod");
   const [customerNote, setCustomerNote] = useState("");
   const [newAddress, setNewAddress] = useState(false);
@@ -238,13 +239,13 @@ export default function App() {
         supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true)
       ]);
       if (addressResult.error) throw addressResult.error;
-      if (feeResult.error) throw feeResult.error;
       const saved = (addressResult.data ?? []) as unknown as CustomerAddress[];
       setAddresses(saved);
       setSelectedAddressId(saved[0]?.id ?? "");
-      const branchMunicipality = storeProducts[0]?.branch?.municipality_id;
-      const matchingFee = (feeResult.data ?? []).find((z: any) => z.municipality_id === branchMunicipality);
-      setDeliveryFeePreview(matchingFee ? Number(matchingFee.base_delivery_fee) : null);
+      const feeMap: Record<string, number> = {};
+      if (!feeResult.error) for (const zone of (feeResult.data ?? []) as any[]) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      setDeliveryFees(feeMap);
+      setDeliveryFeePreview(saved[0] && feeMap[saved[0].municipality_id] !== undefined ? feeMap[saved[0].municipality_id] : null);
       const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
       setPaymentMethod(methods.includes("cod") ? "cod" : "gcash");
       if (!saved.length) setNewAddress(true);
@@ -382,7 +383,7 @@ export default function App() {
           <View style={styles.checkoutHeader}><TouchableOpacity disabled={checkoutBusy} onPress={() => setCheckoutOpen(false)}><Text style={styles.backLinkText}>‹  Back</Text></TouchableOpacity><Text style={styles.checkoutTitle}>Checkout</Text></View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Delivery address</Text>
-            {!newAddress && addresses.map(a => <TouchableOpacity key={a.id} style={[styles.addressOption, selectedAddressId === a.id && styles.addressOptionActive]} onPress={() => setSelectedAddressId(a.id)}>
+            {!newAddress && addresses.map(a => <TouchableOpacity key={a.id} style={[styles.addressOption, selectedAddressId === a.id && styles.addressOptionActive]} onPress={() => { setSelectedAddressId(a.id); setDeliveryFeePreview(deliveryFees[a.municipality_id] ?? null); }}>
               <Text style={styles.addressOptionTitle}>{selectedAddressId === a.id ? "● " : "○ "}{a.label} · {a.recipient_name}</Text>
               <Text style={styles.addressOptionText}>{a.address_line}, {one(a.municipalities)?.name ?? ""}</Text>
               <Text style={styles.addressOptionText}>{a.recipient_phone}{a.landmark ? " · Near " + a.landmark : ""}</Text>
@@ -393,7 +394,7 @@ export default function App() {
               <TextInput style={styles.checkoutInput} placeholder="Recipient full name" value={recipientName} onChangeText={setRecipientName}/>
               <TextInput style={styles.checkoutInput} placeholder="Mobile number" keyboardType="phone-pad" value={recipientPhone} onChangeText={setRecipientPhone}/>
               <Text style={styles.checkoutHint}>Select municipality</Text>
-              {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => setAddressMunicipality(m.id)} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
+              {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => { setAddressMunicipality(m.id); setDeliveryFeePreview(deliveryFees[m.id] ?? null); }} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
               <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="House no., street, purok / sitio, barangay" multiline value={addressLine} onChangeText={setAddressLine}/>
               <TextInput style={styles.checkoutInput} placeholder="Nearby landmark (optional)" value={addressLandmark} onChangeText={setAddressLandmark}/>
             </>}
@@ -408,11 +409,11 @@ export default function App() {
           </View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Payment method</Text>
-            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"]).includes("cod") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "cod" && styles.addressOptionActive]} onPress={() => setPaymentMethod("cod")}><Text style={styles.paymentTitle}>{paymentMethod === "cod" ? "● " : "○ "}Cash on Delivery (COD)</Text><Text style={styles.checkoutHint}>Have enough cash for the order subtotal. The rider's delivery fee is handled separately with the merchant.</Text></TouchableOpacity>}
+            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"]).includes("cod") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "cod" && styles.addressOptionActive]} onPress={() => setPaymentMethod("cod")}><Text style={styles.paymentTitle}>{paymentMethod === "cod" ? "● " : "○ "}Cash on Delivery (COD)</Text><Text style={styles.checkoutHint}>Pay the displayed order total in cash on delivery. Rider cash capacity and assignment safeguards are handled in the order workflow.</Text></TouchableOpacity>}
             {(storeProducts[0]?.merchant?.accepted_payment_methods ?? []).includes("gcash") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "gcash" && styles.addressOptionActive]} onPress={() => setPaymentMethod("gcash")}><Text style={styles.paymentTitle}>{paymentMethod === "gcash" ? "● " : "○ "}GCash</Text><Text style={styles.checkoutHint}>Pay the full order total, including the delivery fee. Merchant confirmation is required before preparation.</Text></TouchableOpacity>}
             <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="Delivery instructions (optional)" multiline value={customerNote} onChangeText={setCustomerNote}/>
           </View>
-          <TouchableOpacity disabled={checkoutBusy || !cartItems.length} style={[styles.primary, checkoutBusy && styles.disabled]} onPress={placeNativeOrder}><Text style={styles.primaryText}>{checkoutBusy ? "Placing order…" : "Place order · " + peso(cartTotal + (deliveryFeePreview ?? 0))}</Text></TouchableOpacity>
+          <TouchableOpacity disabled={checkoutBusy || !cartItems.length} style={[styles.primary, checkoutBusy && styles.disabled]} onPress={placeNativeOrder}><Text style={styles.primaryText}>{checkoutBusy ? "Placing order…" : deliveryFeePreview === null ? "Place order · Confirm total at placement" : "Place order · " + peso(cartTotal + deliveryFeePreview)}</Text></TouchableOpacity>
           <Text style={styles.checkoutFootnote}>For GCash, your order stays unprepared until the merchant verifies payment in their GCash wallet. Do not treat an uploaded receipt as payment confirmation.</Text>
         </ScrollView>
       </SafeAreaView>
