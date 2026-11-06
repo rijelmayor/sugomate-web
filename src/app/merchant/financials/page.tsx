@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { ArrowDownRight, ArrowLeft, FileText, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import MerchantShell from "@/components/merchant/MerchantShell";
-import PortalSignOut from "@/components/PortalSignOut";
 const money=(v:number|string|null|undefined)=>"₱"+Number(v??0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
 const panel="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm";
 export default async function MerchantFinancialsPage(){
@@ -20,7 +19,7 @@ export default async function MerchantFinancialsPage(){
  const unbilled=entries.filter(x=>x.status==="unbilled"), billed=entries.filter(x=>x.status==="billed"), paid=entries.filter(x=>x.status==="paid");
  const allTotal=sum(entries), unbilledTotal=sum(unbilled), statementTotal=statements.filter(x=>x.status!=="void").reduce((n,x)=>n+Number(x.total_system_usage||0),0);
  const loadError=Boolean(usageRes.error||statementsRes.error);
- return <MerchantShell active="finance" store={store?{name:store.name,logoUrl:store.logo_url}:null} headerActions={<PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-[#102e57]"/>}>
+ return <MerchantShell active="finance" store={store?{name:store.name,logoUrl:store.logo_url}:null}>
  <header className="mt-6 flex flex-wrap items-end justify-between gap-3"><div><Link href="/merchant" className="inline-flex items-center gap-2 text-xs font-black text-orange-700"><ArrowLeft size={14}/>Orders</Link><p className="mt-3 text-[10px] font-black uppercase tracking-[.18em] text-orange-600">Merchant account</p><h1 className="mt-1 text-3xl font-black">System Usage & billing</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Transparent records of platform usage charges from delivered orders, billing statements and payments.</p></div><span className={`rounded-full px-3 py-2 text-[10px] font-black ${settingsRes.data?.merchant_usage_enabled?"bg-emerald-50 text-emerald-800":"bg-slate-100 text-slate-600"}`}>{settingsRes.data?.merchant_usage_enabled?"System Usage enabled":"System Usage disabled"}</span></header>
  {!ids.length&&<section className={`${panel} mt-5`}><h2 className="font-black">No approved merchant store</h2><p className="mt-2 text-sm text-slate-500">Billing records appear here after your merchant account is approved.</p></section>}
  {loadError&&<p role="alert" className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Some financial records could not be loaded. Refresh or contact SUGOMATE support.</p>}
