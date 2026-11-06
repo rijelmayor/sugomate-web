@@ -14,6 +14,7 @@ const NAVY = "#102e57";
 const ORANGE = "#ff8a00";
 const RED = "#e95718";
 const BG = "#fff7ef";
+const BRAND_LOGO = "https://sugomate.com/images/sugomate-eagle-road-logo.png";
 const peso = (v: number | string) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const one = <T,>(v: T | T[] | null | undefined): T | null => Array.isArray(v) ? v[0] ?? null : v ?? null;
 
@@ -218,8 +219,7 @@ export default function App() {
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
   if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
-    <View style={styles.brandMark}><Text style={styles.brandS}>S</Text></View>
-    <Text style={styles.brand}>SUGOMATE</Text><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
+    <Image source={{ uri: BRAND_LOGO }} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
     <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
@@ -232,7 +232,7 @@ export default function App() {
   const firstName = profileName.split(/\s+/)[0] || "there";
   return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
     <View style={styles.topbar}>
-      <View style={styles.brandRow}><View style={styles.smallMark}><Text style={styles.smallMarkText}>S</Text></View><View><Text style={styles.topBrand}>SUGOMATE</Text><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
+      <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
       <TouchableOpacity style={styles.ordersShortcut} onPress={() => setTab("orders")}><Text style={styles.ordersShortcutText}>My Orders</Text></TouchableOpacity>
     </View>
     <View style={styles.greeting}><Text style={styles.greetingSmall}>Maayong adlaw, {firstName}!</Text><Text style={styles.greetingTitle}>Unsa imong sugo karon?</Text></View>
@@ -282,15 +282,14 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
-  loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, brandMark: { alignSelf: "center", width: 64, height: 64, borderRadius: 22, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" },
-  brandS: { fontSize: 38, fontWeight: "900", color: ORANGE }, brand: { marginTop: 14, textAlign: "center", fontSize: 25, fontWeight: "900", letterSpacing: 2, color: NAVY }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
+  loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
   loginCard: { marginTop: 34, padding: 22, borderRadius: 26, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8" }, heading: { fontSize: 24, fontWeight: "900", color: NAVY }, muted: { fontSize: 12, color: "#738096", marginTop: 5, lineHeight: 18 },
   input: { marginTop: 16, paddingHorizontal: 15, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#e5eaf0", fontSize: 15, color: NAVY, backgroundColor: "#fff" },
   primary: { marginTop: 18, backgroundColor: ORANGE, padding: 14, borderRadius: 15, alignItems: "center" }, disabled: { opacity: .6 }, primaryText: { color: "#fff", fontWeight: "900", fontSize: 14 },
   linkButton: { alignItems: "center", padding: 15 }, link: { color: RED, fontWeight: "800" }, footnote: { fontSize: 11, color: "#8995a7", lineHeight: 17, textAlign: "center" },
   topbar: { paddingHorizontal: 16, paddingVertical: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }, brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   smallMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, smallMarkText: { fontSize: 22, fontWeight: "900", color: ORANGE },
-  topBrand: { fontSize: 17, fontWeight: "900", letterSpacing: 1.1, color: NAVY }, topTag: { fontSize: 9, color: RED, marginTop: 1 }, ordersShortcut: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "#ffead8" }, ordersShortcutText: { fontSize: 11, fontWeight: "800", color: NAVY },
+  topTag: { fontSize: 9, color: RED, marginTop: 1 }, ordersShortcut: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "#ffead8" }, ordersShortcutText: { fontSize: 11, fontWeight: "800", color: NAVY },
   greeting: { paddingHorizontal: 17, paddingTop: 17, paddingBottom: 13 }, greetingSmall: { fontSize: 12, fontWeight: "800", color: RED }, greetingTitle: { fontSize: 21, fontWeight: "900", color: NAVY, marginTop: 4 },
   searchWrap: { marginHorizontal: 15, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8", borderRadius: 15, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }, searchIcon: { fontSize: 23, color: "#9aa4b3" }, searchInput: { flex: 1, height: 44, fontSize: 13, color: NAVY, paddingHorizontal: 8 }, clearSearch: { fontSize: 22, color: "#8995a7", paddingHorizontal: 5 },
   areaScroll: { maxHeight: 48, marginTop: 8, flexGrow: 0 }, areaContent: { paddingHorizontal: 14, alignItems: "center", gap: 7 }, areaChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e9e3dc" }, areaChipActive: { backgroundColor: NAVY, borderColor: NAVY }, areaChipText: { fontSize: 10, fontWeight: "700", color: NAVY }, areaChipTextActive: { color: "#fff" },
