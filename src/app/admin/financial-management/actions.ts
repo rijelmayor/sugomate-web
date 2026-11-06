@@ -65,3 +65,40 @@ export async function setDriverBenefitProgramStatus(formData:FormData){
  revalidatePath("/admin/financial-management");
  redirect("/admin/financial-management?program=updated");
 }
+
+
+export async function createMerchantBillingStatement(formData:FormData){
+ const {db}=await requireAdmin();
+ const merchantId=String(formData.get("merchant_id")??"");
+ const periodStart=String(formData.get("period_start")??"");
+ const periodEnd=String(formData.get("period_end")??"");
+ const note=String(formData.get("admin_note")??"").trim().slice(0,500);
+ if(!/^[0-9a-f-]{36}$/i.test(merchantId)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(periodStart)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(periodEnd)||periodEnd<periodStart){
+  redirect("/admin/financial-management?error=billing-period");
+ }
+ const {error}=await db.rpc("admin_create_merchant_billing_statement",{
+  p_merchant_id:merchantId,p_period_start:periodStart,p_period_end:periodEnd,p_admin_note:note||null
+ });
+ if(error) redirect("/admin/financial-management?error=billing-create");
+ revalidatePath("/admin/financial-management");
+ redirect("/admin/financial-management?billing=issued");
+}
+
+export async function reviewDriverPayout(formData:FormData){
+ const {db}=await requireAdmin();
+ const requestId=String(formData.get("request_id")??"");
+ const nextStatus=String(formData.get("next_status")??"");
+ const reference=String(formData.get("payment_reference")??"").trim().slice(0,120);
+ const note=String(formData.get("admin_note")??"").trim().slice(0,500);
+ if(!/^[0-9a-f-]{36}$/i.test(requestId)||!["approved","rejected","paid"].includes(nextStatus)){
+  redirect("/admin/financial-management?error=payout-action");
+ }
+ if(nextStatus==="paid"&&!reference) redirect("/admin/financial-management?error=payout-reference");
+ const {error}=await db.rpc("admin_review_driver_payout",{
+  p_request_id:requestId,p_next_status:nextStatus,
+  p_payment_reference:reference||null,p_admin_note:note||null
+ });
+ if(error) redirect("/admin/financial-management?error=payout-review");
+ revalidatePath("/admin/financial-management");
+ redirect("/admin/financial-management?payout=updated");
+}
