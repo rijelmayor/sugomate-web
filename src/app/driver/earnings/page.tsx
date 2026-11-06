@@ -14,16 +14,14 @@ export default async function DriverEarningsPage({searchParams}:{searchParams:Pr
  if(!user) redirect("/login?next=/driver/earnings");
  const {data:profile}=await db.from("driver_profiles").select("status").eq("user_id",user.id).maybeSingle();
  if(!profile||profile.status!=="active") redirect("/driver/apply");
- const [earningsRes,benefitsRes,payoutsRes]=await Promise.all([
+ const [earningsRes,benefitsRes,payoutsRes,balanceRes]=await Promise.all([
   db.from("driver_earnings_entries").select("id,order_id,driver_base_rate,delivery_system_usage,net_delivery_earnings,status,created_at").eq("driver_user_id",user.id).order("created_at",{ascending:false}).limit(100),
   db.from("driver_benefit_entries").select("id,amount,status,created_at,driver_benefit_programs(name,benefit_type)").eq("driver_user_id",user.id).order("created_at",{ascending:false}).limit(100),
-  db.from("driver_payout_requests").select("id,requested_amount,status,payout_method,requested_at,payment_reference").eq("driver_user_id",user.id).order("requested_at",{ascending:false}).limit(50)
+  db.from("driver_payout_requests").select("id,requested_amount,status,payout_method,requested_at,payment_reference").eq("driver_user_id",user.id).order("requested_at",{ascending:false}).limit(50),
+  db.rpc("driver_available_balance")
  ]);
  const earnings=earningsRes.data??[], benefits=benefitsRes.data??[], payouts=payoutsRes.data??[];
- const earned=earnings.filter(x=>["earned","adjusted"].includes(x.status)).reduce((s,x)=>s+Number(x.net_delivery_earnings||0),0);
- const approvedBenefits=benefits.filter(x=>["approved","paid"].includes(x.status)).reduce((s,x)=>s+Number(x.amount||0),0);
- const reserved=payouts.filter(x=>["pending","approved","paid"].includes(x.status)).reduce((s,x)=>s+Number(x.requested_amount||0),0);
- const balance=Math.max(earned+approvedBenefits-reserved,0);
+ const balance=Number(balanceRes.data??0);
  return <main className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8"><div className="mx-auto max-w-4xl">
   <header className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 pb-5"><div><Link href="/driver" className="inline-flex items-center gap-2 text-xs font-black text-orange-700"><ArrowLeft size={14}/>Driver workspace</Link><p className="mt-3 text-[10px] font-black uppercase tracking-[.18em] text-orange-600">Partner wallet</p><h1 className="mt-1 text-3xl font-black">Earnings & payouts</h1></div><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></header>
   {params.error&&<p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{params.error==="details"?"Enter a valid amount and complete payout account details.":"Payout request could not be submitted. Check your available balance and try again."}</p>}
