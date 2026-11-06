@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 
 type Category = { id: string; name: string; slug: string; icon: string; image_url?: string | null };
@@ -138,6 +138,15 @@ export default function App() {
 
   useEffect(() => {
     if (!session?.user?.id) return;
+    const timer = setInterval(() => {
+      if (tab === "market") void loadMarketplace();
+      if (tab === "orders") void loadOrders();
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [session?.user?.id, tab, loadMarketplace, loadOrders]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
     const channel = supabase.channel("customer-orders-" + session.user.id)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: "customer_id=eq." + session.user.id }, () => { if (tab === "orders") void loadOrders(); })
       .subscribe();
@@ -233,7 +242,7 @@ export default function App() {
       {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => setSelectedMunicipality(m.id)} style={[styles.areaChip, selectedMunicipality === m.id && styles.areaChipActive]}><Text style={[styles.areaChipText, selectedMunicipality === m.id && styles.areaChipTextActive]}>{m.name}</Text></TouchableOpacity>)}
     </ScrollView>}
     {loading && <ActivityIndicator style={{ marginVertical: 8 }} color={ORANGE} />}
-    <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={undefined}>
+    <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
       {tab === "market" && <>
         {selectedStore && currentStore ? <>
           <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedStore(""); setSearch(""); }}><Text style={styles.backLinkText}>‹  Back to stores</Text></TouchableOpacity>
