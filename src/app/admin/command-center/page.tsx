@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, ArrowUpRight, Bike, CircleDollarSign, ClipboardCheck, Gauge, MapPinned, PackageCheck, ShieldCheck, Store, Truck, Users, Wallet, Zap } from "lucide-react";
+import { Activity, ArrowUpRight, Bike, ClipboardCheck, Gauge, PackageCheck, ShieldCheck, Store, Truck, Users, Wallet, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import PortalSignOut from "@/components/PortalSignOut";
 
