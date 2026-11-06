@@ -9,7 +9,6 @@ type Store = { id: string; name: string; branchName: string; categorySlug: strin
 type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
-type PlacedOrder = { id: string; order_number: string; subtotal: number | string; delivery_fee: number | string; total: number | string };
 type Tab = "market" | "orders" | "account";
 
 const NAVY = "#102e57";
