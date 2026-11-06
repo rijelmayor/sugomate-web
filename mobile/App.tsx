@@ -388,7 +388,7 @@ export default function App() {
               <Text style={styles.addressOptionText}>{a.address_line}, {one(a.municipalities)?.name ?? ""}</Text>
               <Text style={styles.addressOptionText}>{a.recipient_phone}{a.landmark ? " · Near " + a.landmark : ""}</Text>
             </TouchableOpacity>)}
-            <TouchableOpacity onPress={() => setNewAddress(v => !v)} style={styles.addressToggle}><Text style={styles.addressToggleText}>{newAddress ? "Choose a saved address" : "+ Add a new delivery address"}</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { setNewAddress(v => { const next = !v; if (next) setDeliveryFeePreview(null); else { const selected = addresses.find(a => a.id === selectedAddressId); setDeliveryFeePreview(selected ? deliveryFees[selected.municipality_id] ?? null : null); } return next; }); }} style={styles.addressToggle}><Text style={styles.addressToggleText}>{newAddress ? "Choose a saved address" : "+ Add a new delivery address"}</Text></TouchableOpacity>
             {newAddress && <>
               <TextInput style={styles.checkoutInput} placeholder="Address label (Home, Work)" value={addressLabel} onChangeText={setAddressLabel}/>
               <TextInput style={styles.checkoutInput} placeholder="Recipient full name" value={recipientName} onChangeText={setRecipientName}/>
