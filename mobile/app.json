@@ -6,9 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "sugomate",
-    "splash": {
-      "backgroundColor": "#fff7ef"
-    },
     "android": {
       "package": "com.sugomate.app"
     },
@@ -16,6 +13,12 @@
       "bundleIdentifier": "com.sugomate.app"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#fff7ef"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-image-picker",
