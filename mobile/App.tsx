@@ -8,7 +8,7 @@ type Category = { id: string; name: string; slug: string; icon: string; image_ur
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
-type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; merchants: any };
+type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type Tab = "market" | "orders" | "account";
@@ -148,9 +148,23 @@ export default function App() {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,rider_on_way_at,delivery_proof_path,driver_note,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
       if (error) throw error;
-      setOrders((data ?? []) as unknown as Order[]);
+      const rows = (data ?? []) as unknown as Order[];
+      const ids = rows.map(order => order.id);
+      const [{ data: events }, proofResults] = await Promise.all([
+        ids.length ? supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id", ids).order("created_at", { ascending: true }) : Promise.resolve({ data: [] as any[] }),
+        Promise.all(rows.filter(order => order.delivery_proof_path).map(async order => {
+          const { data: signed } = await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string, 3600);
+          return [order.id, signed?.signedUrl ?? null] as const;
+        }))
+      ]);
+      const nextOrders = rows.map(order => ({
+        ...order,
+        history: (events ?? []).filter((event: any) => event.order_id === order.id),
+        deliveryProofUrl: proofResults.find(([id]) => id === order.id)?.[1] ?? null
+      }));
+      setOrders(nextOrders);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [session?.user?.id]);
