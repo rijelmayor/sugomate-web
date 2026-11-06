@@ -79,7 +79,6 @@ export default function App() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
-  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -294,17 +293,15 @@ export default function App() {
         p_customer_note: customerNote.trim().slice(0, 500) || null
       });
       if (error || !orderId) throw error ?? new Error("Order was not created.");
-      const { data: order, error: orderError } = await supabase.from("orders")
+      const { data: order } = await supabase.from("orders")
         .select("id,order_number,subtotal,delivery_fee,total")
-        .eq("id", orderId).eq("customer_id", session.user.id).single();
-      if (orderError || !order) throw orderError ?? new Error("Order was placed but its confirmation could not be loaded.");
-      setPlacedOrder(order as PlacedOrder);
+        .eq("id", orderId).eq("customer_id", session.user.id).maybeSingle();
       setCart({});
       setCheckoutOpen(false);
       setTab("orders");
       setSelectedStore("");
       await loadOrders();
-      Alert.alert("Order placed!", order.order_number + "\nTotal: " + peso(order.total) + (paymentMethod === "gcash" ? "\nGCash payment is awaiting your payment proof and merchant verification." : "\nPlease prepare the exact COD amount for the rider."));
+      Alert.alert("Order placed!", (order?.order_number ?? "Order " + String(orderId).slice(0, 8)) + (order ? "\nTotal: " + peso(order.total) : "") + (paymentMethod === "gcash" ? "\nGCash payment is awaiting your payment proof and merchant verification." : "\nPlease prepare the exact COD amount for the rider."));
     } catch (e: any) {
       Alert.alert("Unable to place order", e?.message ?? "Please refresh your basket and try again.");
     } finally { setCheckoutBusy(false); }
