@@ -287,7 +287,7 @@ grant execute on function public.driver_update_order_status(uuid,text,text,text)
 -- Authoritative full-history balance for the signed-in active driver.
 create or replace function public.driver_available_balance()
 returns numeric(12,2)
-language plpgsql security definer set search_path=''
+language plpgsql security invoker set search_path=''
 as $balance$
 declare
   v_actor uuid:=auth.uid();
