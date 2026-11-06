@@ -186,5 +186,6 @@ grant select, insert, update, delete on public.merchant_system_usage_entries to 
 grant select, insert, update, delete on public.driver_earnings_entries to authenticated;
 grant select, insert, update, delete on public.driver_benefit_programs to authenticated;
 grant select, insert, update, delete on public.driver_benefit_entries to authenticated;
-grant select, insert, update, delete on public.driver_payout_requests to authenticated;
+grant select, update, delete on public.driver_payout_requests to authenticated;
+revoke insert on public.driver_payout_requests from authenticated;
 
