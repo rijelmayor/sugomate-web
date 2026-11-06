@@ -288,7 +288,7 @@ grant execute on function public.driver_update_order_status(uuid,text,text,text)
 create or replace function public.driver_available_balance()
 returns numeric(12,2)
 language plpgsql security definer set search_path=''
-as $
+as $balance$
 declare
   v_actor uuid:=auth.uid();
   v_balance numeric(12,2);
@@ -306,7 +306,7 @@ begin
     from public.driver_payout_requests r where r.driver_user_id=v_actor and r.status in ('pending','approved','paid');
   return greatest(v_balance-v_reserved,0);
 end;
-$;
+$balance$;
 revoke all on function public.driver_available_balance() from public,anon;
 grant execute on function public.driver_available_balance() to authenticated;
 
