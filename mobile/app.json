@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SUGOMATE",
+    "slug": "sugomate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "sugomate",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#fff7ef"
+    },
+    "android": {
+      "package": "com.sugomate.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#fff7ef"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.sugomate.app"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
