@@ -55,7 +55,7 @@ function StoreCard({ item, href }: { item: Store; href: string }) {
   return item.isOpen ? <PendingLink href={href} className={className}>{content}</PendingLink> : <div aria-disabled="true" className={className}>{content}</div>;
 }
 
-export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
+export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {}, merchantUsageEnabled = false, merchantUsageMethod = "percentage", merchantUsageValue = 0 }: {
   products: Product[];
   stores: Store[];
   selectedStore?: string;
@@ -66,6 +66,9 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   addresses: Address[];
   checkoutError?: string;
   deliveryFees?: Record<string, number>;
+  merchantUsageEnabled?: boolean;
+  merchantUsageMethod?: "percentage" | "fixed" | string;
+  merchantUsageValue?: number;
 }) {
   const router = useRouter();
   const [isFiltering, startFilter] = useTransition();
@@ -127,8 +130,10 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   useEffect(() => { setSearch(""); }, [selectedStore]);
 
   const items = Object.values(cart);
+  const usagePerUnit = (srp: number) => !merchantUsageEnabled ? 0 : merchantUsageMethod === "fixed" ? merchantUsageValue : Math.round((srp * merchantUsageValue / 100) * 100) / 100;
+  const displayUnitPrice = (product: Product) => Number(product.price) + usagePerUnit(Number(product.price));
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
-  const total = items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+  const total = items.reduce((sum, item) => sum + displayUnitPrice(item.product) * item.quantity, 0);
   const q = search.trim().toLowerCase();
   const currentStore = stores.find(item => item.id === selectedStore);
   const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
@@ -235,7 +240,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
               <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-400 sm:text-xs"><MapPin aria-hidden="true" size={13} className="shrink-0" /><span className="line-clamp-1">{product.branch?.municipalities?.name || "Leyte"}</span></p>
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <strong className="text-base font-black text-[#e95718] sm:text-lg">{peso(Number(product.price))}</strong>
+              <div><strong className="text-base font-black text-[#e95718] sm:text-lg">{peso(displayUnitPrice(product))}</strong>{usagePerUnit(Number(product.price))>0&&<p className="text-[9px] font-semibold text-slate-400">Includes System Usage {peso(usagePerUnit(Number(product.price)))}</p>}</div>
               {qty > 0 ? <div className="inline-flex items-center rounded-full bg-[#102e57] text-white shadow-sm">
                 <button type="button" onClick={() => change(product.id, -1)} aria-label={`Remove one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full transition active:scale-90"><Minus size={16} /></button>
                 <span key={qty} aria-live="polite" className="animate-pop min-w-6 text-center text-sm font-black">{qty}</span>
@@ -264,7 +269,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       </div>
       {items.length ? <div className="mt-4 space-y-4">
         {items.map(({ product, quantity }) => <div key={product.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="min-w-0"><p className="truncate text-sm font-bold text-[#102e57]">{product.name}</p><p className="text-xs text-slate-500">{peso(Number(product.price))}</p></div>
+          <div className="min-w-0"><p className="truncate text-sm font-bold text-[#102e57]">{product.name}</p><p className="text-xs text-slate-500">{peso(displayUnitPrice(product))} / unit{usagePerUnit(Number(product.price))>0?` · includes ${peso(usagePerUnit(Number(product.price)))} System Usage`:""}</p></div>
           <div className="flex items-center gap-1"><button type="button" onClick={() => change(product.id, -1)} aria-label={`Remove one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 transition active:scale-90"><Minus size={15} /></button><span key={quantity} className="animate-pop w-6 text-center text-sm font-bold">{quantity}</span><button type="button" onClick={() => change(product.id, 1)} aria-label={`Add one ${product.name}`} className="grid h-9 w-9 place-items-center rounded-full bg-orange-100 text-orange-700 transition active:scale-90"><Plus size={15} /></button></div>
         </div>)}
         <div className="space-y-1.5 text-sm">
