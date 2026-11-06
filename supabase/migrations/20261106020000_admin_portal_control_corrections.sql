@@ -76,6 +76,13 @@ begin
     raise exception 'Driver application not found.';
   end if;
 
+  if p_status = 'active' and not exists (
+    select 1 from public.driver_profiles
+    where user_id = p_user_id and nullif(trim(id_storage_path), '') is not null
+  ) then
+    raise exception 'A verified ID document is required before driver activation.';
+  end if;
+
   if p_status <> 'active' and exists (
     select 1 from public.orders
     where driver_user_id = p_user_id
