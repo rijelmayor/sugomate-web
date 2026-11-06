@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 
 type Category = { id: string; name: string; slug: string; icon: string; image_url?: string | null };
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
-type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; merchants: any };
+type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type Tab = "market" | "orders" | "account";
@@ -63,6 +65,9 @@ export default function App() {
   const [cart, setCart] = useState<Cart>({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [gcashReference, setGcashReference] = useState<Record<string, string>>({});
+  const [gcashProof, setGcashProof] = useState<Record<string, { uri: string; mimeType: string; fileName: string; size: number }>>({});
+  const [gcashSubmitting, setGcashSubmitting] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
@@ -143,9 +148,23 @@ export default function App() {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,merchants(name)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,rider_on_way_at,delivery_proof_path,driver_note,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
       if (error) throw error;
-      setOrders((data ?? []) as unknown as Order[]);
+      const rows = (data ?? []) as unknown as Order[];
+      const ids = rows.map(order => order.id);
+      const [{ data: events }, proofResults] = await Promise.all([
+        ids.length ? supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id", ids).order("created_at", { ascending: true }) : Promise.resolve({ data: [] as any[] }),
+        Promise.all(rows.filter(order => order.delivery_proof_path).map(async order => {
+          const { data: signed } = await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string, 3600);
+          return [order.id, signed?.signedUrl ?? null] as const;
+        }))
+      ]);
+      const nextOrders = rows.map(order => ({
+        ...order,
+        history: (events ?? []).filter((event: any) => event.order_id === order.id),
+        deliveryProofUrl: proofResults.find(([id]) => id === order.id)?.[1] ?? null
+      }));
+      setOrders(nextOrders);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [session?.user?.id]);
@@ -205,7 +224,78 @@ export default function App() {
     setBusy(false);
   }
 
-  async function signOut() { await supabase.auth.signOut(); setCart({}); setOrders([]); setProducts([]); setStores([]); }
+  async function chooseGcashProof(orderId: string) {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+        Alert.alert("Unsupported image", "Choose a JPG, PNG or WebP receipt image.");
+        return;
+      }
+      const file = new File(asset.uri);
+      const size = asset.fileSize ?? file.size;
+      if (!size || size > 5 * 1024 * 1024) {
+        Alert.alert("Image too large", "The receipt image must be smaller than 5 MB.");
+        return;
+      }
+      setGcashProof(current => ({ ...current, [orderId]: {
+        uri: asset.uri, mimeType,
+        fileName: asset.fileName ?? "gcash-receipt." + (mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg"),
+        size
+      }}));
+    } catch (e: any) {
+      Alert.alert("Unable to select image", e?.message ?? "Please try again.");
+    }
+  }
+
+  async function submitNativeGcashPayment(order: Order) {
+    const reference = (gcashReference[order.id] ?? "").trim();
+    const proof = gcashProof[order.id];
+    if (!/^[A-Za-z0-9-]{6,40}$/.test(reference)) {
+      Alert.alert("Invalid reference", "Enter the 6–40 character GCash transaction reference shown on your receipt.");
+      return;
+    }
+    if (!proof) {
+      Alert.alert("Receipt required", "Choose your GCash receipt screenshot before submitting.");
+      return;
+    }
+    if (order.payment_method !== "gcash" || order.payment_status === "paid" ||
+        ["cancelled", "rejected", "delivered"].includes(order.status)) {
+      Alert.alert("Payment submission unavailable", "This order can no longer accept a GCash payment submission.");
+      return;
+    }
+    setGcashSubmitting(order.id);
+    try {
+      const extension = proof.mimeType === "image/png" ? "png" : proof.mimeType === "image/webp" ? "webp" : "jpg";
+      const fileName = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + "." + extension;
+      const uploadedPath = order.id + "/" + session.user.id + "/" + fileName;
+      const bytes = await new File(proof.uri).arrayBuffer();
+      const { error: uploadError } = await supabase.storage.from("gcash-payment-proofs").upload(uploadedPath, bytes, {
+        contentType: proof.mimeType, cacheControl: "3600", upsert: false
+      });
+      if (uploadError) throw uploadError;
+      const { error: submitError } = await supabase.rpc("customer_submit_gcash_payment", {
+        p_order_id: order.id,
+        p_transaction_reference: reference,
+        p_proof_path: uploadedPath
+      });
+      if (submitError) throw submitError;
+      setGcashProof(current => { const next = { ...current }; delete next[order.id]; return next; });
+      setGcashReference(current => ({ ...current, [order.id]: reference }));
+      await loadOrders();
+      Alert.alert("Payment proof submitted", "The merchant will verify the transaction against their GCash wallet. Your order will not be prepared until the merchant confirms payment.");
+    } catch (e: any) {
+      Alert.alert("Unable to submit payment proof", e?.message ?? "Please check your connection and try again. If upload completed before the error, the private receipt file may remain unattached to the order.");
+    } finally { setGcashSubmitting(null); }
+  }
+
+  async function signOut() { await supabase.auth.signOut(); setCart({}); setOrders([]); setProducts([]); setStores([]); setGcashProof({}); setGcashReference({}); }
   function addToCart(product: Product) {
     if (cartItems.length && cartItems[0].product.branch_id !== product.branch_id) {
       Alert.alert("One store per order", "Your basket can contain items from one store branch at a time.", [
@@ -367,7 +457,38 @@ export default function App() {
       </>}
       {tab === "orders" && <>
         <Text style={styles.sectionTitle}>My orders</Text><Text style={styles.sectionSub}>Follow your orders from store confirmation through delivery.</Text>
-        {orders.map(o => <View key={o.id} style={styles.orderCard}><View style={styles.orderTop}><View><Text style={styles.orderNumber}>{o.order_number}</Text><Text style={styles.storeName}>{one(o.merchants)?.name ?? "Local merchant"}</Text><Text style={styles.storeBranch}>{new Date(o.placed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text></View><Text style={styles.statusPill}>{orderStatus[o.status] ?? o.status.replaceAll("_", " ")}</Text></View><View style={styles.orderAmounts}><View style={styles.amountRow}><Text style={styles.amountLabel}>Items subtotal</Text><Text style={styles.amountValue}>{peso(o.subtotal)}</Text></View><View style={styles.amountRow}><Text style={styles.deliveryLabel}>Delivery fee</Text><Text style={styles.deliveryValue}>{peso(o.delivery_fee)}</Text></View><View style={[styles.amountRow, styles.totalRow]}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{peso(o.total)}</Text></View></View></View>)}
+        {orders.map(o => {
+          const merchant = one(o.merchants);
+          const isTerminal = ["cancelled", "rejected", "delivered"].includes(o.status);
+          const submitted = Boolean(o.gcash_payment_submitted_at) && o.payment_status !== "failed";
+          return <View key={o.id} style={styles.orderCard}>
+            <View style={styles.orderTop}><View><Text style={styles.orderNumber}>{o.order_number}</Text><Text style={styles.storeName}>{merchant?.name ?? "Local merchant"}</Text><Text style={styles.storeBranch}>{new Date(o.placed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text></View><Text style={styles.statusPill}>{orderStatus[o.status] ?? o.status.replaceAll("_", " ")}</Text></View>
+            <View style={styles.orderAmounts}><View style={styles.amountRow}><Text style={styles.amountLabel}>Items subtotal</Text><Text style={styles.amountValue}>{peso(o.subtotal)}</Text></View><View style={styles.amountRow}><Text style={styles.deliveryLabel}>Delivery fee</Text><Text style={styles.deliveryValue}>{peso(o.delivery_fee)}</Text></View><View style={[styles.amountRow, styles.totalRow]}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{peso(o.total)}</Text></View></View>
+            {Boolean(o.order_items?.length) && <View style={styles.orderItems}><Text style={styles.orderDetailTitle}>Items ordered</Text>{o.order_items?.map((item: any) => <View key={item.id} style={styles.orderItemRow}><Text style={styles.orderItemName}>{item.quantity} × {item.product_name}</Text><Text style={styles.orderItemPrice}>{peso(item.line_total)}</Text></View>)}</View>}
+            {o.status === "accepted" && <View style={[styles.riderNotice, o.rider_on_way_at ? styles.riderNoticeReady : null]}><Text style={styles.riderNoticeText}>{o.rider_on_way_at ? "Your rider confirmed and is heading to the store. The merchant can now start preparing." : "The store reserved your items and is waiting for a rider to commit. Preparation starts after the rider confirms they are on the way."}</Text></View>}
+            <View style={styles.paymentSummary}><Text style={styles.paymentSummaryText}>Payment: {String(o.payment_method).toUpperCase()} · {String(o.payment_status).replaceAll("_", " ")}</Text></View>
+            {Boolean(o.history?.length) && <View style={styles.orderHistory}><Text style={styles.orderDetailTitle}>Order activity</Text>{o.history?.map((event: any, index: number) => <View key={event.id} style={styles.historyRow}><View style={styles.historyMarker}><View style={[styles.historyDot, index === (o.history?.length ?? 0) - 1 && styles.historyDotActive]}/>{index !== (o.history?.length ?? 0) - 1 && <View style={styles.historyLine}/>}</View><View style={styles.historyBody}><Text style={styles.historyStatus}>{orderStatus[event.to_status] ?? String(event.to_status).replaceAll("_", " ")}</Text><Text style={styles.historyDate}>{new Date(event.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text>{event.note && <Text style={styles.historyNote}>{event.note}</Text>}</View></View>)}</View>}
+            {o.deliveryProofUrl && <TouchableOpacity style={styles.deliveryProofButton} onPress={() => Linking.openURL(o.deliveryProofUrl as string)}><Text style={styles.deliveryProofText}>View delivery photo ↗</Text></TouchableOpacity>}
+            {o.driver_note && <Text style={styles.driverNote}>Driver note: {o.driver_note}</Text>}
+            {o.payment_method === "gcash" && !isTerminal && <View style={styles.gcashCard}>
+              <View style={styles.gcashHeader}><Text style={styles.gcashTitle}>Pay with GCash</Text><Text style={styles.gcashBadge}>{o.payment_status === "paid" ? "Verified" : submitted ? "Verification pending" : "Payment needed"}</Text></View>
+              {o.payment_status === "paid" ? <Text style={styles.gcashSuccess}>✓ Payment confirmed by the merchant. Your order can proceed through the normal fulfillment workflow.</Text> : <>
+                <Text style={styles.gcashHint}>Pay the exact order total, including the delivery fee. The merchant must verify the transaction against their GCash wallet before preparing your order.</Text>
+                <View style={styles.gcashAmount}><Text style={styles.gcashHint}>Amount to pay</Text><Text style={styles.gcashTotal}>{peso(o.total)}</Text></View>
+                {merchant?.gcash_payment_type === "qr" && merchant?.gcash_qr_url ? <View style={styles.gcashQrWrap}><Image source={{ uri: merchant.gcash_qr_url }} style={styles.gcashQr} resizeMode="contain"/><Text style={styles.gcashHint}>Scan the merchant's QR code in GCash. If you are using the same phone, save the QR image first if your GCash app cannot scan from the screen.</Text></View> : <View style={styles.gcashAccount}><Text style={styles.gcashHint}>GCash account name</Text><Text style={styles.gcashAccountValue}>{merchant?.gcash_account_name ?? "Not provided"}</Text><Text style={[styles.gcashHint, { marginTop: 9 }]}>GCash mobile number</Text><Text style={styles.gcashPhone}>{merchant?.gcash_mobile_number ?? "Not provided"}</Text></View>}
+                {submitted ? <View style={styles.gcashPending}><Text style={styles.gcashPendingTitle}>Receipt submitted · Waiting for merchant verification</Text><Text style={styles.gcashHint}>Reference: {o.gcash_payment_reference ?? "Not available"}</Text><Text style={styles.gcashHint}>The merchant will verify your payment. Do not pay again unless the merchant or support team asks you to.</Text></View> : <View style={styles.gcashForm}>
+                  <Text style={styles.gcashLabel}>GCash transaction reference</Text>
+                  <TextInput style={styles.gcashInput} placeholder="6–40 characters from your receipt" autoCapitalize="characters" value={gcashReference[o.id] ?? ""} onChangeText={value => setGcashReference(current => ({ ...current, [o.id]: value }))} maxLength={40}/>
+                  <Text style={styles.gcashLabel}>Receipt screenshot</Text>
+                  <TouchableOpacity style={styles.gcashPick} onPress={() => void chooseGcashProof(o.id)}><Text style={styles.gcashPickText}>{gcashProof[o.id] ? "Change selected receipt" : "Choose receipt image"}</Text></TouchableOpacity>
+                  {gcashProof[o.id] && <View style={styles.gcashPreviewWrap}><Image source={{ uri: gcashProof[o.id].uri }} style={styles.gcashPreview} resizeMode="cover"/><View style={{ flex: 1 }}><Text style={styles.gcashPreviewName} numberOfLines={2}>{gcashProof[o.id].fileName}</Text><Text style={styles.gcashHint}>{(gcashProof[o.id].size / 1024 / 1024).toFixed(2)} MB · {gcashProof[o.id].mimeType}</Text><TouchableOpacity onPress={() => setGcashProof(current => { const next = { ...current }; delete next[o.id]; return next; })}><Text style={styles.gcashRemove}>Remove image</Text></TouchableOpacity></View></View>}
+                  <Text style={styles.gcashHint}>JPG, PNG or WebP · Maximum 5 MB. Never share your GCash MPIN, password or OTP.</Text>
+                  <TouchableOpacity disabled={gcashSubmitting === o.id} style={[styles.gcashSubmit, gcashSubmitting === o.id && styles.disabled]} onPress={() => void submitNativeGcashPayment(o)}><Text style={styles.gcashSubmitText}>{gcashSubmitting === o.id ? "Submitting receipt…" : "Submit payment proof"}</Text></TouchableOpacity>
+                </View>}
+              </>}
+            </View>}
+          </View>;
+        })}
         {!loading && orders.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛵</Text><Text style={styles.emptyTitle}>No orders yet</Text><Text style={styles.muted}>Your placed orders will appear here.</Text><TouchableOpacity onPress={() => setTab("market")} style={styles.primary}><Text style={styles.primaryText}>Browse marketplace</Text></TouchableOpacity></View>}
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => Linking.openURL("https://sugomate.com/customer/addresses")}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
@@ -440,6 +561,8 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ffead8", padding: 25, marginTop: 10 }, emptyIcon: { fontSize: 34 }, emptyTitle: { fontSize: 14, fontWeight: "900", color: NAVY, marginTop: 8 },
   basketBar: { position: "absolute", bottom: 72, left: 15, right: 15, backgroundColor: ORANGE, borderRadius: 25, paddingHorizontal: 18, paddingVertical: 13, flexDirection: "row", justifyContent: "space-between", alignItems: "center", elevation: 5 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" },
   tabbar: { height: 62, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", paddingTop: 7, paddingBottom: 5 }, tab: { flex: 1, alignItems: "center", justifyContent: "center" }, activeTab: {}, tabIcon: { fontSize: 19, color: "#8995a7" }, tabText: { fontSize: 9, fontWeight: "700", color: "#8995a7", marginTop: 2 }, activeTabText: { color: RED },
+  orderItems: { marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, orderDetailTitle: { fontSize: 10, fontWeight: "900", color: NAVY, marginBottom: 7 }, orderItemRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 5 }, orderItemName: { flex: 1, fontSize: 10, color: "#63748a" }, orderItemPrice: { fontSize: 10, fontWeight: "800", color: NAVY }, riderNotice: { marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#fff7e7", borderWidth: 1, borderColor: "#f3dfb5" }, riderNoticeReady: { backgroundColor: "#eaf8f0", borderColor: "#c7ead4" }, riderNoticeText: { fontSize: 10, lineHeight: 15, color: NAVY, fontWeight: "700" }, orderHistory: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#f1eee9" }, historyRow: { flexDirection: "row", minHeight: 47 }, historyMarker: { width: 17, alignItems: "center" }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#b7c1ce", marginTop: 3 }, historyDotActive: { backgroundColor: ORANGE, width: 11, height: 11, borderRadius: 6 }, historyLine: { width: 1, flex: 1, backgroundColor: "#dfe5ec", marginTop: 3 }, historyBody: { flex: 1, paddingBottom: 10, paddingLeft: 5 }, historyStatus: { fontSize: 10, fontWeight: "900", color: NAVY, textTransform: "capitalize" }, historyDate: { marginTop: 2, fontSize: 9, color: "#8995a7" }, historyNote: { marginTop: 3, fontSize: 9, color: "#63748a", lineHeight: 13 }, deliveryProofButton: { marginTop: 10, alignSelf: "flex-start", borderRadius: 18, backgroundColor: "#e7f7ed", paddingHorizontal: 12, paddingVertical: 8 }, deliveryProofText: { fontSize: 10, fontWeight: "900", color: "#176b43" }, driverNote: { marginTop: 8, fontSize: 10, color: "#63748a", fontStyle: "italic" },
+  paymentSummary: { marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: "#f1eee9" }, paymentSummaryText: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashCard: { marginTop: 12, padding: 13, borderRadius: 15, borderWidth: 1, borderColor: "#d9ecf7", backgroundColor: "#f2faff" }, gcashHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, gcashTitle: { fontSize: 14, fontWeight: "900", color: NAVY }, gcashBadge: { overflow: "hidden", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#fff", color: "#17618b", fontSize: 9, fontWeight: "900" }, gcashHint: { marginTop: 7, fontSize: 10, lineHeight: 15, color: "#63748a" }, gcashAmount: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashTotal: { marginTop: 2, fontSize: 24, fontWeight: "900", color: NAVY }, gcashQrWrap: { alignItems: "center", marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: "#fff" }, gcashQr: { width: 190, height: 190 }, gcashAccount: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashAccountValue: { marginTop: 3, fontSize: 13, fontWeight: "900", color: NAVY }, gcashPhone: { marginTop: 2, fontSize: 18, fontWeight: "900", letterSpacing: 1, color: NAVY }, gcashSuccess: { marginTop: 9, padding: 10, borderRadius: 10, backgroundColor: "#e7f7ed", color: "#176b43", fontSize: 11, fontWeight: "800", lineHeight: 17 }, gcashPending: { marginTop: 11, padding: 11, borderRadius: 11, borderWidth: 1, borderColor: "#f1d89b", backgroundColor: "#fff9e9" }, gcashPendingTitle: { fontSize: 11, fontWeight: "900", color: "#805300" }, gcashForm: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#d9ecf7" }, gcashLabel: { marginTop: 8, fontSize: 10, fontWeight: "900", color: NAVY }, gcashInput: { marginTop: 5, paddingHorizontal: 11, paddingVertical: 11, borderWidth: 1, borderColor: "#dce5ed", borderRadius: 10, backgroundColor: "#fff", color: NAVY, fontSize: 12 }, gcashPick: { marginTop: 6, padding: 12, borderRadius: 11, borderWidth: 1, borderStyle: "dashed", borderColor: ORANGE, backgroundColor: "#fff", alignItems: "center" }, gcashPickText: { color: NAVY, fontSize: 11, fontWeight: "900" }, gcashPreviewWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, padding: 8, borderRadius: 10, backgroundColor: "#fff" }, gcashPreview: { width: 66, height: 66, borderRadius: 8, backgroundColor: "#edf2f7" }, gcashPreviewName: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashRemove: { marginTop: 6, fontSize: 10, fontWeight: "900", color: RED }, gcashSubmit: { marginTop: 12, paddingVertical: 13, borderRadius: 22, backgroundColor: NAVY, alignItems: "center" }, gcashSubmitText: { fontSize: 11, fontWeight: "900", color: "#fff" },
   orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
   accountCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#ffead8", padding: 19 }, accountLink: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f1eee9" }, accountLinkText: { fontSize: 12, fontWeight: "800", color: NAVY },
   checkoutSafe: { flex: 1, backgroundColor: BG }, checkoutContent: { padding: 18, paddingBottom: 36 }, checkoutHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }, checkoutTitle: { fontSize: 22, fontWeight: "900", color: NAVY }, checkoutCard: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ffead8", padding: 15, marginBottom: 13 }, checkoutSection: { fontSize: 15, fontWeight: "900", color: NAVY, marginBottom: 10 }, addressOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 11, marginBottom: 8 }, addressOptionActive: { borderColor: ORANGE, backgroundColor: "#fff7ef" }, addressOptionTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, addressOptionText: { fontSize: 10, color: "#738096", marginTop: 4 }, addressToggle: { paddingVertical: 10 }, addressToggleText: { fontSize: 11, fontWeight: "900", color: RED }, checkoutInput: { marginTop: 9, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#e5eaf0", backgroundColor: "#fff", color: NAVY, fontSize: 12 }, checkoutMultiline: { minHeight: 72, textAlignVertical: "top" }, checkoutHint: { fontSize: 10, color: "#738096", lineHeight: 15, marginTop: 6 }, municipalityOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 10, padding: 9, marginTop: 5 }, checkoutAmountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginTop: 8 }, checkoutAmountLabel: { flex: 1, fontSize: 11, color: "#738096" }, checkoutAmountValue: { fontSize: 11, fontWeight: "800", color: NAVY }, checkoutDeliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, checkoutTotalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 10, marginTop: 12 }, checkoutTotalLabel: { fontSize: 13, fontWeight: "900", color: NAVY }, paymentOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 12, marginBottom: 8 }, paymentTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, checkoutFootnote: { fontSize: 10, lineHeight: 16, color: "#738096", textAlign: "center", marginTop: 10 }
