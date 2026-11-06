@@ -24,6 +24,7 @@ export default async function FinancialManagementPage(){
  ]);
  const settings=settingsRes.data;
  const merchantEntries=merchantRes.data??[],driverEntries=driverRes.data??[];
+ const detailedDriverEntries=driverEntries;
  const unbilled=merchantEntries.filter(x=>x.status==="unbilled").reduce((s,x)=>s+Number(x.system_usage_amount||0),0);
  const netEarnings=driverEntries.filter(x=>x.status!=="void").reduce((s,x)=>s+Number(x.net_delivery_earnings||0),0);
  const platformRevenue=merchantEntries.filter(x=>x.status!=="void").reduce((s,x)=>s+Number(x.system_usage_amount||0),0)+driverEntries.filter(x=>x.status!=="void").reduce((s,x)=>s+Number(x.delivery_system_usage||0),0);
