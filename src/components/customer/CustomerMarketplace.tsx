@@ -55,7 +55,7 @@ function StoreCard({ item, href }: { item: Store; href: string }) {
   return item.isOpen ? <PendingLink href={href} className={className}>{content}</PendingLink> : <div aria-disabled="true" className={className}>{content}</div>;
 }
 
-export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {} }: {
+export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {}, merchantUsageEnabled = false, merchantUsageMethod = "percentage", merchantUsageValue = 0 }: {
   products: Product[];
   stores: Store[];
   selectedStore?: string;
