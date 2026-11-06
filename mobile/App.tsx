@@ -57,6 +57,19 @@ export default function App() {
     setBusy(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (error) { Alert.alert("Sign in failed", error.message); setBusy(false); return; }
+    if (!data.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      Alert.alert("Email verification required", "Please confirm your email address using the link sent by SUGOMATE, then sign in again.");
+      setBusy(false);
+      return;
+    }
+    const { data: profile, error: profileError } = await supabase.from("profiles").select("phone_verified_at").eq("id", data.user.id).maybeSingle();
+    if (profileError || !profile?.phone_verified_at) {
+      await supabase.auth.signOut();
+      Alert.alert("Mobile verification required", "Please complete the Philippine mobile SMS verification on sugomate.com/register before signing in.");
+      setBusy(false);
+      return;
+    }
     const { data: roleRows, error: roleError } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     if (roleError) { await supabase.auth.signOut(); Alert.alert("Account check failed", "We could not verify your SUGOMATE account access."); setBusy(false); return; }
     const roles = new Set((roleRows ?? []).map((r: any) => r.role));
