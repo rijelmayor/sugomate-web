@@ -97,3 +97,26 @@ export async function updateDriverOrderStatus(formData: FormData) {
   }
   revalidatePath("/driver");
 }
+
+
+export async function requestDriverPayout(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const amount = Number(formData.get("amount"));
+  const payoutMethod = String(formData.get("payout_method") ?? "").trim();
+  const accountName = String(formData.get("account_name") ?? "").trim().slice(0,120);
+  const accountNumber = String(formData.get("account_number") ?? "").trim().slice(0,80);
+  const note = String(formData.get("driver_note") ?? "").trim().slice(0,300);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000 ||
+      !["gcash","bank_transfer"].includes(payoutMethod) || !accountName || !accountNumber) {
+    redirect("/driver/earnings?error=details");
+  }
+  const { error } = await supabase.rpc("driver_request_payout", {
+    p_amount: Math.round(amount * 100) / 100,
+    p_payout_method: payoutMethod,
+    p_account_snapshot: { account_name: accountName, account_number: accountNumber },
+    p_driver_note: note || null,
+  });
+  if (error) redirect("/driver/earnings?error=balance");
+  revalidatePath("/driver/earnings");
+  redirect("/driver/earnings?requested=1");
+}
