@@ -1,0 +1,38 @@
+workflows:
+  sugomate-android-apk:
+    name: SUGOMATE Android APK
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      node: 22.13.0
+      groups:
+        - sugomate-mobile-env
+      android_signing:
+        - sugomate-android-keystore
+    scripts:
+      - name: Install mobile dependencies
+        script: |
+          cd mobile
+          npm install
+      - name: Generate Android native project
+        script: |
+          cd mobile
+          npx expo prebuild --platform android --non-interactive
+      - name: Configure Android release signing
+        script: |
+          test -n "$CM_KEYSTORE_PATH"
+          test -f "$CM_KEYSTORE_PATH"
+          cd mobile/android
+          cat >> gradle.properties <<EOF
+          MYAPP_UPLOAD_STORE_FILE=$CM_KEYSTORE_PATH
+          MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS
+          MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD
+          MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
+          EOF
+      - name: Build release APK
+        script: |
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+    artifacts:
+      - mobile/android/app/build/outputs/apk/release/app-release.apk
