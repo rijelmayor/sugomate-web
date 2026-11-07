@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
+import RegistrationFlow from "./src/components/RegistrationFlow";
+import RoleApplicationFlow from "./src/components/RoleApplicationFlow";
 
 type Category = { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null };
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
-type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
+type Store = { id: string; name: string; branchName: string; categorySlug: string; municipalityId: string | null; area: string; count: number; image: string | null; isOpen: boolean };
 type DriverDetails = { name: string; phone: string | null; vehicleType: string | null; plate: string | null; photoUrl: string | null };
 type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string; merchantName: string; recipientName: string; address: string; total: number; createdAt: string; driver?: DriverDetails | null };
 type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
@@ -19,7 +21,8 @@ const NAVY = "#102e57";
 const ORANGE = "#ff8a00";
 const RED = "#e95718";
 const BG = "#fff7ef";
-const BRAND_LOGO = require("./src/assets/sugomate-logo-transparent.png");
+const BRAND_LOGO = require("./src/assets/sugomate-wordmark.png");
+const FLYING_EAGLE = require("./src/assets/sugomate-flyer-intro.jpg");
 const AndroidStatusBar = StatusBar as React.ComponentType<any>;
 const peso = (v: number | string) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const one = <T,>(v: T | T[] | null | undefined): T | null => Array.isArray(v) ? v[0] ?? null : v ?? null;
@@ -54,6 +57,10 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
+  const loginIntro = useRef(new Animated.Value(0)).current;
+  const flyerIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -91,6 +98,13 @@ export default function App() {
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
 
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(flyerIntro, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(loginIntro, { toValue: 1, duration: 650, useNativeDriver: true })
+    ]).start();
+  }, [flyerIntro, loginIntro]);
+
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -127,6 +141,20 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function resolveAccountRole() {
+      if (!session?.user?.id) { if (active) setApplicationRole(null); return; }
+      const { data: roles, error } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
+      if (!active || error) return;
+      const intended = session.user.user_metadata?.intended_role;
+      if (intended === "merchant" || intended === "driver") { setApplicationRole(intended); return; }
+      setApplicationRole(null);
+    }
+    resolveAccountRole();
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   const loadMarketplace = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -171,7 +199,7 @@ export default function App() {
         if (old) { old.count += 1; continue; }
         map.set(p.branch_id, {
           id: p.branch_id, name: m?.name ?? "Local store", branchName: b?.name ?? "",
-          categorySlug: m?.store_category?.slug ?? "other", area: b?.municipalities?.name ?? "",
+          categorySlug: m?.store_category?.slug ?? "other", municipalityId: b?.municipality_id ?? null, area: b?.municipalities?.name ?? "",
           count: 1, image: m?.logo_url ?? null,
           isOpen: isStoreOpen(b?.store_hours, Boolean(b?.is_temporarily_closed))
         });
@@ -271,9 +299,9 @@ export default function App() {
   const activeCategory = categories.find(c => c.slug === selectedCategory);
   const visibleStores = useMemo(() => stores.filter(s =>
     (!selectedCategory || s.categorySlug === selectedCategory) &&
-    (!selectedMunicipality || products.some(p => p.branch_id === s.id && p.branch?.municipality_id === selectedMunicipality)) &&
+    (!selectedMunicipality || s.municipalityId === selectedMunicipality) &&
     (!search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase()) || s.area.toLowerCase().includes(search.trim().toLowerCase()))
-  ), [stores, products, selectedCategory, selectedMunicipality, search]);
+  ), [stores, selectedCategory, selectedMunicipality, search]);
   const currentStore = stores.find(s => s.id === selectedStore);
   const storeProducts = useMemo(() => products.filter(p => p.branch_id === selectedStore && (!search.trim() || p.name.toLowerCase().includes(search.trim().toLowerCase()))), [products, selectedStore, search]);
   const cartItems = Object.values(cart);
@@ -297,10 +325,17 @@ export default function App() {
       setBusy(false); return;
     }
     const { data: roleRows, error: roleError } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-    if (roleError || !(roleRows ?? []).some((r: any) => r.role === "customer")) {
+    if (roleError) {
       await supabase.auth.signOut();
-      Alert.alert("Customer access only", "This app area is for verified customer accounts.");
+      Alert.alert("Unable to verify account type", "Please try again.");
+      setBusy(false); return;
     }
+    const intended = data.user.user_metadata?.intended_role;
+    if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
+    else if (!(roleRows ?? []).some((r: any) => r.role === "customer")) {
+      await supabase.auth.signOut();
+      Alert.alert("Account type not recognized", "Please contact SUGOMATE support.");
+    } else setApplicationRole(null);
     setBusy(false);
   }
 
@@ -485,16 +520,23 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
-  if (!session) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
-    <Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
-    <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
+  if (session && applicationRole) return <RoleApplicationFlow
+    role={applicationRole}
+    userId={session.user.id}
+    onDone={() => { setApplicationRole(null); supabase.auth.signOut(); }}
+    onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
+  />;
+  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+    <Animated.View style={{ alignItems: "center", opacity: flyerIntro, transform: [{ translateX: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [-110, 0] }), }, { scale: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) }] }}><Image source={FLYING_EAGLE} style={{ width: 148, height: 148, alignSelf: "center" }} resizeMode="contain" /></Animated.View>
+    <Animated.View style={{ opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></Animated.View>
+    <Animated.View style={[styles.loginCard, { opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) }] }]}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
-      <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}><Text style={styles.primaryText}>{busy ? "Signing in…" : "Sign in"}</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.linkButton} onPress={() => Linking.openURL("https://sugomate.com/register?next=%2Fcustomer")}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
-      <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/merchant")}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/driver")}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
+      <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}>{busy ? <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color="#fff" /><Text style={styles.primaryText}>Signing in…</Text></View> : <Text style={styles.primaryText}>Sign in</Text>}</TouchableOpacity>
+      <TouchableOpacity style={styles.linkButton} onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
+      <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
       <Text style={styles.footnote}>New accounts complete email confirmation and Philippine mobile SMS verification before ordering.</Text>
-    </View>
+    </Animated.View>
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
@@ -524,10 +566,9 @@ export default function App() {
         </> : <>
           <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
           {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedParentCategory(""); setSelectedCategory(""); }}><Text style={styles.backLinkText}>‹  Back to all categories</Text></TouchableOpacity> : null}
-          <View style={styles.categoryGrid}>{(selectedParentCategory ? childCategories : topLevelCategories).map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { if (categories.some(child => child.parent_id === c.id)) { setSelectedParentCategory(c.id); setSelectedCategory(""); } else setSelectedCategory(selectedCategory === c.slug ? "" : c.slug); }}>
+          <View style={styles.categoryGrid}>{(selectedParentCategory ? childCategories : topLevelCategories).map(c => <TouchableOpacity key={c.id} style={[styles.categoryCard, selectedCategory === c.slug && styles.categoryCardSelected]} onPress={() => { if (categories.some(child => child.parent_id === c.id)) { setSelectedParentCategory(c.id); setSelectedCategory(""); } else setSelectedCategory(selectedCategory === c.slug ? "" : c.slug); }}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
-            {selectedCategory === c.slug && <View style={styles.categorySelected}><Text style={{ color: "#fff", fontWeight: "900" }}>✓</Text></View>}
           </TouchableOpacity>)}</View>
           <View style={styles.storesHeading}><Text style={styles.sectionTitle}>{selectedCategory ? (activeCategory?.name ?? "Stores") : selectedParentCategory ? (categories.find(c => c.id === selectedParentCategory)?.name ?? "Stores") : "Stores near you"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
           {visibleStores.map(s => <TouchableOpacity key={s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
@@ -677,7 +718,7 @@ const styles = StyleSheet.create({
   searchWrap: { marginHorizontal: 15, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8", borderRadius: 15, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }, searchIcon: { fontSize: 23, color: "#9aa4b3" }, searchInput: { flex: 1, height: 44, fontSize: 13, color: NAVY, paddingHorizontal: 8 }, clearSearch: { fontSize: 22, color: "#8995a7", paddingHorizontal: 5 },
   areaScroll: { maxHeight: 48, marginTop: 8, flexGrow: 0 }, areaContent: { paddingHorizontal: 14, alignItems: "center", gap: 7 }, areaChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e9e3dc" }, areaChipActive: { backgroundColor: NAVY, borderColor: NAVY }, areaChipText: { fontSize: 10, fontWeight: "700", color: NAVY }, areaChipTextActive: { color: "#fff" },
   content: { flex: 1 }, contentInner: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 105 }, sectionTitle: { fontSize: 18, fontWeight: "900", color: NAVY }, sectionSub: { fontSize: 11, color: "#738096", marginTop: 3, marginBottom: 13 },
-  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 13 }, categoryCard: { width: "48%", height: 145, borderRadius: 18, overflow: "hidden", backgroundColor: NAVY }, categoryImage: { width: "100%", height: "100%", position: "absolute" }, categoryFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#294d75" }, categoryEmoji: { fontSize: 42 }, categoryShade: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(5,23,46,0.32)" }, categoryCaption: { position: "absolute", bottom: 11, left: 11, right: 8 }, categoryName: { fontSize: 13, fontWeight: "900", color: "#fff" }, categoryCount: { fontSize: 10, fontWeight: "700", color: "#fff", marginTop: 3 }, categorySelected: { position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: 12, backgroundColor: ORANGE, alignItems: "center", justifyContent: "center" },
+  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 13 }, categoryCard: { width: "48%", height: 145, borderRadius: 18, overflow: "hidden", backgroundColor: NAVY, borderWidth: 2, borderColor: "transparent" }, categoryCardSelected: { borderColor: ORANGE, transform: [{ scale: 0.985 }] }, categoryImage: { width: "100%", height: "100%", position: "absolute" }, categoryFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#294d75" }, categoryEmoji: { fontSize: 42 }, categoryShade: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(5,23,46,0.32)" }, categoryCaption: { position: "absolute", bottom: 11, left: 11, right: 8 }, categoryName: { fontSize: 13, fontWeight: "900", color: "#fff" }, categoryCount: { fontSize: 10, fontWeight: "700", color: "#fff", marginTop: 3 },
   storesHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 10 }, storeCount: { fontSize: 10, color: "#8995a7", fontWeight: "700" },
   storeCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 11, marginBottom: 9, gap: 11 }, storeImage: { width: 66, height: 66, borderRadius: 14, resizeMode: "contain", backgroundColor: "#fff7ef" }, storeImageFallback: { width: 66, height: 66, borderRadius: 14, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, storeInfo: { flex: 1 }, storeName: { fontSize: 13, fontWeight: "900", color: NAVY }, storeBranch: { fontSize: 10, color: "#8995a7", marginTop: 3 }, storeArea: { fontSize: 10, color: "#8995a7", marginTop: 4 }, openLabel: { fontSize: 9, fontWeight: "800", alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginTop: 5 }, open: { backgroundColor: "#e7f7ed", color: "#177245" }, closed: { backgroundColor: "#f1f2f4", color: "#697586" }, chevron: { fontSize: 25, color: "#c1c9d2", paddingHorizontal: 5 },
   backLink: { marginBottom: 12 }, backLinkText: { fontSize: 12, fontWeight: "800", color: RED }, storeHero: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 18, backgroundColor: "#fff", marginBottom: 13, borderWidth: 1, borderColor: "#ffead8" }, storeHeroImage: { width: 62, height: 62, borderRadius: 14, resizeMode: "contain" }, storeHeroIcon: { fontSize: 40, width: 62, textAlign: "center" },

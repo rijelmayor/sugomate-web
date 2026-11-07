@@ -11,7 +11,7 @@
     "android": {
       "package": "com.sugomate.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/sugomate-app-icon.png",
+        "foregroundImage": "./assets/sugomate-adaptive-foreground.png",
         "backgroundColor": "#071848"
       }
     },
