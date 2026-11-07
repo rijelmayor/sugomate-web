@@ -41,6 +41,7 @@ async function uploadDriverDocuments(supabase: Awaited<ReturnType<typeof createC
   const spec = [
     { field: "id_document", key: "id", required: false },
     { field: "selfie_document", key: "selfie", required: false },
+    { field: "profile_photo", key: "profile_photo", required: false },
     { field: "license_document", key: "license", required: false },
   ] as const;
   const files: Record<string, File> = {};
@@ -53,7 +54,7 @@ async function uploadDriverDocuments(supabase: Awaited<ReturnType<typeof createC
     files[item.key] = value;
   }
   const uploaded: string[] = [];
-  const paths: Record<string, string | null> = { id: null, selfie: null, license: null };
+  const paths: Record<string, string | null> = { id: null, selfie: null, license: null, profile_photo: null };
   for (const [key, file] of Object.entries(files)) {
     // Prefer JPEG after client compression; fall back to detected type
     const isJpeg = file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
@@ -86,7 +87,7 @@ export async function applyAsDriver(formData: FormData) {
   const { error } = await supabase.from("driver_profiles").insert({
     user_id: user.id, vehicle_type: vehicleType, vehicle_plate: vehiclePlate || null, status: "pending",
     age, address: address || null,
-    id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license,
+    id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license, profile_photo_path: paths.profile_photo,
   });
   if (error) {
     await supabase.storage.from("driver-documents").remove(uploaded);
@@ -98,11 +99,11 @@ export async function applyAsDriver(formData: FormData) {
 // For applicants who applied before IDs were required: attach documents to the pending application.
 export async function submitDriverDocuments(formData: FormData) {
   const { supabase, user } = await requireUser();
-  const { data: driver } = await supabase.from("driver_profiles").select("status,vehicle_type").eq("user_id", user.id).maybeSingle();
+  const { data: driver } = await supabase.from("driver_profiles").select("status,vehicle_type,profile_photo_path").eq("user_id", user.id).maybeSingle();
   if (!driver || driver.status !== "pending") redirect("/driver/apply");
   const { paths, uploaded } = await uploadDriverDocuments(supabase, user.id, formData, String(driver.vehicle_type ?? ""), "/driver/apply");
   const { error } = await supabase.from("driver_profiles")
-    .update({ id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license })
+    .update({ id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license, profile_photo_path: paths.profile_photo ?? driver.profile_photo_path })
     .eq("user_id", user.id);
   if (error) {
     await supabase.storage.from("driver-documents").remove(uploaded);
