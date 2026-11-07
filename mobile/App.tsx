@@ -113,11 +113,12 @@ export default function App() {
         setSelectedStore("");
         return true;
       }
-      if (selectedCategory) {
+      if (selectedCategory && categories.some(c => c.parent_id === selectedParentCategory)) {
         setSelectedCategory("");
         return true;
       }
-      if (selectedParentCategory || selectedMunicipality || search) {
+      if (selectedCategory || selectedParentCategory || selectedMunicipality || search) {
+        setSelectedCategory("");
         setSelectedParentCategory("");
         setSelectedMunicipality("");
         setSearch("");
@@ -557,12 +558,12 @@ export default function App() {
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
           <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
-          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory) setSelectedCategory(""); else setSelectedParentCategory(""); }}><Text style={styles.backLinkText}>{selectedCategory ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
-          {!selectedParentCategory && <View style={styles.categoryGrid}>{topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { setSelectedParentCategory(c.id); setSelectedCategory(""); }}>
+          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory && childCategories.length > 0) setSelectedCategory(""); else { setSelectedCategory(""); setSelectedParentCategory(""); } }}><Text style={styles.backLinkText}>{selectedCategory && childCategories.length > 0 ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
+          {!selectedParentCategory && <View style={styles.categoryGrid}>{topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { const hasSubcategories = categories.some(child => child.parent_id === c.id); setSelectedParentCategory(c.id); setSelectedCategory(hasSubcategories ? "" : c.slug); }}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
           </TouchableOpacity>)}</View>}
-          {selectedParentCategory && !selectedCategory && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
+          {selectedParentCategory && !selectedCategory && childCategories.length > 0 && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
           </TouchableOpacity>)}</View>}
