@@ -42,3 +42,21 @@ button,a{-webkit-tap-highlight-color:transparent}
 @keyframes rider-go{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:0}}
 .rider-go{animation:rider-go 2.6s ease-in-out infinite;transform:translateX(-50%)}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.skeleton{animation:none}}
+
+
+/* SUGOMATE sign-in brand intro: short, lightweight and reduced-motion aware. */
+.auth-intro-shell{width:100%;max-width:100%;margin-inline:auto}
+.auth-intro-stage{height:218px;max-width:420px;margin:0 auto 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;animation:auth-stage-exit .32s ease 1.2s forwards}
+.auth-intro-logo{position:relative;z-index:2;width:min(78vw,300px);height:150px;object-fit:contain;opacity:0;filter:drop-shadow(0 10px 14px #102e5720);animation:auth-eagle-enter .78s cubic-bezier(.18,.78,.2,1) .08s forwards}
+.auth-intro-tagline{position:relative;z-index:2;margin:0;color:#102e57;font-size:12px;font-weight:900;letter-spacing:.08em;opacity:0;animation:auth-tagline-in .35s ease .72s forwards}
+.auth-speed-trail{position:absolute;z-index:1;left:-65%;height:3px;border-radius:99px;background:linear-gradient(90deg,transparent,#ffbd18,#ff6a00,transparent);filter:drop-shadow(0 0 5px #ff8a0080);transform:skewX(-24deg);animation:auth-trail-sweep .62s ease-out forwards}
+.auth-speed-trail-one{top:43%;width:78%}
+.auth-speed-trail-two{top:54%;width:58%;animation-delay:.09s;opacity:.8}
+.auth-login-content{opacity:0;transform:translateY(14px);pointer-events:none}
+.auth-login-content-visible{opacity:1;transform:translateY(0);pointer-events:auto;transition:opacity .42s ease,transform .42s ease}
+@keyframes auth-eagle-enter{0%{opacity:0;transform:translateX(-110px) scale(.84)}65%{opacity:1;transform:translateX(9px) scale(1.03)}100%{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes auth-trail-sweep{0%{left:-65%;opacity:0}18%{opacity:1}100%{left:120%;opacity:0}}
+@keyframes auth-tagline-in{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(6px)}}
+@keyframes auth-stage-exit{to{height:0;margin-bottom:0;opacity:0;visibility:hidden}}
+@media(max-width:560px){.auth-intro-stage{height:184px}.auth-intro-logo{height:126px;width:min(82vw,270px)}}
+@media(prefers-reduced-motion:reduce){.auth-intro-stage{display:none!important}.auth-login-content{opacity:1!important;transform:none!important;pointer-events:auto!important}.auth-speed-trail,.auth-intro-logo,.auth-intro-tagline{animation:none!important}}
