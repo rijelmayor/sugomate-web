@@ -13,5 +13,6 @@ export async function GET(request: Request) {
     if (!error) return NextResponse.redirect(new URL(safeNext, url.origin));
   }
 
-  return NextResponse.redirect(new URL("/login?error=confirmation", url.origin));
+  const isRecovery = safeNext === "/reset-password";
+  return NextResponse.redirect(new URL(isRecovery ? "/forgot-password?error=send" : "/login?error=confirmation", url.origin));
 }
