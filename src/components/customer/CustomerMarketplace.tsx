@@ -136,8 +136,6 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const q = search.trim().toLowerCase();
   const currentStore = stores.find(item => item.id === selectedStore);
   const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
-  const selectedCategorySlugs = selectedCategory ? [selectedCategory.slug, ...tiles.filter(item => item.parent_id === selectedCategory.id).map(item => item.slug)] : [];
-  const storeMatches = stores.filter(item => (!selectedMerchantCategory || selectedCategorySlugs.includes(item.categorySlug)) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
   const uncategorised = stores.filter(item => item.categorySlug === "other").length;
   const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug || merchantCategories.some(child => child.parent_id === item.id && child.slug === store.categorySlug)).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", parent_id: null, image_url: null, count: uncategorised }] : [])];
   const topLevelTiles = tiles.filter(item => !item.parent_id);
@@ -145,6 +143,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const childTiles = selectedCategory ? tiles.filter(item => item.parent_id === selectedCategory.id) : [];
   const parentCategory = selectedCategory?.parent_id ? tiles.find(item => item.id === selectedCategory.parent_id) : undefined;
   const activeCategory = selectedCategory;
+  const selectedCategorySlugs = selectedCategory ? [selectedCategory.slug, ...childTiles.map(item => item.slug)] : [];
+  const storeMatches = stores.filter(item => (!selectedMerchantCategory || selectedCategorySlugs.includes(item.categorySlug)) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
   const view: "store" | "stores" | "subcategories" | "home" = currentStore ? "store" : q ? "stores" : selectedCategory && childTiles.length ? "subcategories" : selectedMerchantCategory ? "stores" : "home";
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.branch_id === firstItem?.branch_id);
