@@ -450,7 +450,7 @@ export default function App() {
   const firstName = profileName.split(/\s+/)[0] || "there";
   return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
     <View style={styles.topbar}>
-      <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
+      <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View style={styles.taglineWrap}><Text style={styles.topTag} numberOfLines={1}>Imong sugo, kami bahala.</Text></View></View>
       <TouchableOpacity style={styles.ordersShortcut} onPress={() => setTab("orders")}><Text style={styles.ordersShortcutText}>My Orders</Text></TouchableOpacity>
     </View>
     <View style={styles.greeting}><Text style={styles.greetingSmall}>Maayong adlaw, {firstName}!</Text><Text style={styles.greetingTitle}>Unsa imong sugo karon?</Text></View>
@@ -571,15 +571,15 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
-  loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
+  safe: { flex: 1, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
+  loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42, flexShrink: 0 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
   loginCard: { marginTop: 34, padding: 22, borderRadius: 26, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8" }, heading: { fontSize: 24, fontWeight: "900", color: NAVY }, muted: { fontSize: 12, color: "#738096", marginTop: 5, lineHeight: 18 },
   input: { marginTop: 16, paddingHorizontal: 15, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#e5eaf0", fontSize: 15, color: NAVY, backgroundColor: "#fff" },
   primary: { marginTop: 18, backgroundColor: ORANGE, padding: 14, borderRadius: 15, alignItems: "center" }, disabled: { opacity: .6 }, primaryText: { color: "#fff", fontWeight: "900", fontSize: 14 },
   linkButton: { alignItems: "center", padding: 15 }, link: { color: RED, fontWeight: "800" }, footnote: { fontSize: 11, color: "#8995a7", lineHeight: 17, textAlign: "center" },
-  topbar: { paddingHorizontal: 16, paddingVertical: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }, brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  topbar: { paddingHorizontal: 16, paddingVertical: 11, minHeight: 64, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }, brandRow: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 9 }, taglineWrap: { flex: 1, minWidth: 0 },
   smallMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, smallMarkText: { fontSize: 22, fontWeight: "900", color: ORANGE },
-  topTag: { fontSize: 9, color: RED, marginTop: 1 }, ordersShortcut: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "#ffead8" }, ordersShortcutText: { fontSize: 11, fontWeight: "800", color: NAVY },
+  topTag: { flexShrink: 1, fontSize: 9, color: RED, marginTop: 1 }, ordersShortcut: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "#ffead8" }, ordersShortcutText: { fontSize: 11, fontWeight: "800", color: NAVY },
   greeting: { paddingHorizontal: 17, paddingTop: 17, paddingBottom: 13 }, greetingSmall: { fontSize: 12, fontWeight: "800", color: RED }, greetingTitle: { fontSize: 21, fontWeight: "900", color: NAVY, marginTop: 4 },
   searchWrap: { marginHorizontal: 15, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8", borderRadius: 15, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }, searchIcon: { fontSize: 23, color: "#9aa4b3" }, searchInput: { flex: 1, height: 44, fontSize: 13, color: NAVY, paddingHorizontal: 8 }, clearSearch: { fontSize: 22, color: "#8995a7", paddingHorizontal: 5 },
   areaScroll: { maxHeight: 48, marginTop: 8, flexGrow: 0 }, areaContent: { paddingHorizontal: 14, alignItems: "center", gap: 7 }, areaChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e9e3dc" }, areaChipActive: { backgroundColor: NAVY, borderColor: NAVY }, areaChipText: { fontSize: 10, fontWeight: "700", color: NAVY }, areaChipTextActive: { color: "#fff" },
