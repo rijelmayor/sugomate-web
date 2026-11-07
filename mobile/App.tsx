@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -15,6 +15,7 @@ type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string
 type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
+type MerchantUsageSettings = { merchant_usage_enabled: boolean; merchant_usage_method: string; merchant_usage_value: number | string };
 type Tab = "market" | "orders" | "account";
 
 const NAVY = "#102e57";
@@ -50,6 +51,65 @@ const orderStatus: Record<string, string> = {
   in_transit: "On the way", delivered: "Delivered", cancelled: "Cancelled", rejected: "Rejected"
 };
 
+
+const ORDER_PROGRESS_STAGES = ["Placed", "Accepted", "Preparing", "On the way", "Delivered"];
+const ORDER_PROGRESS_INDEX: Record<string, number> = {
+  pending_merchant: 0, accepted: 1, preparing: 2, ready_for_pickup: 2,
+  assigned: 2, picked_up: 3, in_transit: 3, delivered: 4
+};
+
+function ProgressConnector({ active, complete }: { active: boolean; complete: boolean }) {
+  const flow = useRef(new Animated.Value(0)).current;
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const animation = Animated.loop(Animated.timing(flow, { toValue: 1, duration: 1150, useNativeDriver: true }));
+    animation.start();
+    return () => { animation.stop(); flow.setValue(0); };
+  }, [active, flow]);
+  const translateX = flow.interpolate({ inputRange: [0, 1], outputRange: [-18, Math.max(0, width - 18)] });
+  return <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={[styles.progressConnector, complete && styles.progressConnectorComplete, active && styles.progressConnectorActive]}>
+    {active && <Animated.View style={[styles.progressFlowDash, { transform: [{ translateX }] }]} />}
+  </View>;
+}
+
+function OrderProgressTracker({ status }: { status: string }) {
+  const currentStep = ORDER_PROGRESS_INDEX[status] ?? 0;
+  const pulse = useRef(new Animated.Value(0)).current;
+  const cancelled = status === "cancelled" || status === "rejected";
+  useEffect(() => {
+    if (cancelled || status === "delivered") return;
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 850, useNativeDriver: true })
+    ]));
+    animation.start();
+    return () => { animation.stop(); pulse.setValue(0); };
+  }, [cancelled, status, pulse]);
+  if (cancelled) return null;
+  return <View style={styles.progressTracker}>
+    <View style={styles.progressTrackRow}>
+      {ORDER_PROGRESS_STAGES.map((stage, index) => <React.Fragment key={stage}>
+        <View style={styles.progressNodeWrap}>
+          {index === currentStep && status !== "delivered" && <Animated.View style={[styles.progressPulse, {
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.42, 0.08] }),
+            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.65] }) }]
+          }]} />}
+          <View style={[styles.progressNode, index < currentStep && styles.progressNodeComplete, index === currentStep && styles.progressNodeCurrent]}>
+            <Text style={[styles.progressNodeText, index <= currentStep && styles.progressNodeTextActive]}>{index < currentStep ? "✓" : index + 1}</Text>
+          </View>
+        </View>
+        {index < ORDER_PROGRESS_STAGES.length - 1 && <ProgressConnector active={index === currentStep - 1 && status !== "delivered"} complete={index < currentStep - 1 || status === "delivered"} />}
+      </React.Fragment>)}
+    </View>
+    <View style={styles.progressLabelRow}>
+      {ORDER_PROGRESS_STAGES.map((stage, index) => <View key={stage} style={styles.progressLabelWrap}>
+        <Text numberOfLines={1} style={[styles.progressLabel, index < currentStep && styles.progressLabelComplete, index === currentStep && styles.progressLabelActive]}>{stage}</Text>
+      </View>)}
+    </View>
+  </View>;
+}
+
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [checking, setChecking] = useState(true);
@@ -63,6 +123,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [merchantUsageSettings, setMerchantUsageSettings] = useState<MerchantUsageSettings>({ merchant_usage_enabled: false, merchant_usage_method: "percentage", merchant_usage_value: 0 });
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
@@ -154,13 +215,20 @@ export default function App() {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      const [profileRes, municipalityRes, categoryRes] = await Promise.all([
+      const [profileRes, municipalityRes, categoryRes, usageSettingsRes] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle(),
         supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
-        supabase.from("merchant_categories").select("id,name,slug,icon,image_url,parent_id").eq("is_active", true).order("sort_order").order("name")
+        supabase.from("merchant_categories").select("id,name,slug,icon,image_url,parent_id").eq("is_active", true).order("sort_order").order("name"),
+        supabase.from("platform_financial_settings").select("merchant_usage_enabled,merchant_usage_method,merchant_usage_value").eq("id", 1).maybeSingle()
       ]);
       if (profileRes.error) throw profileRes.error;
       if (municipalityRes.error) throw municipalityRes.error;
+      if (usageSettingsRes.error) throw usageSettingsRes.error;
+      setMerchantUsageSettings({
+        merchant_usage_enabled: Boolean(usageSettingsRes.data?.merchant_usage_enabled),
+        merchant_usage_method: usageSettingsRes.data?.merchant_usage_method ?? "percentage",
+        merchant_usage_value: Number(usageSettingsRes.data?.merchant_usage_value ?? 0)
+      });
       setProfileName(profileRes.data?.display_name?.trim() ?? "");
       setMunicipalities(municipalityRes.data ?? []);
       if (categoryRes.error) {
@@ -300,7 +368,14 @@ export default function App() {
   const storeProducts = useMemo(() => products.filter(p => p.branch_id === selectedStore && (!search.trim() || p.name.toLowerCase().includes(search.trim().toLowerCase()))), [products, selectedStore, search]);
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((n, item) => n + item.quantity, 0);
-  const cartTotal = cartItems.reduce((n, item) => n + Number(item.product.price) * item.quantity, 0);
+  const customerUnitPrice = (merchantPrice: number | string) => {
+    const base = Number(merchantPrice) || 0;
+    if (!merchantUsageSettings.merchant_usage_enabled) return base;
+    const rate = Number(merchantUsageSettings.merchant_usage_value) || 0;
+    const usage = merchantUsageSettings.merchant_usage_method === "percentage" ? base * rate / 100 : rate;
+    return Math.round((base + usage + Number.EPSILON) * 100) / 100;
+  };
+  const cartTotal = cartItems.reduce((n, item) => n + customerUnitPrice(item.product.price) * item.quantity, 0);
 
   async function signIn() {
     if (!email.trim() || !password) { Alert.alert("Missing details", "Enter your email and password."); return; }
@@ -506,8 +581,8 @@ export default function App() {
   }
 
   function showBasket() {
-    const lines = cartItems.map(x => x.quantity + " × " + x.product.name + " — " + peso(Number(x.product.price) * x.quantity)).join("\n");
-    Alert.alert("Your basket", lines + "\n\nItems subtotal: " + peso(cartTotal) + "\n\nDelivery fee is calculated at checkout.", [
+    const lines = cartItems.map(x => x.quantity + " × " + x.product.name + " — " + peso(customerUnitPrice(x.product.price) * x.quantity)).join("\n");
+    Alert.alert("Your basket", lines + "\n\nItems subtotal (system usage fee included): " + peso(cartTotal) + "\n\nDelivery fee is calculated at checkout.", [
       { text: "Continue shopping", style: "cancel" },
       { text: "Clear basket", style: "destructive", onPress: () => setCart({}) }
     ]);
@@ -553,7 +628,7 @@ export default function App() {
             <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>{currentStore.name}</Text><Text style={styles.muted}>{currentStore.branchName} · {currentStore.area}</Text><Text style={[styles.openLabel, currentStore.isOpen ? styles.open : styles.closed]}>{currentStore.isOpen ? "Open now" : "Closed"}</Text></View></View>
           {currentStore.isOpen ? storeProducts.map(p => <View key={p.id} style={styles.productCard}>
             {p.image_url ? <Image source={{ uri: p.image_url }} style={styles.productImage} resizeMode="contain" /> : <View style={styles.productPlaceholder}><Text style={{ fontSize: 27 }}>🛍️</Text></View>}
-            <View style={styles.productInfo}><Text style={styles.productName}>{p.name}</Text><Text style={styles.productDescription} numberOfLines={2}>{p.description ?? ""}</Text><View style={styles.productBottom}><Text style={styles.price}>{peso(p.price)}</Text><View style={styles.qtyRow}>{cart[p.id] ? <><TouchableOpacity onPress={() => changeQuantity(p.id, -1)} style={styles.qtyButton}><Text style={styles.qtyText}>−</Text></TouchableOpacity><Text style={styles.qtyValue}>{cart[p.id].quantity}</Text><TouchableOpacity onPress={() => changeQuantity(p.id, 1)} style={styles.qtyButton}><Text style={styles.qtyText}>+</Text></TouchableOpacity></> : <TouchableOpacity onPress={() => addToCart(p)} style={styles.addButton}><Text style={styles.addButtonText}>＋ Add</Text></TouchableOpacity>}</View></View></View>
+            <View style={styles.productInfo}><Text style={styles.productName}>{p.name}</Text><Text style={styles.productDescription} numberOfLines={2}>{p.description ?? ""}</Text><View style={styles.productBottom}><View style={{ gap: 1 }}><Text style={styles.price}>{peso(customerUnitPrice(p.price))}</Text><Text style={styles.priceFeeNote}>System usage fee included</Text></View><View style={styles.qtyRow}>{cart[p.id] ? <><TouchableOpacity onPress={() => changeQuantity(p.id, -1)} style={styles.qtyButton}><Text style={styles.qtyText}>−</Text></TouchableOpacity><Text style={styles.qtyValue}>{cart[p.id].quantity}</Text><TouchableOpacity onPress={() => changeQuantity(p.id, 1)} style={styles.qtyButton}><Text style={styles.qtyText}>+</Text></TouchableOpacity></> : <TouchableOpacity onPress={() => addToCart(p)} style={styles.addButton}><Text style={styles.addButtonText}>＋ Add</Text></TouchableOpacity>}</View></View></View>
           </View>) : <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🕒</Text><Text style={styles.emptyTitle}>This store is currently closed</Text><Text style={styles.muted}>Please check back during its operating hours.</Text></View>}
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
@@ -584,6 +659,7 @@ export default function App() {
           const submitted = Boolean(o.gcash_payment_submitted_at) && o.payment_status !== "failed";
           return <View key={o.id} style={styles.orderCard}>
             <View style={styles.orderTop}><View><Text style={styles.orderNumber}>{o.order_number}</Text><Text style={styles.storeName}>{merchant?.name ?? "Local merchant"}</Text><Text style={styles.storeBranch}>{new Date(o.placed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text></View><Text style={styles.statusPill}>{orderStatus[o.status] ?? o.status.replaceAll("_", " ")}</Text></View>
+            <OrderProgressTracker status={o.status} />
             <View style={styles.orderAmounts}><View style={styles.amountRow}><Text style={styles.amountLabel}>Items subtotal</Text><Text style={styles.amountValue}>{peso(o.subtotal)}</Text></View><View style={styles.amountRow}><Text style={styles.deliveryLabel}>Delivery fee</Text><Text style={styles.deliveryValue}>{peso(o.delivery_fee)}</Text></View><View style={[styles.amountRow, styles.totalRow]}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{peso(o.total)}</Text></View></View>
             {Boolean(o.order_items?.length) && <View style={styles.orderItems}><Text style={styles.orderDetailTitle}>Items ordered</Text>{o.order_items?.map((item: any) => <View key={item.id} style={styles.orderItemRow}><Text style={styles.orderItemName}>{item.quantity} × {item.product_name}</Text><Text style={styles.orderItemPrice}>{peso(item.line_total)}</Text></View>)}</View>}
             {o.status === "accepted" && <View style={[styles.riderNotice, o.rider_on_way_at ? styles.riderNoticeReady : null]}><Text style={styles.riderNoticeText}>{o.rider_on_way_at ? "Your rider confirmed and is heading to the store. The merchant can now start preparing." : "The store reserved your items and is waiting for a rider to commit. Preparation starts after the rider confirms they are on the way."}</Text></View>}
@@ -681,11 +757,11 @@ export default function App() {
           </View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Order summary</Text>
-            {cartItems.map(item => <View key={item.product.id} style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>{item.quantity} × {item.product.name}</Text><Text style={styles.checkoutAmountValue}>{peso(Number(item.product.price) * item.quantity)}</Text></View>)}
+            {cartItems.map(item => <View key={item.product.id} style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>{item.quantity} × {item.product.name}</Text><Text style={styles.checkoutAmountValue}>{peso(customerUnitPrice(item.product.price) * item.quantity)}</Text></View>)}
             <View style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>Items subtotal</Text><Text style={styles.checkoutAmountValue}>{peso(cartTotal)}</Text></View>
             <View style={styles.checkoutAmountRow}><Text style={styles.checkoutDeliveryLabel}>Delivery fee</Text><Text style={styles.checkoutDeliveryLabel}>{deliveryFeePreview === null ? "Calculated at checkout" : peso(deliveryFeePreview)}</Text></View>
             <View style={[styles.checkoutAmountRow, styles.checkoutTotalRow]}><Text style={styles.checkoutTotalLabel}>Estimated total</Text><Text style={styles.checkoutTotalLabel}>{deliveryFeePreview === null ? "Confirmed after placement" : peso(cartTotal + deliveryFeePreview)}</Text></View>
-            <Text style={styles.checkoutHint}>Final prices, stock, delivery fee and total are validated securely when you place the order.</Text>
+            <Text style={styles.checkoutHint}>Displayed item prices include the applicable system usage fee. Final prices, stock, delivery fee and total are validated securely when you place the order.</Text>
           </View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Payment method</Text>
@@ -750,7 +826,8 @@ const styles = StyleSheet.create({
   eventButtonText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   orderItems: { marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, orderDetailTitle: { fontSize: 10, fontWeight: "900", color: NAVY, marginBottom: 7 }, orderItemRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 5 }, orderItemName: { flex: 1, fontSize: 10, color: "#63748a" }, orderItemPrice: { fontSize: 10, fontWeight: "800", color: NAVY }, riderNotice: { marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#fff7e7", borderWidth: 1, borderColor: "#f3dfb5" }, riderNoticeReady: { backgroundColor: "#eaf8f0", borderColor: "#c7ead4" }, riderNoticeText: { fontSize: 10, lineHeight: 15, color: NAVY, fontWeight: "700" }, orderHistory: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#f1eee9" }, historyRow: { flexDirection: "row", minHeight: 47 }, historyMarker: { width: 17, alignItems: "center" }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#b7c1ce", marginTop: 3 }, historyDotActive: { backgroundColor: ORANGE, width: 11, height: 11, borderRadius: 6 }, historyLine: { width: 1, flex: 1, backgroundColor: "#dfe5ec", marginTop: 3 }, historyBody: { flex: 1, paddingBottom: 10, paddingLeft: 5 }, historyStatus: { fontSize: 10, fontWeight: "900", color: NAVY, textTransform: "capitalize" }, historyDate: { marginTop: 2, fontSize: 9, color: "#8995a7" }, historyNote: { marginTop: 3, fontSize: 9, color: "#63748a", lineHeight: 13 }, deliveryProofButton: { marginTop: 10, alignSelf: "flex-start", borderRadius: 18, backgroundColor: "#e7f7ed", paddingHorizontal: 12, paddingVertical: 8 }, deliveryProofText: { fontSize: 10, fontWeight: "900", color: "#176b43" }, driverNote: { marginTop: 8, fontSize: 10, color: "#63748a", fontStyle: "italic" },
   paymentSummary: { marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: "#f1eee9" }, paymentSummaryText: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashCard: { marginTop: 12, padding: 13, borderRadius: 15, borderWidth: 1, borderColor: "#d9ecf7", backgroundColor: "#f2faff" }, gcashHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, gcashTitle: { fontSize: 14, fontWeight: "900", color: NAVY }, gcashBadge: { overflow: "hidden", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#fff", color: "#17618b", fontSize: 9, fontWeight: "900" }, gcashHint: { marginTop: 7, fontSize: 10, lineHeight: 15, color: "#63748a" }, gcashAmount: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashTotal: { marginTop: 2, fontSize: 24, fontWeight: "900", color: NAVY }, gcashQrWrap: { alignItems: "center", marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: "#fff" }, gcashQr: { width: 190, height: 190 }, gcashAccount: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashAccountValue: { marginTop: 3, fontSize: 13, fontWeight: "900", color: NAVY }, gcashPhone: { marginTop: 2, fontSize: 18, fontWeight: "900", letterSpacing: 1, color: NAVY }, gcashSuccess: { marginTop: 9, padding: 10, borderRadius: 10, backgroundColor: "#e7f7ed", color: "#176b43", fontSize: 11, fontWeight: "800", lineHeight: 17 }, gcashPending: { marginTop: 11, padding: 11, borderRadius: 11, borderWidth: 1, borderColor: "#f1d89b", backgroundColor: "#fff9e9" }, gcashPendingTitle: { fontSize: 11, fontWeight: "900", color: "#805300" }, gcashForm: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#d9ecf7" }, gcashLabel: { marginTop: 8, fontSize: 10, fontWeight: "900", color: NAVY }, gcashInput: { marginTop: 5, paddingHorizontal: 11, paddingVertical: 11, borderWidth: 1, borderColor: "#dce5ed", borderRadius: 10, backgroundColor: "#fff", color: NAVY, fontSize: 12 }, gcashPick: { marginTop: 6, padding: 12, borderRadius: 11, borderWidth: 1, borderStyle: "dashed", borderColor: ORANGE, backgroundColor: "#fff", alignItems: "center" }, gcashPickText: { color: NAVY, fontSize: 11, fontWeight: "900" }, gcashPreviewWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, padding: 8, borderRadius: 10, backgroundColor: "#fff" }, gcashPreview: { width: 66, height: 66, borderRadius: 8, backgroundColor: "#edf2f7" }, gcashPreviewName: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashRemove: { marginTop: 6, fontSize: 10, fontWeight: "900", color: RED }, gcashSubmit: { marginTop: 12, paddingVertical: 13, borderRadius: 22, backgroundColor: NAVY, alignItems: "center" }, gcashSubmitText: { fontSize: 11, fontWeight: "900", color: "#fff" },
-  orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
+  orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 },
+  progressTracker: { marginTop: 16, marginBottom: 12, paddingHorizontal: 2 }, progressTrackRow: { flexDirection: "row", alignItems: "center" }, progressNodeWrap: { width: 25, height: 25, alignItems: "center", justifyContent: "center" }, progressNode: { width: 23, height: 23, borderRadius: 12, backgroundColor: "#e8edf3", alignItems: "center", justifyContent: "center", zIndex: 1 }, progressNodeComplete: { backgroundColor: RED }, progressNodeCurrent: { backgroundColor: RED, borderWidth: 2, borderColor: "#ffd4b6" }, progressNodeText: { fontSize: 10, fontWeight: "900", color: "#718096" }, progressNodeTextActive: { color: "#fff" }, progressPulse: { position: "absolute", width: 25, height: 25, borderRadius: 13, backgroundColor: ORANGE }, progressConnector: { flex: 1, height: 3, backgroundColor: "#e3e8ef", overflow: "hidden", borderRadius: 2 }, progressConnectorComplete: { backgroundColor: RED }, progressConnectorActive: { backgroundColor: "#f6d5c2" }, progressFlowDash: { position: "absolute", left: 0, top: 0, bottom: 0, width: 18, backgroundColor: RED, borderRadius: 2 }, progressLabelRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 7 }, progressLabelWrap: { flex: 1, alignItems: "center", paddingHorizontal: 1 }, progressLabel: { fontSize: 8, fontWeight: "700", color: "#8b96a5", textAlign: "center" }, progressLabelComplete: { color: NAVY }, progressLabelActive: { color: NAVY, fontWeight: "900" }, priceFeeNote: { fontSize: 7, color: "#7c8796", fontWeight: "600" }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
   accountCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#ffead8", padding: 19 }, accountLink: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f1eee9" }, accountLinkText: { fontSize: 12, fontWeight: "800", color: NAVY },
   checkoutSafe: { flex: 1, backgroundColor: BG }, checkoutContent: { padding: 18, paddingBottom: 36 }, checkoutHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }, checkoutTitle: { fontSize: 22, fontWeight: "900", color: NAVY }, checkoutCard: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ffead8", padding: 15, marginBottom: 13 }, checkoutSection: { fontSize: 15, fontWeight: "900", color: NAVY, marginBottom: 10 }, addressOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 11, marginBottom: 8 }, addressOptionActive: { borderColor: ORANGE, backgroundColor: "#fff7ef" }, addressOptionTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, addressOptionText: { fontSize: 10, color: "#738096", marginTop: 4 }, addressToggle: { paddingVertical: 10 }, addressToggleText: { fontSize: 11, fontWeight: "900", color: RED }, checkoutInput: { marginTop: 9, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#e5eaf0", backgroundColor: "#fff", color: NAVY, fontSize: 12 }, checkoutMultiline: { minHeight: 72, textAlignVertical: "top" }, checkoutHint: { fontSize: 10, color: "#738096", lineHeight: 15, marginTop: 6 }, municipalityOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 10, padding: 9, marginTop: 5 }, checkoutAmountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginTop: 8 }, checkoutAmountLabel: { flex: 1, fontSize: 11, color: "#738096" }, checkoutAmountValue: { fontSize: 11, fontWeight: "800", color: NAVY }, checkoutDeliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, checkoutTotalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 10, marginTop: 12 }, checkoutTotalLabel: { fontSize: 13, fontWeight: "900", color: NAVY }, paymentOption: { borderWidth: 1, borderColor: "#edf0f3", borderRadius: 13, padding: 12, marginBottom: 8 }, paymentTitle: { fontSize: 12, fontWeight: "900", color: NAVY }, checkoutFootnote: { fontSize: 10, lineHeight: 16, color: "#738096", textAlign: "center", marginTop: 10 }
 });
