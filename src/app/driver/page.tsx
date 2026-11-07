@@ -6,6 +6,7 @@ import { signOut } from "@/app/dashboard/actions";
 import SignOutSubmitButton from "@/components/SignOutSubmitButton";
 import FormSubmitButton from "@/components/FormSubmitButton";
 import DriverOfferAlarm from "@/components/driver/DriverOfferAlarm";
+import DriverProfilePhotoUpload from "@/components/driver/DriverProfilePhotoUpload";
 import { respondToDriverAssignment, setDriverAvailability, updateDriverOrderStatus, claimReadyOrder, confirmRiderOnTheWay, releaseDriverClaim } from "./actions";
 
 const labels: Record<string,string> = {
@@ -21,10 +22,11 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
  if(!user) redirect("/login?next=/driver");
  const [{data:profile},{data:driver}]=await Promise.all([
   supabase.from("profiles").select("display_name,phone").eq("id",user.id).maybeSingle(),
-  supabase.from("driver_profiles").select("status,vehicle_type,vehicle_plate,is_available").eq("user_id",user.id).maybeSingle()
+  supabase.from("driver_profiles").select("status,vehicle_type,vehicle_plate,is_available,profile_photo_path").eq("user_id",user.id).maybeSingle()
  ]);
  if(!driver) redirect("/driver/apply");
  const active=driver.status==="active";
+ const {data:driverPhoto}=active&&driver.profile_photo_path?await supabase.storage.from("driver-documents").createSignedUrl(driver.profile_photo_path,3600):{data:null};
  const {data:orders}=active?await supabase.from("orders")
   .select("id,order_number,status,driver_assignment_status,rider_on_way_at,payment_method,subtotal,total,delivery_fee,placed_at,address_snapshot,driver_note,order_items(id,product_name,quantity,line_total),merchants(name)")
   .eq("driver_user_id",user.id).in("status",["accepted","preparing","ready_for_pickup","assigned","picked_up","in_transit","delivered"])
@@ -49,7 +51,8 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
     </div>
     {active&&<div className="mt-3 flex items-center justify-between gap-3 border-t border-white/15 pt-3"><div className="flex min-w-0 items-center gap-2 text-xs"><span className={`h-2 w-2 shrink-0 rounded-full ${driver.is_available?"bg-emerald-300":"bg-slate-400"}`}/><span className="font-bold">{driver.is_available?"Online · Receiving orders":"Offline · Not receiving orders"}</span></div><form action={setDriverAvailability}><input type="hidden" name="is_available" value={String(!driver.is_available)}/><FormSubmitButton pendingLabel="Updating…" className={`rounded-full px-4 py-2 text-xs font-black ${driver.is_available?"bg-white/10 text-white":"bg-[#ffbd18] text-[#102e57]"}`}>{driver.is_available?"Go offline":"Go online"}</FormSubmitButton></form></div>}
    </section>
-   {(params.error||params.updated)&&<p role={params.error?"alert":"status"} className={`mt-4 rounded-xl p-4 text-sm ${params.error?"bg-rose-50 text-rose-700":"bg-emerald-50 text-emerald-800"}`}>{params.error==="proof"?"A delivery photo is required (JPG, PNG or WEBP, maximum 5 MB).":params.error==="upload"?"The delivery photo could not be uploaded. Please try again.":params.error?"We couldn't complete that action. Refresh and try again.":params.updated==="declined"?"Assignment declined and returned to dispatch.":params.updated==="claimed"?"Order claimed. Proceed to the pickup location.":params.updated==="accepted"?"Assignment accepted. Proceed to the pickup location.": "Delivery status updated successfully."}</p>}
+   {active&&<DriverProfilePhotoUpload currentPhotoUrl={driverPhoto?.signedUrl??null}/>}
+   {(params.error||params.updated)&&<p role={params.error?"alert":"status"} className={`mt-4 rounded-xl p-4 text-sm ${params.error?"bg-rose-50 text-rose-700":"bg-emerald-50 text-emerald-800"}`}>{params.error==="proof"?"A delivery photo is required (JPG, PNG or WEBP, maximum 5 MB).":params.error==="upload"?"The delivery photo could not be uploaded. Please try again.":params.error==="photo"?"The profile photo could not be saved. Use a JPG, PNG or WEBP image up to 5 MB.":params.error?"We couldn't complete that action. Refresh and try again.":params.updated==="declined"?"Assignment declined and returned to dispatch.":params.updated==="claimed"?"Order claimed. Proceed to the pickup location.":params.updated==="accepted"?"Assignment accepted. Proceed to the pickup location.":params.updated==="photo"?"Your customer-facing profile photo has been updated.":"Delivery status updated successfully."}</p>}
    {!active?<section className="mt-6 rounded-3xl border border-amber-200 bg-white p-7"><h2 className="text-xl font-black">Your application is under review</h2><p className="mt-2 text-sm leading-6 text-slate-500">Delivery assignments and availability controls become available after SUGOMATE Operations approves your application.</p><Link href="/driver/apply" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">View application</Link></section>:<>
     <section className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl border border-orange-100 bg-white p-3"><p className="text-[10px] font-bold leading-tight text-slate-500">Active deliveries</p><p className="mt-1 text-2xl font-black">{current.length}</p></div><div className="rounded-2xl border border-orange-100 bg-white p-5"><p className="text-xs font-bold text-slate-500">Offers to respond</p><p className="mt-2 text-3xl font-black">{offered.length}</p></div><div className="rounded-2xl border border-orange-100 bg-white p-5"><p className="text-xs font-bold text-slate-500">Completed deliveries loaded</p><p className="mt-2 text-3xl font-black">{completed.length}</p></div></section>
     <section className="mt-8">
