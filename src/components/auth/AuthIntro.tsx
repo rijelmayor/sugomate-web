@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-export default function AuthIntro({ children }: { children: React.ReactNode }) {
+export default function AuthIntro({ children }: { children: ReactNode }) {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
