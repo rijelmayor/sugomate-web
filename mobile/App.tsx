@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -83,6 +83,36 @@ export default function App() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
+
+  // Android system Back should unwind the customer's in-app screen state first.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (checkoutOpen) {
+        if (!checkoutBusy) setCheckoutOpen(false);
+        return true;
+      }
+      if (selectedStore) {
+        setSelectedStore("");
+        setSearch("");
+        return true;
+      }
+      if (tab !== "market") {
+        setTab("market");
+        setSelectedStore("");
+        return true;
+      }
+      if (selectedCategory || selectedMunicipality || search) {
+        setSelectedCategory("");
+        setSelectedMunicipality("");
+        setSearch("");
+        return true;
+      }
+      // At the marketplace root, let Android handle the normal app-exit behavior.
+      return false;
+    });
+    return () => subscription.remove();
+  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedMunicipality, search]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -405,7 +435,7 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
-  if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+  if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
     <Image source={{ uri: BRAND_LOGO }} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
     <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
@@ -560,7 +590,7 @@ const styles = StyleSheet.create({
   productCard: { flexDirection: "row", padding: 10, backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", marginBottom: 10, gap: 10 }, productImage: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff7ef" }, productPlaceholder: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, productInfo: { flex: 1, justifyContent: "space-between", paddingVertical: 3 }, productName: { fontSize: 13, fontWeight: "900", color: NAVY }, productDescription: { fontSize: 10, color: "#8995a7", marginTop: 4 }, productBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5, marginTop: 7 }, price: { fontSize: 14, fontWeight: "900", color: RED }, qtyRow: { flexDirection: "row", alignItems: "center", gap: 8 }, qtyButton: { width: 27, height: 27, borderRadius: 14, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, qtyText: { fontSize: 17, color: "#fff", fontWeight: "900" }, qtyValue: { fontSize: 12, fontWeight: "900", color: NAVY }, addButton: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: NAVY }, addButtonText: { fontSize: 10, fontWeight: "900", color: "#fff" },
   emptyCard: { alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ffead8", padding: 25, marginTop: 10 }, emptyIcon: { fontSize: 34 }, emptyTitle: { fontSize: 14, fontWeight: "900", color: NAVY, marginTop: 8 },
   basketBar: { position: "absolute", bottom: 72, left: 15, right: 15, backgroundColor: ORANGE, borderRadius: 25, paddingHorizontal: 18, paddingVertical: 13, flexDirection: "row", justifyContent: "space-between", alignItems: "center", elevation: 5 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" },
-  tabbar: { height: 62, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", paddingTop: 7, paddingBottom: 5 }, tab: { flex: 1, alignItems: "center", justifyContent: "center" }, activeTab: {}, tabIcon: { fontSize: 19, color: "#8995a7" }, tabText: { fontSize: 9, fontWeight: "700", color: "#8995a7", marginTop: 2 }, activeTabText: { color: RED },
+  tabbar: { height: Platform.OS === "android" ? 84 : 62, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", paddingTop: 7, paddingBottom: Platform.OS === "android" ? 25 : 5 }, tab: { flex: 1, alignItems: "center", justifyContent: "center" }, activeTab: {}, tabIcon: { fontSize: 19, color: "#8995a7" }, tabText: { fontSize: 9, fontWeight: "700", color: "#8995a7", marginTop: 2 }, activeTabText: { color: RED },
   orderItems: { marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, orderDetailTitle: { fontSize: 10, fontWeight: "900", color: NAVY, marginBottom: 7 }, orderItemRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 5 }, orderItemName: { flex: 1, fontSize: 10, color: "#63748a" }, orderItemPrice: { fontSize: 10, fontWeight: "800", color: NAVY }, riderNotice: { marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#fff7e7", borderWidth: 1, borderColor: "#f3dfb5" }, riderNoticeReady: { backgroundColor: "#eaf8f0", borderColor: "#c7ead4" }, riderNoticeText: { fontSize: 10, lineHeight: 15, color: NAVY, fontWeight: "700" }, orderHistory: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#f1eee9" }, historyRow: { flexDirection: "row", minHeight: 47 }, historyMarker: { width: 17, alignItems: "center" }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#b7c1ce", marginTop: 3 }, historyDotActive: { backgroundColor: ORANGE, width: 11, height: 11, borderRadius: 6 }, historyLine: { width: 1, flex: 1, backgroundColor: "#dfe5ec", marginTop: 3 }, historyBody: { flex: 1, paddingBottom: 10, paddingLeft: 5 }, historyStatus: { fontSize: 10, fontWeight: "900", color: NAVY, textTransform: "capitalize" }, historyDate: { marginTop: 2, fontSize: 9, color: "#8995a7" }, historyNote: { marginTop: 3, fontSize: 9, color: "#63748a", lineHeight: 13 }, deliveryProofButton: { marginTop: 10, alignSelf: "flex-start", borderRadius: 18, backgroundColor: "#e7f7ed", paddingHorizontal: 12, paddingVertical: 8 }, deliveryProofText: { fontSize: 10, fontWeight: "900", color: "#176b43" }, driverNote: { marginTop: 8, fontSize: 10, color: "#63748a", fontStyle: "italic" },
   paymentSummary: { marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: "#f1eee9" }, paymentSummaryText: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashCard: { marginTop: 12, padding: 13, borderRadius: 15, borderWidth: 1, borderColor: "#d9ecf7", backgroundColor: "#f2faff" }, gcashHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, gcashTitle: { fontSize: 14, fontWeight: "900", color: NAVY }, gcashBadge: { overflow: "hidden", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#fff", color: "#17618b", fontSize: 9, fontWeight: "900" }, gcashHint: { marginTop: 7, fontSize: 10, lineHeight: 15, color: "#63748a" }, gcashAmount: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashTotal: { marginTop: 2, fontSize: 24, fontWeight: "900", color: NAVY }, gcashQrWrap: { alignItems: "center", marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: "#fff" }, gcashQr: { width: 190, height: 190 }, gcashAccount: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashAccountValue: { marginTop: 3, fontSize: 13, fontWeight: "900", color: NAVY }, gcashPhone: { marginTop: 2, fontSize: 18, fontWeight: "900", letterSpacing: 1, color: NAVY }, gcashSuccess: { marginTop: 9, padding: 10, borderRadius: 10, backgroundColor: "#e7f7ed", color: "#176b43", fontSize: 11, fontWeight: "800", lineHeight: 17 }, gcashPending: { marginTop: 11, padding: 11, borderRadius: 11, borderWidth: 1, borderColor: "#f1d89b", backgroundColor: "#fff9e9" }, gcashPendingTitle: { fontSize: 11, fontWeight: "900", color: "#805300" }, gcashForm: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#d9ecf7" }, gcashLabel: { marginTop: 8, fontSize: 10, fontWeight: "900", color: NAVY }, gcashInput: { marginTop: 5, paddingHorizontal: 11, paddingVertical: 11, borderWidth: 1, borderColor: "#dce5ed", borderRadius: 10, backgroundColor: "#fff", color: NAVY, fontSize: 12 }, gcashPick: { marginTop: 6, padding: 12, borderRadius: 11, borderWidth: 1, borderStyle: "dashed", borderColor: ORANGE, backgroundColor: "#fff", alignItems: "center" }, gcashPickText: { color: NAVY, fontSize: 11, fontWeight: "900" }, gcashPreviewWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, padding: 8, borderRadius: 10, backgroundColor: "#fff" }, gcashPreview: { width: 66, height: 66, borderRadius: 8, backgroundColor: "#edf2f7" }, gcashPreviewName: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashRemove: { marginTop: 6, fontSize: 10, fontWeight: "900", color: RED }, gcashSubmit: { marginTop: 12, paddingVertical: 13, borderRadius: 22, backgroundColor: NAVY, alignItems: "center" }, gcashSubmitText: { fontSize: 11, fontWeight: "900", color: "#fff" },
   orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
