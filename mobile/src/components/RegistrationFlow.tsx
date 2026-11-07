@@ -17,6 +17,7 @@ export default function RegistrationFlow({ onBack }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [createdUserId, setCreatedUserId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -43,6 +44,7 @@ export default function RegistrationFlow({ onBack }: Props) {
       });
       if (signupError || !data.user) throw new Error(signupError?.message ?? "Unable to create your account.");
       if (data.user.identities?.length === 0) throw new Error("This email is already registered. Please sign in instead.");
+      setCreatedUserId(data.user.id);
       await sendCode(data.user.id);
       setStep("verify");
       setNotice("We sent a six-digit code to your mobile number. It expires in five minutes.");
@@ -69,9 +71,8 @@ export default function RegistrationFlow({ onBack }: Props) {
   async function resendCode() {
     setBusy(true); setError(""); setNotice("");
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-      if (authError || !data.user) throw new Error("Please finish email confirmation or register again before requesting another code.");
-      await sendCode(data.user.id);
+      if (!createdUserId) throw new Error("Please register again before requesting another code.");
+      await sendCode(createdUserId);
       setNotice("A new verification code has been sent.");
     } catch (e: any) { setError(e?.message ?? "Unable to resend the code."); }
     finally { setBusy(false); }
