@@ -6,6 +6,7 @@ import OrderLive from "@/components/customer/OrderLive";
 import OrderProgress from "@/components/orders/OrderProgress";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GcashPaymentSubmission from "@/components/customer/GcashPaymentSubmission";
+import OrderEventModal from "@/components/customer/OrderEventModal";
 
 const labels: Record<string,string> = {pending_merchant:"Awaiting store",accepted:"Accepted · finding rider",preparing:"Preparing",ready_for_pickup:"Ready for pickup",assigned:"Driver assigned",picked_up:"Picked up",in_transit:"On the way",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
 const finished = new Set(["delivered", "cancelled", "rejected"]);
@@ -14,11 +15,11 @@ const money = (value: number | string) => "₱" + Number(value).toLocaleString("
 export default async function CustomerOrders({searchParams}:{searchParams:Promise<{placed?:string;paymentSubmitted?:string;paymentError?:string}>}) {
   const params=await searchParams;
   const {user,supabase}=await requireCustomer();
-  const {data:orders}=await supabase.from("orders").select("id,order_number,status,rider_on_way_at,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,delivery_proof_path,driver_note,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id",user.id).order("placed_at",{ascending:false}).limit(50);
+  const {data:orders}=await supabase.from("orders").select("id,order_number,status,driver_user_id,assigned_at,address_snapshot,rider_on_way_at,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,delivery_proof_path,driver_note,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id",user.id).order("placed_at",{ascending:false}).limit(50);
   const orderIds=(orders??[]).map(order=>order.id);
   // History and delivery-photo links load together instead of one after another.
   const [{data:history},proofEntries]=await Promise.all([
-    orderIds.length?supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id",orderIds).order("created_at",{ascending:true}):Promise.resolve({data:[]}),
+    orderIds.length?supabase.from("order_status_history").select("id,order_id,from_status,to_status,note,created_at").in("order_id",orderIds).order("created_at",{ascending:true}):Promise.resolve({data:[]}),
     Promise.all((orders??[]).filter(order=>order.delivery_proof_path).map(async order=>{
       const {data}=await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string,3600);
       return [order.id,data?.signedUrl] as const;
@@ -28,8 +29,31 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
   for(const id of orderIds) historyByOrder.set(id,(history??[]).filter(event=>event.order_id===id));
   const proofUrls=new Map<string,string>();
   for(const [id,url] of proofEntries) if(url) proofUrls.set(id,url);
+
+  // Driver details are returned by a customer-scoped SECURITY DEFINER function;
+  // the customer never receives another driver's private application documents.
+  const { data: driverRows } = orderIds.length
+    ? await supabase.rpc("customer_order_driver_details", { p_order_ids: orderIds })
+    : { data: [] };
+  const driverByOrder = new Map<string,{name:string;phone:string|null;vehicleType:string|null;plate:string|null;photoUrl:string|null}>();
+  for (const driver of driverRows ?? []) {
+    let photoUrl: string | null = null;
+    if (driver.profile_photo_path) {
+      const { data } = await supabase.storage.from("driver-documents").createSignedUrl(driver.profile_photo_path, 3600);
+      photoUrl = data?.signedUrl ?? null;
+    }
+    driverByOrder.set(driver.order_id, { name: driver.driver_name, phone: driver.driver_phone, vehicleType: driver.vehicle_type, plate: driver.vehicle_plate, photoUrl });
+  }
+  const eventItems = (orders ?? []).flatMap(order => {
+    const merchantName = (order.merchants as unknown as {name:string}|null)?.name ?? "Local merchant";
+    const address = order.address_snapshot as {recipient_name?:string;address_line?:string;landmark?:string}|null;
+    const base = { orderId: order.id, orderNumber: order.order_number, merchantName, recipientName: address?.recipient_name ?? "Customer", address: [address?.address_line,address?.landmark].filter(Boolean).join(" · "), total: Number(order.total) };
+    const accepted = (historyByOrder.get(order.id) ?? []).filter(event => event.to_status === "accepted").map(event => ({ ...base, id: event.id, kind: "accepted" as const, createdAt: event.created_at }));
+    const driver = order.driver_user_id && order.assigned_at ? [{ ...base, id: `driver-${order.id}-${order.driver_user_id}`, kind: "driver" as const, createdAt: order.assigned_at, driver: driverByOrder.get(order.id) ?? null }] : [];
+    return [...accepted, ...driver];
+  });
   const hasActive=(orders??[]).some(order=>!finished.has(order.status));
-  return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">
+  return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">\n    <OrderEventModal events={eventItems}/>
     {params.placed&&<ClearCartOnPlaced/>}
     <div className="flex items-center justify-between gap-3"><PendingLink href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</PendingLink><div className="flex items-center gap-2"><NotificationBell userId={user.id}/><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div></div>
     <div className="mt-5 flex flex-wrap items-center justify-between gap-2"><h1 className="text-3xl font-black">My orders</h1><OrderLive userId={user.id} hasActive={hasActive}/></div><p className="mt-2 text-sm text-slate-500">Follow your orders from store confirmation through delivery.</p>

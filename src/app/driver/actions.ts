@@ -15,6 +15,36 @@ async function requireActiveDriver() {
   return { supabase, user };
 }
 
+
+export async function updateDriverProfilePhoto(formData: FormData) {
+  const { supabase, user } = await requireActiveDriver();
+  const file = formData.get("profile_photo");
+  if (!(file instanceof File) || file.size < 1 || file.size > 5 * 1024 * 1024 ||
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    redirect("/driver?error=photo");
+  }
+
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${user.id}/profile-${randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage.from("driver-documents").upload(path, file, {
+    contentType: file.type, upsert: false,
+  });
+  if (uploadError) redirect("/driver?error=photo");
+
+  const { data: previous } = await supabase.from("driver_profiles")
+    .select("profile_photo_path").eq("user_id", user.id).maybeSingle();
+  const { error } = await supabase.rpc("driver_update_profile_photo", { p_profile_photo_path: path });
+  if (error) {
+    await supabase.storage.from("driver-documents").remove([path]);
+    redirect("/driver?error=photo");
+  }
+  if (previous?.profile_photo_path && previous.profile_photo_path !== path) {
+    await supabase.storage.from("driver-documents").remove([previous.profile_photo_path]);
+  }
+  revalidatePath("/driver");
+  redirect("/driver?updated=photo");
+}
+
 export async function setDriverAvailability(formData: FormData) {
   const { supabase } = await requireActiveDriver();
   const available = String(formData.get("is_available")) === "true";
