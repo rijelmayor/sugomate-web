@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -45,7 +46,7 @@ const orderStatus: Record<string, string> = {
   in_transit: "On the way", delivered: "Delivered", cancelled: "Cancelled", rejected: "Rejected"
 };
 
-export default function App() {
+function AppContent() {
   const [session, setSession] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
@@ -537,6 +538,10 @@ export default function App() {
     </Modal>
     <View style={styles.tabbar}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "◉"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "Account"}</Text></TouchableOpacity>)}</View>
   </SafeAreaView>;
+}
+
+export default function App() {
+  return <SafeAreaProvider><AppContent /></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
