@@ -4,7 +4,7 @@ import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 
-type Category = { id: string; name: string; slug: string; icon: string; image_url?: string | null };
+type Category = { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null };
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
@@ -60,6 +60,7 @@ export default function App() {
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedParentCategory, setSelectedParentCategory] = useState("");
   const [selectedMunicipality, setSelectedMunicipality] = useState("");
   const [selectedStore, setSelectedStore] = useState("");
   const [search, setSearch] = useState("");
@@ -103,8 +104,9 @@ export default function App() {
         setSelectedStore("");
         return true;
       }
-      if (selectedCategory || selectedMunicipality || search) {
+      if (selectedCategory || selectedParentCategory || selectedMunicipality || search) {
         setSelectedCategory("");
+        setSelectedParentCategory("");
         setSelectedMunicipality("");
         setSearch("");
         return true;
@@ -113,7 +115,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedMunicipality, search]);
+  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -128,7 +130,7 @@ export default function App() {
       const [profileRes, municipalityRes, categoryRes] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle(),
         supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
-        supabase.from("merchant_categories").select("id,name,slug,icon,image_url").eq("is_active", true).order("sort_order").order("name")
+        supabase.from("merchant_categories").select("id,name,slug,icon,image_url,parent_id").eq("is_active", true).order("sort_order").order("name")
       ]);
       if (profileRes.error) throw profileRes.error;
       if (municipalityRes.error) throw municipalityRes.error;
@@ -220,6 +222,9 @@ export default function App() {
     return () => { void supabase.removeChannel(channel); };
   }, [session?.user?.id, tab, loadOrders]);
 
+  const topLevelCategories = categories.filter(c => !c.parent_id);
+  const childCategories = categories.filter(c => c.parent_id === selectedParentCategory);
+  const activeCategory = categories.find(c => c.slug === selectedCategory);
   const visibleStores = useMemo(() => stores.filter(s =>
     (!selectedCategory || s.categorySlug === selectedCategory) &&
     (!selectedMunicipality || products.some(p => p.branch_id === s.id && p.branch?.municipality_id === selectedMunicipality)) &&
@@ -443,6 +448,7 @@ export default function App() {
       <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
       <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}><Text style={styles.primaryText}>{busy ? "Signing in…" : "Sign in"}</Text></TouchableOpacity>
       <TouchableOpacity style={styles.linkButton} onPress={() => Linking.openURL("https://sugomate.com/register?next=%2Fcustomer")}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
+      <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/merchant")}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/driver")}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
       <Text style={styles.footnote}>New accounts complete email confirmation and Philippine mobile SMS verification before ordering.</Text>
     </View>
   </KeyboardAvoidingView></SafeAreaView>;
@@ -473,12 +479,13 @@ export default function App() {
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
           <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
-          <View style={styles.categoryGrid}>{categories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(selectedCategory === c.slug ? "" : c.slug)}>
+          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedParentCategory(""); setSelectedCategory(""); }}><Text style={styles.backLinkText}>‹  Back to all categories</Text></TouchableOpacity> : null}
+          <View style={styles.categoryGrid}>{(selectedParentCategory ? childCategories : topLevelCategories).map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { if (categories.some(child => child.parent_id === c.id)) { setSelectedParentCategory(c.id); setSelectedCategory(""); } else setSelectedCategory(selectedCategory === c.slug ? "" : c.slug); }}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
             {selectedCategory === c.slug && <View style={styles.categorySelected}><Text style={{ color: "#fff", fontWeight: "900" }}>✓</Text></View>}
           </TouchableOpacity>)}</View>
-          <View style={styles.storesHeading}><Text style={styles.sectionTitle}>{selectedCategory ? (categories.find(c => c.slug === selectedCategory)?.name ?? "Stores") : "Stores near you"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
+          <View style={styles.storesHeading}><Text style={styles.sectionTitle}>{selectedCategory ? (activeCategory?.name ?? "Stores") : selectedParentCategory ? (categories.find(c => c.id === selectedParentCategory)?.name ?? "Stores") : "Stores near you"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
           {visibleStores.map(s => <TouchableOpacity key={s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
             {s.image ? <Image source={{ uri: s.image }} style={styles.storeImage} /> : <View style={styles.storeImageFallback}><Text style={{ fontSize: 25 }}>🏪</Text></View>}
             <View style={styles.storeInfo}><Text style={styles.storeName}>{s.name}</Text>{!!s.branchName && <Text style={styles.storeBranch}>{s.branchName}</Text>}<Text style={styles.storeArea}>⌖  {s.area || "Leyte"}</Text><Text style={[styles.openLabel, s.isOpen ? styles.open : styles.closed]}>{s.isOpen ? "Open now" : "Closed"}</Text></View><Text style={styles.chevron}>›</Text>
