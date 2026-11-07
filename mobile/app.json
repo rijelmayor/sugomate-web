@@ -2,6 +2,7 @@
   "expo": {
     "name": "SUGOMATE",
     "slug": "sugomate",
+    "owner": "cdm-prime",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -27,6 +28,11 @@
           "backgroundColor": "#fff7ef"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2911cdaa-1c15-4f19-9327-6e8276bf133b"
+      }
+    }
   }
 }
