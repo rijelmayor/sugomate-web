@@ -53,7 +53,8 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);\n  const loginIntro = useRef(new Animated.Value(0)).current;
+  const [busy, setBusy] = useState(false);
+  const loginIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
