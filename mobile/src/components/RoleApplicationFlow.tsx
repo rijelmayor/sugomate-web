@@ -59,11 +59,21 @@ export default function RoleApplicationFlow({ role, userId, onDone, onSignOut }:
         const years = age.trim() ? Number(age) : null;
         if (!["Motorcycle", "Bicycle", "Car", "Other"].includes(vehicle)) throw new Error("Select your vehicle type.");
         if (years !== null && (!Number.isInteger(years) || years < 18 || years > 80)) throw new Error("Enter an age between 18 and 80.");
-        const uploadedPaths: string[] = [];
-        const [idPath, selfiePath, licensePath, profilePath] = await Promise.all([
+        const uploadResults = await Promise.allSettled([
           uploadDocument("id"), uploadDocument("selfie"), uploadDocument("license"), uploadDocument("profile_photo")
         ]);
-        uploadedPaths.push(...[idPath, selfiePath, licensePath, profilePath].filter((path): path is string => Boolean(path)));
+        const uploadedPaths = uploadResults
+          .filter((result): result is PromiseFulfilledResult<string | null> => result.status === "fulfilled")
+          .map(result => result.value)
+          .filter((path): path is string => Boolean(path));
+        const failedUpload = uploadResults.find((result): result is PromiseRejectedResult => result.status === "rejected");
+        if (failedUpload) {
+          if (uploadedPaths.length) await supabase.storage.from("driver-documents").remove(uploadedPaths);
+          throw failedUpload.reason;
+        }
+        const [idPath, selfiePath, licensePath, profilePath] = uploadResults.map(result =>
+          result.status === "fulfilled" ? result.value : null
+        );
         const { error: insertError } = await supabase.from("driver_profiles").insert({
           user_id: userId, vehicle_type: vehicle, vehicle_plate: plate.trim() || null, age: years,
           address: address.trim() || null, status: "pending", id_storage_path: idPath,
