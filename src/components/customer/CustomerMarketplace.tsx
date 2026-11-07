@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, MapPin, Minus, Plus, Search, ShoppingBasket,
 import { placeOrder } from "@/app/customer/actions";
 import PendingLink from "@/components/PendingLink";
 import { CART_KEY } from "@/lib/cart";
-import CategoryTile, { CategoryGlyph } from "@/components/customer/CategoryTile";
+import CategoryTile from "@/components/customer/CategoryTile";
 
 type Product = {
   id: string;
@@ -25,7 +25,6 @@ type Cart = Record<string, { product: Product; quantity: number }>;
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
 
 const peso = (value: number) => `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const activeStyle = { color: "#ffffff", WebkitTextFillColor: "#ffffff" } as const;
 
 function CheckoutSubmitButton({ disabled, paymentMethod }: { disabled: boolean; paymentMethod: string }) {
   const { pending } = useFormStatus();
@@ -137,9 +136,10 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const q = search.trim().toLowerCase();
   const currentStore = stores.find(item => item.id === selectedStore);
   const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
-  const storeMatches = stores.filter(item => (!selectedMerchantCategory || item.categorySlug === selectedMerchantCategory) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
+  const selectedCategorySlugs = selectedCategory ? [selectedCategory.slug, ...tiles.filter(item => item.parent_id === selectedCategory.id).map(item => item.slug)] : [];
+  const storeMatches = stores.filter(item => (!selectedMerchantCategory || selectedCategorySlugs.includes(item.categorySlug)) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
   const uncategorised = stores.filter(item => item.categorySlug === "other").length;
-  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", parent_id: null, image_url: null, count: uncategorised }] : [])];
+  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug || merchantCategories.some(child => child.parent_id === item.id && child.slug === store.categorySlug)).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", parent_id: null, image_url: null, count: uncategorised }] : [])];
   const topLevelTiles = tiles.filter(item => !item.parent_id);
   const selectedCategory = tiles.find(item => item.slug === selectedMerchantCategory);
   const childTiles = selectedCategory ? tiles.filter(item => item.parent_id === selectedCategory.id) : [];
@@ -186,7 +186,6 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       return next;
     });
   }
-  const chip = (active: boolean, size: "sm" | "md") => `${size === "sm" ? "min-h-9 px-4 py-2 text-xs" : "min-h-10 px-4 py-2.5 text-sm"} shrink-0 rounded-full font-bold transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${active ? "bg-[#102e57] shadow-sm" : "border border-slate-200 bg-white text-[#102e57]"}`;
 
   return <div className={`grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] ${count > 0 ? "pb-24 lg:pb-0" : ""}`}>
     {checkoutError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{checkoutError === "checkout" ? "We could not place your order. Check store availability, product stock, and delivery coverage. Your basket is still saved." : checkoutError === "address" ? "Please complete your delivery address before placing the order." : "Your basket could not be processed. Please review your items and try again."}</p>}
@@ -197,13 +196,13 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "store" ? "Search this store's items…" : "Search stores or areas…"} aria-label="Search" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-10 pr-10 text-sm text-[#102e57] shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-200" />
           {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 active:scale-90"><X size={16} /></button>}
         </div>
-        <div className="relative">
+        {view !== "store" && <div className="relative">
           <MapPin aria-hidden="true" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-orange-500" />
           <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value, store: view === "store" ? "" : undefined })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
             <option value="">All service areas</option>
             {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-        </div>
+        </div>}
       </div>
 
       <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
