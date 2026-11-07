@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, Keybo
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
+import RegistrationFlow from "./src/components/RegistrationFlow";
 
 type Category = { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null };
 type Municipality = { id: string; name: string };
@@ -54,6 +55,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const loginIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
@@ -91,6 +93,8 @@ export default function App() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
+
+  useEffect(() => { Animated.timing(loginIntro, { toValue: 1, duration: 850, useNativeDriver: true }).start(); }, [loginIntro]);
 
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
@@ -486,16 +490,16 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
-  if (!session) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
-    <Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
-    <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
+  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+    <Animated.View style={{ opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></Animated.View>
+    <Animated.View style={[styles.loginCard, { opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) }] }]}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
       <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}>{busy ? <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color="#fff" /><Text style={styles.primaryText}>Signing in…</Text></View> : <Text style={styles.primaryText}>Sign in</Text>}</TouchableOpacity>
-      <TouchableOpacity style={styles.linkButton} onPress={() => Linking.openURL("https://sugomate.com/register?next=%2Fcustomer")}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
-      <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/merchant")}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => Linking.openURL("https://sugomate.com/register/driver")}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
+      <TouchableOpacity style={styles.linkButton} onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
+      <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
       <Text style={styles.footnote}>New accounts complete email confirmation and Philippine mobile SMS verification before ordering.</Text>
-    </View>
+    </Animated.View>
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
