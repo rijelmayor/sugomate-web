@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
@@ -8,7 +8,9 @@ type Category = { id: string; name: string; slug: string; icon: string; parent_i
 type Municipality = { id: string; name: string };
 type Product = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: any; branch: any };
 type Store = { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean };
-type Order = { id: string; order_number: string; status: string; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
+type DriverDetails = { name: string; phone: string | null; vehicleType: string | null; plate: string | null; photoUrl: string | null };
+type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string; merchantName: string; recipientName: string; address: string; total: number; createdAt: string; driver?: DriverDetails | null };
+type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type Tab = "market" | "orders" | "account";
@@ -59,6 +61,9 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
+  const [activeOrderEvent, setActiveOrderEvent] = useState<OrderEvent | null>(null);
+  const seenOrderEvents = useRef<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedParentCategory, setSelectedParentCategory] = useState("");
   const [selectedMunicipality, setSelectedMunicipality] = useState("");
@@ -181,7 +186,7 @@ export default function App() {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").select("id,order_number,status,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,rider_on_way_at,delivery_proof_path,driver_note,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("orders").select("id,order_number,status,driver_user_id,assigned_at,address_snapshot,subtotal,delivery_fee,total,placed_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,rider_on_way_at,delivery_proof_path,driver_note,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id", session.user.id).order("placed_at", { ascending: false }).limit(50);
       if (error) throw error;
       const rows = (data ?? []) as unknown as Order[];
       const ids = rows.map(order => order.id);
@@ -192,18 +197,57 @@ export default function App() {
           return [order.id, signed?.signedUrl ?? null] as const;
         }))
       ]);
+      const { data: driverRows, error: driverError } = ids.length
+        ? await supabase.rpc("customer_order_driver_details", { p_order_ids: ids })
+        : { data: [], error: null };
+      if (driverError) throw driverError;
+      const driverByOrder = new Map<string, DriverDetails>();
+      await Promise.all((driverRows ?? []).map(async (driver: any) => {
+        let photoUrl: string | null = null;
+        if (driver.profile_photo_path) {
+          const { data: signed } = await supabase.storage.from("driver-documents").createSignedUrl(driver.profile_photo_path, 3600);
+          photoUrl = signed?.signedUrl ?? null;
+        }
+        driverByOrder.set(driver.order_id, { name: driver.driver_name, phone: driver.driver_phone, vehicleType: driver.vehicle_type, plate: driver.vehicle_plate, photoUrl });
+      }));
       const nextOrders = rows.map(order => ({
         ...order,
+        driver: driverByOrder.get(order.id) ?? null,
         history: (events ?? []).filter((event: any) => event.order_id === order.id),
         deliveryProofUrl: proofResults.find(([id]) => id === order.id)?.[1] ?? null
       }));
       setOrders(nextOrders);
+      const freshEvents: OrderEvent[] = [];
+      for (const order of nextOrders) {
+        const merchantName = one(order.merchants)?.name ?? "Local merchant";
+        const address = order.address_snapshot ?? {};
+        const base = { orderNumber: order.order_number, merchantName, recipientName: address.recipient_name ?? "Customer", address: [address.address_line, address.landmark].filter(Boolean).join(" · "), total: Number(order.total) };
+        for (const event of (order.history ?? []).filter((item: any) => item.to_status === "accepted")) {
+          const id = String(event.id);
+          const age = Date.now() - new Date(event.created_at).getTime();
+          if (!seenOrderEvents.current.has(id) && age >= -60000 && age <= 15 * 60 * 1000) freshEvents.push({ ...base, id, kind: "accepted", createdAt: event.created_at });
+          seenOrderEvents.current.add(id);
+        }
+        if (order.driver_user_id && order.assigned_at) {
+          const id = `driver-${order.id}-${order.driver_user_id}`;
+          const age = Date.now() - new Date(order.assigned_at).getTime();
+          if (!seenOrderEvents.current.has(id) && age >= -60000 && age <= 15 * 60 * 1000) freshEvents.push({ ...base, id, kind: "driver", createdAt: order.assigned_at, driver: order.driver ?? null });
+          seenOrderEvents.current.add(id);
+        }
+      }
+      if (freshEvents.length) setOrderEventQueue(current => [...current, ...freshEvents.sort((a, b) => a.createdAt.localeCompare(b.createdAt))]);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [session?.user?.id]);
 
   useEffect(() => { if (session?.user?.id) void loadMarketplace(); }, [session?.user?.id, loadMarketplace]);
   useEffect(() => { if (tab === "orders" && session?.user?.id) void loadOrders(); }, [tab, session?.user?.id, loadOrders]);
+  useEffect(() => {
+    if (!activeOrderEvent && orderEventQueue.length) {
+      setActiveOrderEvent(orderEventQueue[0]);
+      setOrderEventQueue(current => current.slice(1));
+    }
+  }, [activeOrderEvent, orderEventQueue]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -504,6 +548,17 @@ export default function App() {
             <View style={styles.orderAmounts}><View style={styles.amountRow}><Text style={styles.amountLabel}>Items subtotal</Text><Text style={styles.amountValue}>{peso(o.subtotal)}</Text></View><View style={styles.amountRow}><Text style={styles.deliveryLabel}>Delivery fee</Text><Text style={styles.deliveryValue}>{peso(o.delivery_fee)}</Text></View><View style={[styles.amountRow, styles.totalRow]}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{peso(o.total)}</Text></View></View>
             {Boolean(o.order_items?.length) && <View style={styles.orderItems}><Text style={styles.orderDetailTitle}>Items ordered</Text>{o.order_items?.map((item: any) => <View key={item.id} style={styles.orderItemRow}><Text style={styles.orderItemName}>{item.quantity} × {item.product_name}</Text><Text style={styles.orderItemPrice}>{peso(item.line_total)}</Text></View>)}</View>}
             {o.status === "accepted" && <View style={[styles.riderNotice, o.rider_on_way_at ? styles.riderNoticeReady : null]}><Text style={styles.riderNoticeText}>{o.rider_on_way_at ? "Your rider confirmed and is heading to the store. The merchant can now start preparing." : "The store reserved your items and is waiting for a rider to commit. Preparation starts after the rider confirms they are on the way."}</Text></View>}
+            {o.driver && <View style={styles.driverCard}>
+              <Text style={styles.driverCardTitle}>Your delivery partner</Text>
+              <View style={styles.driverCardRow}>
+                {o.driver.photoUrl ? <Image source={{ uri: o.driver.photoUrl }} style={styles.driverPhoto} /> : <View style={styles.driverPhotoFallback}><Text style={{ fontSize: 25 }}>🛵</Text></View>}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.driverName}>{o.driver.name || "Delivery partner"}</Text>
+                  <Text style={styles.driverMeta}>{o.driver.vehicleType || "Motorcycle"}{o.driver.plate ? " · " + o.driver.plate : ""}</Text>
+                  {!!o.driver.phone && <TouchableOpacity onPress={() => Linking.openURL("tel:" + o.driver?.phone)}><Text style={styles.driverPhone}>☎  {o.driver.phone}</Text></TouchableOpacity>}
+                </View>
+              </View>
+            </View>}
             <View style={styles.paymentSummary}><Text style={styles.paymentSummaryText}>Payment: {String(o.payment_method).toUpperCase()} · {String(o.payment_status).replaceAll("_", " ")}</Text></View>
             {Boolean(o.history?.length) && <View style={styles.orderHistory}><Text style={styles.orderDetailTitle}>Order activity</Text>{o.history?.map((event: any, index: number) => <View key={event.id} style={styles.historyRow}><View style={styles.historyMarker}><View style={[styles.historyDot, index === (o.history?.length ?? 0) - 1 && styles.historyDotActive]}/>{index !== (o.history?.length ?? 0) - 1 && <View style={styles.historyLine}/>}</View><View style={styles.historyBody}><Text style={styles.historyStatus}>{orderStatus[event.to_status] ?? String(event.to_status).replaceAll("_", " ")}</Text><Text style={styles.historyDate}>{new Date(event.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text>{event.note && <Text style={styles.historyNote}>{event.note}</Text>}</View></View>)}</View>}
             {o.deliveryProofUrl && <TouchableOpacity style={styles.deliveryProofButton} onPress={() => Linking.openURL(o.deliveryProofUrl as string)}><Text style={styles.deliveryProofText}>View delivery photo ↗</Text></TouchableOpacity>}
@@ -532,6 +587,37 @@ export default function App() {
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => Linking.openURL("https://sugomate.com/customer/addresses")}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
     {tab === "market" && cartCount > 0 && <TouchableOpacity style={styles.basketBar} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
+    <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
+      {activeOrderEvent && <View style={styles.eventOverlay}>
+        <View style={styles.eventCard}>
+          <View style={styles.eventHeader}>
+            <Text style={styles.eventIcon}>{activeOrderEvent.kind === "driver" ? "🛵" : "🏪"}</Text>
+            <Text style={styles.eventTitle}>{activeOrderEvent.kind === "driver" ? "Delivery partner found!" : "Your order is accepted!"}</Text>
+            <Text style={styles.eventSubtitle}>{activeOrderEvent.kind === "driver" ? "A delivery partner has claimed your order." : "The store confirmed your order and reserved your items."}</Text>
+          </View>
+          <View style={styles.eventDetails}>
+            <Text style={styles.eventLabel}>ORDER DETAILS · {activeOrderEvent.orderNumber}</Text>
+            <Text style={styles.eventMerchant}>{activeOrderEvent.merchantName}</Text>
+            <Text style={styles.eventMeta}>{activeOrderEvent.recipientName}</Text>
+            <Text style={styles.eventMeta}>{activeOrderEvent.address || "Delivery address on your order"}</Text>
+            <View style={styles.eventTotal}><Text style={styles.eventMeta}>Order total</Text><Text style={styles.eventTotalValue}>{peso(activeOrderEvent.total)}</Text></View>
+          </View>
+          {activeOrderEvent.kind === "driver" && <View style={styles.eventDriver}>
+            <Text style={styles.eventLabel}>YOUR DELIVERY PARTNER</Text>
+            <View style={styles.driverCardRow}>
+              {activeOrderEvent.driver?.photoUrl ? <Image source={{ uri: activeOrderEvent.driver.photoUrl }} style={styles.driverPhoto} /> : <View style={styles.driverPhotoFallback}><Text style={{ fontSize: 25 }}>🛵</Text></View>}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.driverName}>{activeOrderEvent.driver?.name || "Delivery partner"}</Text>
+                <Text style={styles.driverMeta}>{activeOrderEvent.driver?.vehicleType || "Motorcycle"}{activeOrderEvent.driver?.plate ? " · " + activeOrderEvent.driver.plate : ""}</Text>
+                {!!activeOrderEvent.driver?.phone && <TouchableOpacity onPress={() => Linking.openURL("tel:" + activeOrderEvent.driver?.phone)}><Text style={styles.driverPhone}>☎  {activeOrderEvent.driver.phone}</Text></TouchableOpacity>}
+              </View>
+            </View>
+            <Text style={styles.eventVerified}>✓ Registered delivery partner assigned</Text>
+          </View>}
+          <TouchableOpacity style={styles.eventButton} onPress={() => setActiveOrderEvent(null)}><Text style={styles.eventButtonText}>OK, Got it</Text></TouchableOpacity>
+        </View>
+      </View>}
+    </Modal>
     <Modal visible={checkoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!checkoutBusy) setCheckoutOpen(false); }}>
       <SafeAreaView style={styles.checkoutSafe}>
         <ScrollView contentContainerStyle={styles.checkoutContent} keyboardShouldPersistTaps="handled">
@@ -599,6 +685,30 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ffead8", padding: 25, marginTop: 10 }, emptyIcon: { fontSize: 34 }, emptyTitle: { fontSize: 14, fontWeight: "900", color: NAVY, marginTop: 8 },
   basketBar: { position: "absolute", bottom: 72, left: 15, right: 15, backgroundColor: ORANGE, borderRadius: 25, paddingHorizontal: 18, paddingVertical: 13, flexDirection: "row", justifyContent: "space-between", alignItems: "center", elevation: 5 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" },
   tabbar: { height: Platform.OS === "android" ? 84 : 62, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", paddingTop: 7, paddingBottom: Platform.OS === "android" ? 25 : 5 }, tab: { flex: 1, alignItems: "center", justifyContent: "center" }, activeTab: {}, tabIcon: { fontSize: 19, color: "#8995a7" }, tabText: { fontSize: 9, fontWeight: "700", color: "#8995a7", marginTop: 2 }, activeTabText: { color: RED },
+  driverCard: { marginTop: 12, borderRadius: 16, padding: 13, backgroundColor: "#effaf3", borderWidth: 1, borderColor: "#d5f0df" },
+  driverCardTitle: { fontSize: 10, fontWeight: "900", color: "#166534", marginBottom: 10, letterSpacing: 0.5 },
+  driverCardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  driverPhoto: { width: 58, height: 58, borderRadius: 16, backgroundColor: "#fff" },
+  driverPhotoFallback: { width: 58, height: 58, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
+  driverName: { fontSize: 14, fontWeight: "900", color: NAVY },
+  driverMeta: { marginTop: 3, fontSize: 11, color: "#526173" },
+  driverPhone: { marginTop: 7, fontSize: 12, fontWeight: "800", color: "#166534" },
+  eventOverlay: { flex: 1, backgroundColor: "rgba(16,46,87,0.62)", justifyContent: "center", padding: 18 },
+  eventCard: { backgroundColor: "#fff", borderRadius: 26, padding: 18, borderWidth: 1, borderColor: "#ffead8" },
+  eventHeader: { alignItems: "center", paddingVertical: 10 },
+  eventIcon: { fontSize: 30, backgroundColor: "#fff0df", padding: 13, borderRadius: 18, overflow: "hidden" },
+  eventTitle: { marginTop: 12, fontSize: 20, fontWeight: "900", color: NAVY, textAlign: "center" },
+  eventSubtitle: { marginTop: 5, fontSize: 12, color: "#738096", textAlign: "center" },
+  eventDetails: { marginTop: 14, padding: 14, borderRadius: 17, backgroundColor: "#fff7ef", borderWidth: 1, borderColor: "#ffe4c7" },
+  eventLabel: { fontSize: 9, fontWeight: "900", color: "#738096", letterSpacing: 0.8, marginBottom: 8 },
+  eventMerchant: { fontSize: 15, fontWeight: "900", color: NAVY },
+  eventMeta: { marginTop: 5, fontSize: 11, color: "#526173" },
+  eventTotal: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f3d9be", flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  eventTotalValue: { fontSize: 16, fontWeight: "900", color: NAVY },
+  eventDriver: { marginTop: 12, padding: 14, borderRadius: 17, backgroundColor: "#effaf3", borderWidth: 1, borderColor: "#d5f0df" },
+  eventVerified: { marginTop: 10, fontSize: 10, fontWeight: "800", color: "#166534" },
+  eventButton: { marginTop: 16, paddingVertical: 14, borderRadius: 28, backgroundColor: NAVY, alignItems: "center" },
+  eventButtonText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   orderItems: { marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, orderDetailTitle: { fontSize: 10, fontWeight: "900", color: NAVY, marginBottom: 7 }, orderItemRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 5 }, orderItemName: { flex: 1, fontSize: 10, color: "#63748a" }, orderItemPrice: { fontSize: 10, fontWeight: "800", color: NAVY }, riderNotice: { marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#fff7e7", borderWidth: 1, borderColor: "#f3dfb5" }, riderNoticeReady: { backgroundColor: "#eaf8f0", borderColor: "#c7ead4" }, riderNoticeText: { fontSize: 10, lineHeight: 15, color: NAVY, fontWeight: "700" }, orderHistory: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#f1eee9" }, historyRow: { flexDirection: "row", minHeight: 47 }, historyMarker: { width: 17, alignItems: "center" }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#b7c1ce", marginTop: 3 }, historyDotActive: { backgroundColor: ORANGE, width: 11, height: 11, borderRadius: 6 }, historyLine: { width: 1, flex: 1, backgroundColor: "#dfe5ec", marginTop: 3 }, historyBody: { flex: 1, paddingBottom: 10, paddingLeft: 5 }, historyStatus: { fontSize: 10, fontWeight: "900", color: NAVY, textTransform: "capitalize" }, historyDate: { marginTop: 2, fontSize: 9, color: "#8995a7" }, historyNote: { marginTop: 3, fontSize: 9, color: "#63748a", lineHeight: 13 }, deliveryProofButton: { marginTop: 10, alignSelf: "flex-start", borderRadius: 18, backgroundColor: "#e7f7ed", paddingHorizontal: 12, paddingVertical: 8 }, deliveryProofText: { fontSize: 10, fontWeight: "900", color: "#176b43" }, driverNote: { marginTop: 8, fontSize: 10, color: "#63748a", fontStyle: "italic" },
   paymentSummary: { marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: "#f1eee9" }, paymentSummaryText: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashCard: { marginTop: 12, padding: 13, borderRadius: 15, borderWidth: 1, borderColor: "#d9ecf7", backgroundColor: "#f2faff" }, gcashHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, gcashTitle: { fontSize: 14, fontWeight: "900", color: NAVY }, gcashBadge: { overflow: "hidden", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#fff", color: "#17618b", fontSize: 9, fontWeight: "900" }, gcashHint: { marginTop: 7, fontSize: 10, lineHeight: 15, color: "#63748a" }, gcashAmount: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashTotal: { marginTop: 2, fontSize: 24, fontWeight: "900", color: NAVY }, gcashQrWrap: { alignItems: "center", marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: "#fff" }, gcashQr: { width: 190, height: 190 }, gcashAccount: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#fff" }, gcashAccountValue: { marginTop: 3, fontSize: 13, fontWeight: "900", color: NAVY }, gcashPhone: { marginTop: 2, fontSize: 18, fontWeight: "900", letterSpacing: 1, color: NAVY }, gcashSuccess: { marginTop: 9, padding: 10, borderRadius: 10, backgroundColor: "#e7f7ed", color: "#176b43", fontSize: 11, fontWeight: "800", lineHeight: 17 }, gcashPending: { marginTop: 11, padding: 11, borderRadius: 11, borderWidth: 1, borderColor: "#f1d89b", backgroundColor: "#fff9e9" }, gcashPendingTitle: { fontSize: 11, fontWeight: "900", color: "#805300" }, gcashForm: { marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#d9ecf7" }, gcashLabel: { marginTop: 8, fontSize: 10, fontWeight: "900", color: NAVY }, gcashInput: { marginTop: 5, paddingHorizontal: 11, paddingVertical: 11, borderWidth: 1, borderColor: "#dce5ed", borderRadius: 10, backgroundColor: "#fff", color: NAVY, fontSize: 12 }, gcashPick: { marginTop: 6, padding: 12, borderRadius: 11, borderWidth: 1, borderStyle: "dashed", borderColor: ORANGE, backgroundColor: "#fff", alignItems: "center" }, gcashPickText: { color: NAVY, fontSize: 11, fontWeight: "900" }, gcashPreviewWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, padding: 8, borderRadius: 10, backgroundColor: "#fff" }, gcashPreview: { width: 66, height: 66, borderRadius: 8, backgroundColor: "#edf2f7" }, gcashPreviewName: { fontSize: 10, fontWeight: "800", color: NAVY }, gcashRemove: { marginTop: 6, fontSize: 10, fontWeight: "900", color: RED }, gcashSubmit: { marginTop: 12, paddingVertical: 13, borderRadius: 22, backgroundColor: NAVY, alignItems: "center" }, gcashSubmitText: { fontSize: 11, fontWeight: "900", color: "#fff" },
   orderCard: { backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", padding: 14, marginBottom: 11 }, orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, orderNumber: { fontSize: 10, fontWeight: "900", color: "#8995a7" }, statusPill: { fontSize: 9, fontWeight: "900", color: RED, backgroundColor: "#fff0df", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14, alignSelf: "flex-start", maxWidth: 135 }, orderAmounts: { marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f1eee9" }, amountRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 5 }, amountLabel: { fontSize: 10, color: "#738096" }, amountValue: { fontSize: 10, fontWeight: "700", color: NAVY }, deliveryLabel: { fontSize: 11, fontWeight: "800", color: RED }, deliveryValue: { fontSize: 11, fontWeight: "800", color: RED }, totalRow: { borderTopWidth: 1, borderTopColor: "#f1eee9", paddingTop: 8, marginTop: 9 }, totalLabel: { fontSize: 12, fontWeight: "900", color: NAVY }, totalValue: { fontSize: 14, fontWeight: "900", color: NAVY },
