@@ -1,5 +1,7 @@
 -- Let a customer see only the assigned delivery partner's public-facing details for their own order.
--- Never expose ID/license documents; only the driver's application selfie is eligible for this read path.
+-- Never expose ID/license documents or the selfie holding ID. Only a separate public-facing profile photo is eligible.
+
+alter table public.driver_profiles add column if not exists profile_photo_path text;
 
 create or replace function public.customer_order_driver_details(p_order_ids uuid[])
 returns table (
@@ -8,7 +10,7 @@ returns table (
   driver_phone text,
   vehicle_type text,
   vehicle_plate text,
-  selfie_storage_path text
+  profile_photo_path text
 )
 language sql
 stable
@@ -21,7 +23,7 @@ as $$
     nullif(trim(p.phone), ''),
     dp.vehicle_type,
     dp.vehicle_plate,
-    dp.selfie_storage_path
+    dp.profile_photo_path
   from public.orders o
   join public.driver_profiles dp on dp.user_id = o.driver_user_id
   left join public.profiles p on p.id = dp.user_id
@@ -43,7 +45,7 @@ using (
     select 1
     from public.driver_profiles dp
     join public.orders o on o.driver_user_id = dp.user_id
-    where dp.selfie_storage_path = storage.objects.name
+    where dp.profile_photo_path = storage.objects.name
       and o.customer_id = (select auth.uid())
       and o.status in ('accepted','preparing','ready_for_pickup','assigned','picked_up','in_transit','delivered')
   )
