@@ -41,7 +41,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_actor uuid := auth.uid();
 begin
@@ -61,7 +61,7 @@ begin
   where user_id = v_actor and status in ('pending','active');
   if not found then raise exception 'A valid driver application is required.'; end if;
 end;
-$;
+$$;
 
 revoke all on function public.driver_update_profile_photo(text) from public, anon;
 grant execute on function public.driver_update_profile_photo(text) to authenticated;
