@@ -17,7 +17,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
     .eq("user_id", user.id).eq("role", "admin").maybeSingle();
   if (!admin) redirect("/dashboard?error=admin-access");
   const [{ data: categories }, { data: merchants }] = await Promise.all([
-    supabase.from("merchant_categories").select("id,name,slug,icon,image_url,sort_order,is_active").order("sort_order").order("name"),
+    supabase.from("merchant_categories").select("id,name,slug,icon,parent_id,image_url,sort_order,is_active").order("sort_order").order("name"),
     supabase.from("merchants").select("id,name,slug,status,category_id,merchant_categories(name)").order("name"),
   ]);
   return <main className="min-h-screen bg-[#f3f5f9] px-4 py-7 text-[#102b4e] sm:px-6">
@@ -33,6 +33,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
           <form action={saveMerchantCategory} className="mt-4 space-y-3">
             <label className="block text-xs font-bold">Category name<input name="name" required minLength={2} maxLength={80} placeholder="e.g. Flower Shop" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
             <label className="block text-xs font-bold">Icon / emoji<input name="icon" defaultValue="🏪" maxLength={12} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
+            <label className="block text-xs font-bold">Parent category (optional)<select name="parent_id" defaultValue="" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="">Top-level category</option>{(categories ?? []).filter(c => !c.parent_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><span className="mt-1 block text-[11px] font-normal text-slate-500">Choose a parent to create a customer-facing subcategory.</span></label>
             <CategoryImagePicker slug="" />
             <label className="block text-xs font-bold">Display order<input name="sort_order" type="number" min="0" step="1" defaultValue="0" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" defaultChecked/> Active in marketplace</label>
@@ -44,6 +45,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
           <div className="mt-4 space-y-3">
             {(categories ?? []).map(c => <form key={c.id} action={saveMerchantCategory} className="grid gap-2 rounded-2xl border border-slate-100 p-3 sm:grid-cols-[1fr_110px_90px_auto] sm:items-end">
               <input type="hidden" name="category_id" value={c.id}/>
+              <label className="text-[11px] font-bold sm:col-span-2">Parent category<select name="parent_id" defaultValue={c.parent_id ?? ""} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm"><option value="">Top-level category</option>{(categories ?? []).filter(parent => !parent.parent_id && parent.id !== c.id).map(parent => <option key={parent.id} value={parent.id}>{parent.name}</option>)}</select></label>
               <label className="text-[11px] font-bold">Name<input name="name" required defaultValue={c.name} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
               <label className="text-[11px] font-bold">Icon<input name="icon" defaultValue={c.icon} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
               <label className="text-[11px] font-bold">Order<input name="sort_order" type="number" min="0" defaultValue={c.sort_order} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"/></label>
@@ -61,7 +63,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
           {(merchants ?? []).map(m => <form key={m.id} action={assignMerchantCategory} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <input type="hidden" name="merchant_id" value={m.id}/>
             <div><p className="text-sm font-bold">{m.name}</p><p className="text-xs text-slate-500">{m.slug} · {m.status}</p></div>
-            <div className="flex items-center gap-2"><select name="category_id" defaultValue={m.category_id ?? ""} className="max-w-52 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">Uncategorized</option>{(categories ?? []).map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}</select><FormSubmitButton pendingLabel="Assigning…" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold">Assign</FormSubmitButton></div>
+            <div className="flex items-center gap-2"><select name="category_id" defaultValue={m.category_id ?? ""} className="max-w-52 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">Uncategorized</option>{(categories ?? []).map(c=><option key={c.id} value={c.id}>{c.parent_id ? "↳ " : ""}{c.icon} {c.name}</option>)}</select><FormSubmitButton pendingLabel="Assigning…" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold">Assign</FormSubmitButton></div>
           </form>)}
           {!merchants?.length && <p className="py-4 text-sm text-slate-500">No merchant applications yet.</p>}
         </div>
