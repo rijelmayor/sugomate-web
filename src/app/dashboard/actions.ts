@@ -102,8 +102,15 @@ export async function submitDriverDocuments(formData: FormData) {
   const { data: driver } = await supabase.from("driver_profiles").select("status,vehicle_type,profile_photo_path").eq("user_id", user.id).maybeSingle();
   if (!driver || driver.status !== "pending") redirect("/driver/apply");
   const { paths, uploaded } = await uploadDriverDocuments(supabase, user.id, formData, String(driver.vehicle_type ?? ""), "/driver/apply");
+  if (paths.profile_photo) {
+    const { error: photoError } = await supabase.rpc("driver_update_profile_photo", { p_profile_photo_path: paths.profile_photo });
+    if (photoError) {
+      await supabase.storage.from("driver-documents").remove(uploaded);
+      redirect("/driver/apply?error=application");
+    }
+  }
   const { error } = await supabase.from("driver_profiles")
-    .update({ id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license, profile_photo_path: paths.profile_photo ?? driver.profile_photo_path })
+    .update({ id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license })
     .eq("user_id", user.id);
   if (error) {
     await supabase.storage.from("driver-documents").remove(uploaded);
