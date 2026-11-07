@@ -61,7 +61,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   selectedStore?: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
-  merchantCategories?: { id: string; name: string; slug: string; icon: string; image_url?: string | null }[];
+  merchantCategories?: { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null }[];
   selectedMerchantCategory?: string;
   addresses: Address[];
   checkoutError?: string;
@@ -139,9 +139,13 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const productMatches = useMemo(() => products.filter(p => !q || p.name.toLowerCase().includes(q)), [products, q]);
   const storeMatches = stores.filter(item => (!selectedMerchantCategory || item.categorySlug === selectedMerchantCategory) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));
   const uncategorised = stores.filter(item => item.categorySlug === "other").length;
-  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", image_url: null, count: uncategorised }] : [])];
-  const activeCategory = tiles.find(item => item.slug === selectedMerchantCategory);
-  const view: "store" | "stores" | "home" = currentStore ? "store" : selectedMerchantCategory || q ? "stores" : "home";
+  const tiles = [...merchantCategories.map(item => ({ ...item, count: stores.filter(store => store.categorySlug === item.slug).length })), ...(uncategorised ? [{ id: "other", name: "Other stores", slug: "other", icon: "🏪", parent_id: null, image_url: null, count: uncategorised }] : [])];
+  const topLevelTiles = tiles.filter(item => !item.parent_id);
+  const selectedCategory = tiles.find(item => item.slug === selectedMerchantCategory);
+  const childTiles = selectedCategory ? tiles.filter(item => item.parent_id === selectedCategory.id) : [];
+  const parentCategory = selectedCategory?.parent_id ? tiles.find(item => item.id === selectedCategory.parent_id) : undefined;
+  const activeCategory = selectedCategory;
+  const view: "store" | "stores" | "subcategories" | "home" = currentStore ? "store" : q ? "stores" : selectedCategory && childTiles.length ? "subcategories" : selectedMerchantCategory ? "stores" : "home";
   const firstItem = items[0]?.product;
   const sameStore = items.every(({ product }) => product.branch_id === firstItem?.branch_id);
   const cartStore = stores.find(item => item.id === firstItem?.branch_id);
@@ -205,24 +209,30 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
       {view === "home" && <>
         <div className="mt-6"><h2 className="text-xl font-black text-[#102e57]">Browse by category</h2><p className="mt-0.5 text-sm text-slate-500">Pick what you need — we&apos;ll show the stores.</p></div>
-        {tiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {tiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
+        {topLevelTiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {topLevelTiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
         </div> : null}
         <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
         {stores.length > 0 && <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ storeCategory: item.categorySlug === "other" ? "" : item.categorySlug, store: item.id })} />)}</div>}
         {!stores.length && <div className="mt-6 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><ShoppingBasket aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">Your local marketplace is getting ready</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">We&apos;re preparing merchant catalogs in Hilongos, Bato, Hindang, Inopacan, and Matalom. Approved stores will appear here as they join.</p></div>}
       </>}
 
+      {view === "subcategories" && selectedCategory && <>
+        <div className="mt-5 flex items-center gap-3">
+          <PendingLink href={href({ storeCategory: "" })} aria-label="Back to all business categories" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57] shadow-sm"><ChevronLeft size={20} /></PendingLink>
+          <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{selectedCategory.name}</h2><p className="text-xs text-slate-500">Choose a type of {selectedCategory.name.toLowerCase()}.</p></div>
+        </div>
+        {childTiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {childTiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
+        </div> : <p className="mt-4 rounded-2xl border border-dashed border-orange-200 bg-white p-6 text-sm text-slate-500">Subcategories will appear here as they are added.</p>}
+      </>}
+
       {view === "stores" && <>
-        <div className="mt-5 flex items-center gap-2">
-          <PendingLink href={href({ storeCategory: "" })} aria-label="Back to categories" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
+        <div className="mt-5 flex items-center gap-3">
+          <PendingLink href={href({ storeCategory: parentCategory?.slug ?? "" })} aria-label={parentCategory ? `Back to ${parentCategory.name} subcategories` : "Back to categories"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57] shadow-sm"><ChevronLeft size={20} /></PendingLink>
           <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{q ? "Search results" : activeCategory?.name ?? "Stores"}</h2><p className="text-xs text-slate-400">{isFiltering ? "Updating…" : `${storeMatches.length} ${storeMatches.length === 1 ? "store" : "stores"}`}</p></div>
         </div>
-        {tiles.length > 1 && <div aria-label="Store categories" className="mt-3 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none]">
-          <PendingLink href={href({ storeCategory: "" })} className={chip(false, "sm")}>All categories</PendingLink>
-          {tiles.map(item => { const active = selectedMerchantCategory === item.slug; return <PendingLink key={item.id} href={href({ storeCategory: item.slug })} className={chip(active, "sm")} style={active ? activeStyle : undefined}><CategoryGlyph slug={item.slug} size={14} />{item.name}</PendingLink>; })}
-        </div>}
-        {storeMatches.length ? <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{storeMatches.map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><Store aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching stores" : "No stores here yet"}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{q ? "Try another store or area name." : "Stores in this category will appear here once they are approved."}</p></div>}
+        {storeMatches.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{storeMatches.map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div> : <div className="mt-4 rounded-3xl border border-dashed border-orange-200 bg-white p-8 text-center sm:p-12"><Store aria-hidden="true" size={44} strokeWidth={1.5} className="mx-auto text-orange-300" /><h3 className="mt-4 text-xl font-black text-[#102e57]">{q ? "No matching stores" : "No stores here yet"}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{q ? "Try another store or area name." : "Stores in this category will appear here once they are approved."}</p></div>}
       </>}
 
       {view === "store" && currentStore && <>
