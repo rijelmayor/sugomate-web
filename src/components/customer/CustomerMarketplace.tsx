@@ -198,7 +198,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
         </div>
         {view !== "store" && <div className="relative">
           <MapPin aria-hidden="true" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-orange-500" />
-          <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value, store: view === "store" ? "" : undefined })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
+          <select value={selectedMunicipality} onChange={e => startFilter(() => router.push(href({ municipality: e.target.value })))} aria-label="Filter by service area" className="box-border h-12 w-full min-w-0 rounded-2xl border border-orange-100 bg-white pl-9 pr-3 text-sm text-[#102e57] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200">
             <option value="">All service areas</option>
             {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
