@@ -2,6 +2,7 @@
 -- Never expose ID/license documents or the selfie holding ID. Only a separate public-facing profile photo is eligible.
 
 alter table public.driver_profiles add column if not exists profile_photo_path text;
+grant update (profile_photo_path) on table public.driver_profiles to authenticated;
 
 create or replace function public.customer_order_driver_details(p_order_ids uuid[])
 returns table (
