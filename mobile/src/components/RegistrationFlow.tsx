@@ -45,8 +45,8 @@ export default function RegistrationFlow({ onBack }: Props) {
       if (signupError || !data.user) throw new Error(signupError?.message ?? "Unable to create your account.");
       if (data.user.identities?.length === 0) throw new Error("This email is already registered. Please sign in instead.");
       setCreatedUserId(data.user.id);
-      await sendCode(data.user.id);
       setStep("verify");
+      await sendCode(data.user.id);
       setNotice("We sent a six-digit code to your mobile number. It expires in five minutes.");
     } catch (e: any) {
       setError(e?.message ?? "Registration failed. Please try again.");
