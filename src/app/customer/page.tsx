@@ -32,7 +32,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("merchant_categories").select("id,name,slug,icon,image_url").eq("is_active", true).order("sort_order").order("name"),
+    supabase.from("merchant_categories").select("id,name,slug,icon,parent_id,image_url").eq("is_active", true).order("sort_order").order("name"),
     // Optional: needs 20261105110000_customer_read_delivery_fees.sql. Without it this returns nothing and checkout shows "Calculated at checkout".
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
@@ -47,7 +47,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     if (retry.error) console.error("[customer] legacy product query failed:", retry.error.message);
   }
   // If the photo migration has not run yet, fall back to the original columns so tiles still appear.
-  const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
+  const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon,parent_id").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
   // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
   const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
   const rows = productError ? [] : ((productRows ?? []) as ProductRow[]).map(row => {
