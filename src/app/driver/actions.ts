@@ -33,8 +33,7 @@ export async function updateDriverProfilePhoto(formData: FormData) {
 
   const { data: previous } = await supabase.from("driver_profiles")
     .select("profile_photo_path").eq("user_id", user.id).maybeSingle();
-  const { error } = await supabase.from("driver_profiles")
-    .update({ profile_photo_path: path }).eq("user_id", user.id);
+  const { error } = await supabase.rpc("driver_update_profile_photo", { p_profile_photo_path: path });
   if (error) {
     await supabase.storage.from("driver-documents").remove([path]);
     redirect("/driver?error=photo");
