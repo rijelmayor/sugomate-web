@@ -38,8 +38,8 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
   const driverByOrder = new Map<string,{name:string;phone:string|null;vehicleType:string|null;plate:string|null;photoUrl:string|null}>();
   for (const driver of driverRows ?? []) {
     let photoUrl: string | null = null;
-    if (driver.selfie_storage_path) {
-      const { data } = await supabase.storage.from("driver-documents").createSignedUrl(driver.selfie_storage_path, 3600);
+    if (driver.profile_photo_path) {
+      const { data } = await supabase.storage.from("driver-documents").createSignedUrl(driver.profile_photo_path, 3600);
       photoUrl = data?.signedUrl ?? null;
     }
     driverByOrder.set(driver.order_id, { name: driver.driver_name, phone: driver.driver_phone, vehicleType: driver.vehicle_type, plate: driver.vehicle_plate, photoUrl });
