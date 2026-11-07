@@ -76,8 +76,7 @@ export default function RoleApplicationFlow({ role, userId, onDone, onSignOut }:
         if (profilePath) {
           const { error: photoError } = await supabase.rpc("driver_update_profile_photo", { p_profile_photo_path: profilePath });
           if (photoError) {
-            if (uploadedPaths.length) await supabase.storage.from("driver-documents").remove(uploadedPaths);
-            await supabase.from("driver_profiles").delete().eq("user_id", userId);
+            await supabase.storage.from("driver-documents").remove([profilePath]);
             throw photoError;
           }
         }
