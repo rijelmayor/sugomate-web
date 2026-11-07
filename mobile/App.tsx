@@ -141,9 +141,9 @@ export default function App() {
       if (!session?.user?.id) { if (active) setApplicationRole(null); return; }
       const { data: roles, error } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
       if (!active || error) return;
-      if ((roles ?? []).some((row: any) => row.role === "customer")) { setApplicationRole(null); return; }
       const intended = session.user.user_metadata?.intended_role;
-      if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
+      if (intended === "merchant" || intended === "driver") { setApplicationRole(intended); return; }
+      setApplicationRole(null);
     }
     resolveAccountRole();
     return () => { active = false; };
@@ -323,13 +323,11 @@ export default function App() {
       Alert.alert("Unable to verify account type", "Please try again.");
       setBusy(false); return;
     }
-    if (!(roleRows ?? []).some((r: any) => r.role === "customer")) {
-      const intended = data.user.user_metadata?.intended_role;
-      if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
-      else {
-        await supabase.auth.signOut();
-        Alert.alert("Account type not recognized", "Please contact SUGOMATE support.");
-      }
+    const intended = data.user.user_metadata?.intended_role;
+    if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
+    else if (!(roleRows ?? []).some((r: any) => r.role === "customer")) {
+      await supabase.auth.signOut();
+      Alert.alert("Account type not recognized", "Please contact SUGOMATE support.");
     } else setApplicationRole(null);
     setBusy(false);
   }
