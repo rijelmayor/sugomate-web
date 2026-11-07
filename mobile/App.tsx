@@ -113,8 +113,11 @@ export default function App() {
         setSelectedStore("");
         return true;
       }
-      if (selectedCategory || selectedParentCategory || selectedMunicipality || search) {
+      if (selectedCategory) {
         setSelectedCategory("");
+        return true;
+      }
+      if (selectedParentCategory || selectedMunicipality || search) {
         setSelectedParentCategory("");
         setSelectedMunicipality("");
         setSearch("");
