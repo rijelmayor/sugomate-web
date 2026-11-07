@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -22,7 +22,6 @@ const ORANGE = "#ff8a00";
 const RED = "#e95718";
 const BG = "#fff7ef";
 const BRAND_LOGO = require("./src/assets/sugomate-wordmark.png");
-const FLYING_EAGLE = require("./src/assets/sugomate-flyer-intro.jpg");
 const AndroidStatusBar = StatusBar as React.ComponentType<any>;
 const peso = (v: number | string) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const one = <T,>(v: T | T[] | null | undefined): T | null => Array.isArray(v) ? v[0] ?? null : v ?? null;
@@ -59,8 +58,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
-  const loginIntro = useRef(new Animated.Value(0)).current;
-  const flyerIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -97,13 +94,6 @@ export default function App() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(flyerIntro, { toValue: 1, duration: 900, useNativeDriver: true }),
-      Animated.timing(loginIntro, { toValue: 1, duration: 650, useNativeDriver: true })
-    ]).start();
-  }, [flyerIntro, loginIntro]);
 
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
@@ -527,16 +517,15 @@ export default function App() {
     onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
   />;
   if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
-    <Animated.View style={{ alignItems: "center", opacity: flyerIntro, transform: [{ translateX: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [-110, 0] }), }, { scale: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) }] }}><Image source={FLYING_EAGLE} style={{ width: 148, height: 148, alignSelf: "center" }} resizeMode="contain" /></Animated.View>
-    <Animated.View style={{ opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></Animated.View>
-    <Animated.View style={[styles.loginCard, { opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) }] }]}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
+    <View style={{ alignItems: "center" }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></View>
+    <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
       <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}>{busy ? <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color="#fff" /><Text style={styles.primaryText}>Signing in…</Text></View> : <Text style={styles.primaryText}>Sign in</Text>}</TouchableOpacity>
       <TouchableOpacity style={styles.linkButton} onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Create customer account</Text></TouchableOpacity>
       <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 14, marginBottom: 10 }}><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Merchant signup</Text></TouchableOpacity><TouchableOpacity onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Delivery partner signup</Text></TouchableOpacity></View>
       <Text style={styles.footnote}>New accounts complete email confirmation and Philippine mobile SMS verification before ordering.</Text>
-    </Animated.View>
+    </View>
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
@@ -547,7 +536,7 @@ export default function App() {
     </View>
     <View style={styles.greeting}><Text style={styles.greetingSmall}>Maayong adlaw, {firstName}!</Text><Text style={styles.greetingTitle}>Unsa imong sugo karon?</Text></View>
     <View style={styles.searchWrap}><Text style={styles.searchIcon}>⌕</Text><TextInput style={styles.searchInput} placeholder={selectedStore ? "Search this store's items…" : "Search stores or areas…"} placeholderTextColor="#9aa4b3" value={search} onChangeText={setSearch} />{!!search && <TouchableOpacity onPress={() => setSearch("")}><Text style={styles.clearSearch}>×</Text></TouchableOpacity>}</View>
-    {!selectedStore && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.areaScroll} contentContainerStyle={styles.areaContent}>
+    {tab === "market" && !selectedStore && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.areaScroll} contentContainerStyle={styles.areaContent}>
       <TouchableOpacity onPress={() => setSelectedMunicipality("")} style={[styles.areaChip, !selectedMunicipality && styles.areaChipActive]}><Text style={[styles.areaChipText, !selectedMunicipality && styles.areaChipTextActive]}>All areas</Text></TouchableOpacity>
       {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => setSelectedMunicipality(m.id)} style={[styles.areaChip, selectedMunicipality === m.id && styles.areaChipActive]}><Text style={[styles.areaChipText, selectedMunicipality === m.id && styles.areaChipTextActive]}>{m.name}</Text></TouchableOpacity>)}
     </ScrollView>}
@@ -565,17 +554,22 @@ export default function App() {
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
           <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
-          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedParentCategory(""); setSelectedCategory(""); }}><Text style={styles.backLinkText}>‹  Back to all categories</Text></TouchableOpacity> : null}
-          <View style={styles.categoryGrid}>{(selectedParentCategory ? childCategories : topLevelCategories).map(c => <TouchableOpacity key={c.id} style={[styles.categoryCard, selectedCategory === c.slug && styles.categoryCardSelected]} onPress={() => { if (categories.some(child => child.parent_id === c.id)) { setSelectedParentCategory(c.id); setSelectedCategory(""); } else setSelectedCategory(selectedCategory === c.slug ? "" : c.slug); }}>
+          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory) setSelectedCategory(""); else setSelectedParentCategory(""); }}><Text style={styles.backLinkText}>{selectedCategory ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
+          {!selectedParentCategory && <View style={styles.categoryGrid}>{topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { setSelectedParentCategory(c.id); setSelectedCategory(""); }}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
-          </TouchableOpacity>)}</View>
-          <View style={styles.storesHeading}><Text style={styles.sectionTitle}>{selectedCategory ? (activeCategory?.name ?? "Stores") : selectedParentCategory ? (categories.find(c => c.id === selectedParentCategory)?.name ?? "Stores") : "Stores near you"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
+          </TouchableOpacity>)}</View>}
+          {selectedParentCategory && !selectedCategory && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
+            {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
+            <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
+          </TouchableOpacity>)}</View>}
+          {selectedParentCategory && !selectedCategory && childCategories.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No subcategories available</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
+          {selectedCategory && <><View style={styles.storesHeading}><Text style={styles.sectionTitle}>{activeCategory?.name ?? "Stores"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
           {visibleStores.map(s => <TouchableOpacity key={s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
             {s.image ? <Image source={{ uri: s.image }} style={styles.storeImage} /> : <View style={styles.storeImageFallback}><Text style={{ fontSize: 25 }}>🏪</Text></View>}
             <View style={styles.storeInfo}><Text style={styles.storeName}>{s.name}</Text>{!!s.branchName && <Text style={styles.storeBranch}>{s.branchName}</Text>}<Text style={styles.storeArea}>⌖  {s.area || "Leyte"}</Text><Text style={[styles.openLabel, s.isOpen ? styles.open : styles.closed]}>{s.isOpen ? "Open now" : "Closed"}</Text></View><Text style={styles.chevron}>›</Text>
           </TouchableOpacity>)}
-          {visibleStores.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛍️</Text><Text style={styles.emptyTitle}>No stores found</Text><Text style={styles.muted}>Try another category, search, or service area.</Text></View>}
+          {visibleStores.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛍️</Text><Text style={styles.emptyTitle}>No stores found</Text><Text style={styles.muted}>Try another category, search, or service area.</Text></View>}</>}
         </>}
       </>}
       {tab === "orders" && <>
