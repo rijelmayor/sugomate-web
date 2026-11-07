@@ -21,7 +21,8 @@ const NAVY = "#102e57";
 const ORANGE = "#ff8a00";
 const RED = "#e95718";
 const BG = "#fff7ef";
-const BRAND_LOGO = require("./src/assets/sugomate-logo-transparent.png");
+const BRAND_LOGO = require("./src/assets/sugomate-wordmark.png");
+const FLYING_EAGLE = require("./src/assets/sugomate-flyer-intro.jpg");
 const AndroidStatusBar = StatusBar as React.ComponentType<any>;
 const peso = (v: number | string) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const one = <T,>(v: T | T[] | null | undefined): T | null => Array.isArray(v) ? v[0] ?? null : v ?? null;
@@ -59,6 +60,7 @@ export default function App() {
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
   const loginIntro = useRef(new Animated.Value(0)).current;
+  const flyerIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,7 +98,12 @@ export default function App() {
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
 
-  useEffect(() => { Animated.timing(loginIntro, { toValue: 1, duration: 850, useNativeDriver: true }).start(); }, [loginIntro]);
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(flyerIntro, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(loginIntro, { toValue: 1, duration: 650, useNativeDriver: true })
+    ]).start();
+  }, [flyerIntro, loginIntro]);
 
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
@@ -520,6 +527,7 @@ export default function App() {
     onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
   />;
   if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+    <Animated.View style={{ alignItems: "center", opacity: flyerIntro, transform: [{ translateX: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [-110, 0] }), }, { scale: flyerIntro.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) }] }}><Image source={FLYING_EAGLE} style={{ width: 148, height: 148, alignSelf: "center" }} resizeMode="contain" /></Animated.View>
     <Animated.View style={{ opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></Animated.View>
     <Animated.View style={[styles.loginCard, { opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) }] }]}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
