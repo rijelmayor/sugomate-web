@@ -7,8 +7,13 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "sugomate",
+    "icon": "./assets/sugomate-app-icon.png",
     "android": {
-      "package": "com.sugomate.app"
+      "package": "com.sugomate.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/sugomate-app-icon.png",
+        "backgroundColor": "#071848"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.sugomate.app"
