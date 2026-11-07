@@ -36,17 +36,30 @@ $$;
 revoke all on function public.customer_order_driver_details(uuid[]) from public, anon;
 grant execute on function public.customer_order_driver_details(uuid[]) to authenticated;
 
+create or replace function public.customer_can_read_assigned_driver_photo(p_object_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.driver_profiles dp
+    join public.orders o on o.driver_user_id = dp.user_id
+    where dp.profile_photo_path = p_object_name
+      and o.customer_id = auth.uid()
+      and o.status in ('accepted','preparing','ready_for_pickup','assigned','picked_up','in_transit','delivered')
+  );
+$$;
+
+revoke all on function public.customer_can_read_assigned_driver_photo(text) from public, anon;
+grant execute on function public.customer_can_read_assigned_driver_photo(text) to authenticated;
+
 drop policy if exists "Customers read assigned driver profile photo" on storage.objects;
 create policy "Customers read assigned driver profile photo"
 on storage.objects for select to authenticated
 using (
   bucket_id = 'driver-documents'
-  and exists (
-    select 1
-    from public.driver_profiles dp
-    join public.orders o on o.driver_user_id = dp.user_id
-    where dp.profile_photo_path = storage.objects.name
-      and o.customer_id = (select auth.uid())
-      and o.status in ('accepted','preparing','ready_for_pickup','assigned','picked_up','in_transit','delivered')
-  )
+  and public.customer_can_read_assigned_driver_photo(name)
 );
