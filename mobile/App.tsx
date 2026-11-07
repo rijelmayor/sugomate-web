@@ -128,7 +128,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search]);
+  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search, categories]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
