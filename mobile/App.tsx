@@ -18,6 +18,7 @@ const ORANGE = "#ff8a00";
 const RED = "#e95718";
 const BG = "#fff7ef";
 const BRAND_LOGO = "https://sugomate.com/images/sugomate-eagle-road-logo.png";
+const AndroidStatusBar = StatusBar as React.ComponentType<any>;
 const peso = (v: number | string) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const one = <T,>(v: T | T[] | null | undefined): T | null => Array.isArray(v) ? v[0] ?? null : v ?? null;
 
@@ -83,15 +84,6 @@ export default function App() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
-
-  // Keep Android system bars outside the app content area.
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      StatusBar.setBackgroundColor("#ffffff", true);
-      StatusBar.setTranslucent(false);
-      StatusBar.setBarStyle("dark-content", true);
-    }
-  }, []);
 
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
@@ -444,7 +436,7 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
-  if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+  if (!session) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
     <Image source={{ uri: BRAND_LOGO }} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
     <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
@@ -456,7 +448,7 @@ export default function App() {
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
-  return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
+  return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
     <View style={styles.topbar}>
       <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
       <TouchableOpacity style={styles.ordersShortcut} onPress={() => setTab("orders")}><Text style={styles.ordersShortcutText}>My Orders</Text></TouchableOpacity>
