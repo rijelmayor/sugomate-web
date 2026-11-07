@@ -15,7 +15,7 @@ const money = (value: number | string) => "₱" + Number(value).toLocaleString("
 export default async function CustomerOrders({searchParams}:{searchParams:Promise<{placed?:string;paymentSubmitted?:string;paymentError?:string}>}) {
   const params=await searchParams;
   const {user,supabase}=await requireCustomer();
-  const {data:orders}=await supabase.from("orders").select("id,order_number,status,driver_user_id,assigned_at,rider_on_way_at,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,delivery_proof_path,driver_note,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id",user.id).order("placed_at",{ascending:false}).limit(50);
+  const {data:orders}=await supabase.from("orders").select("id,order_number,status,driver_user_id,assigned_at,address_snapshot,rider_on_way_at,payment_method,payment_status,subtotal,delivery_fee,total,placed_at,delivery_proof_path,driver_note,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,merchants(name,gcash_payment_type,gcash_account_name,gcash_mobile_number,gcash_qr_url),order_items(id,product_name,quantity,line_total)").eq("customer_id",user.id).order("placed_at",{ascending:false}).limit(50);
   const orderIds=(orders??[]).map(order=>order.id);
   // History and delivery-photo links load together instead of one after another.
   const [{data:history},proofEntries]=await Promise.all([
