@@ -84,6 +84,13 @@ export default function App() {
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
 
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      StatusBar.setBackgroundColor("#ffffff", false);
+      StatusBar.setTranslucent(false);
+    }
+  }, []);
+
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -435,7 +442,7 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
-  if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+  if (!session) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
     <Image source={{ uri: BRAND_LOGO }} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text>
     <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
@@ -447,7 +454,7 @@ export default function App() {
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
-  return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
+  return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
     <View style={styles.topbar}>
       <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
       <TouchableOpacity style={styles.ordersShortcut} onPress={() => setTab("orders")}><Text style={styles.ordersShortcutText}>My Orders</Text></TouchableOpacity>
