@@ -4,6 +4,7 @@ import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import RegistrationFlow from "./src/components/RegistrationFlow";
+import RoleApplicationFlow from "./src/components/RoleApplicationFlow";
 
 type Category = { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null };
 type Municipality = { id: string; name: string };
@@ -56,6 +57,7 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
   const loginIntro = useRef(new Animated.Value(0)).current;
   const [tab, setTab] = useState<Tab>("market");
   const [profileName, setProfileName] = useState("");
@@ -132,6 +134,20 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function resolveAccountRole() {
+      if (!session?.user?.id) { if (active) setApplicationRole(null); return; }
+      const { data: roles, error } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
+      if (!active || error) return;
+      if ((roles ?? []).some((row: any) => row.role === "customer")) { setApplicationRole(null); return; }
+      const intended = session.user.user_metadata?.intended_role;
+      if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
+    }
+    resolveAccountRole();
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   const loadMarketplace = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -302,10 +318,19 @@ export default function App() {
       setBusy(false); return;
     }
     const { data: roleRows, error: roleError } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-    if (roleError || !(roleRows ?? []).some((r: any) => r.role === "customer")) {
+    if (roleError) {
       await supabase.auth.signOut();
-      Alert.alert("Customer access only", "This app area is for verified customer accounts.");
+      Alert.alert("Unable to verify account type", "Please try again.");
+      setBusy(false); return;
     }
+    if (!(roleRows ?? []).some((r: any) => r.role === "customer")) {
+      const intended = data.user.user_metadata?.intended_role;
+      if (intended === "merchant" || intended === "driver") setApplicationRole(intended);
+      else {
+        await supabase.auth.signOut();
+        Alert.alert("Account type not recognized", "Please contact SUGOMATE support.");
+      }
+    } else setApplicationRole(null);
     setBusy(false);
   }
 
@@ -490,6 +515,12 @@ export default function App() {
   }
 
   if (checking) return <View style={styles.center}><ActivityIndicator size="large" color={ORANGE} /></View>;
+  if (session && applicationRole) return <RoleApplicationFlow
+    role={applicationRole}
+    userId={session.user.id}
+    onDone={() => { setApplicationRole(null); supabase.auth.signOut(); }}
+    onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
+  />;
   if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
     <Animated.View style={{ opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></Animated.View>
     <Animated.View style={[styles.loginCard, { opacity: loginIntro, transform: [{ translateY: loginIntro.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) }] }]}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
