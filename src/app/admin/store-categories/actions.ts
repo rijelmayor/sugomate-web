@@ -24,9 +24,10 @@ export async function saveMerchantCategory(formData: FormData) {
   const icon = String(formData.get("icon") ?? "🏪").trim().slice(0, 12) || "🏪";
   const sortOrder = Number(formData.get("sort_order") ?? 0);
   const isActive = formData.get("is_active") === "on";
+  const parentId = String(formData.get("parent_id") ?? "") || null;
   const slug = slugify(name);
   if (name.length < 2 || !slug || !Number.isInteger(sortOrder) || sortOrder < 0 ||
-      (id && !/^[0-9a-f-]{36}$/i.test(id))) redirect("/admin/store-categories?error=invalid");
+      (id && !/^[0-9a-f-]{36}$/i.test(id)) || (parentId && !/^[0-9a-f-]{36}$/i.test(parentId)) || (id && parentId === id)) redirect("/admin/store-categories?error=invalid");
   // Photo: keep the current one unless a new WebP is uploaded or removal is ticked. No photo = gradient default.
   const existing = String(formData.get("image_url") ?? "").trim().slice(0, 500);
   let imageUrl: string | null = /^(\/|https:\/\/)/.test(existing) ? existing : null;
@@ -43,7 +44,13 @@ export async function saveMerchantCategory(formData: FormData) {
   } else if (formData.get("remove_image") === "on") {
     imageUrl = null;
   }
-  const payload = { name, slug, icon, image_url: imageUrl, sort_order: sortOrder, is_active: isActive };
+  if (parentId) {
+    const { data: parent } = await supabase.from("merchant_categories").select("id,parent_id").eq("id", parentId).maybeSingle();
+    if (!parent || parent.parent_id || (id && parent.id === id)) redirect("/admin/store-categories?error=parent");
+    const { count: childCount } = await supabase.from("merchant_categories").select("id", { count: "exact", head: true }).eq("parent_id", id || "__new__");
+    if (id && (childCount ?? 0) > 0) redirect("/admin/store-categories?error=parent");
+  }
+  const payload = { name, slug, icon, image_url: imageUrl, sort_order: sortOrder, is_active: isActive, parent_id: parentId };
   const result = id
     ? await supabase.from("merchant_categories").update(payload).eq("id", id)
     : await supabase.from("merchant_categories").insert(payload);
