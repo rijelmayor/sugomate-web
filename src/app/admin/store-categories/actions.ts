@@ -47,8 +47,10 @@ export async function saveMerchantCategory(formData: FormData) {
   if (parentId) {
     const { data: parent } = await supabase.from("merchant_categories").select("id,parent_id").eq("id", parentId).maybeSingle();
     if (!parent || parent.parent_id || (id && parent.id === id)) redirect("/admin/store-categories?error=parent");
-    const { count: childCount } = await supabase.from("merchant_categories").select("id", { count: "exact", head: true }).eq("parent_id", id || "__new__");
-    if (id && (childCount ?? 0) > 0) redirect("/admin/store-categories?error=parent");
+    if (id) {
+      const { count: childCount } = await supabase.from("merchant_categories").select("id", { count: "exact", head: true }).eq("parent_id", id);
+      if ((childCount ?? 0) > 0) redirect("/admin/store-categories?error=parent");
+    }
   }
   const payload = { name, slug, icon, image_url: imageUrl, sort_order: sortOrder, is_active: isActive, parent_id: parentId };
   const result = id
