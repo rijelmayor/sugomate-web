@@ -447,7 +447,7 @@ export default function App() {
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
-  return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
+  return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
     <View style={styles.topbar}>
       <View style={styles.brandRow}><Image source={{ uri: BRAND_LOGO }} style={styles.headerLogo} resizeMode="contain" /><View><Text style={styles.topTag}>Imong sugo, kami bahala.</Text></View></View>
       <TouchableOpacity style={styles.ordersShortcut} onPress={() => setTab("orders")}><Text style={styles.ordersShortcutText}>My Orders</Text></TouchableOpacity>
