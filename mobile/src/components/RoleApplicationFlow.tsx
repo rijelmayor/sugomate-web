@@ -44,7 +44,8 @@ export default function RoleApplicationFlow({ role, userId, onDone, onSignOut }:
     const doc = docs[key];
     if (!doc) return null;
     const ext = doc.mimeType === "image/png" ? "png" : doc.mimeType === "image/webp" ? "webp" : "jpg";
-    const path = userId + "/" + key + "-" + Date.now().toString(36) + "." + ext;
+    const storageKey = key === "profile_photo" ? "profile" : key;
+    const path = userId + "/" + storageKey + "-" + Date.now().toString(36) + "." + ext;
     const bytes = await new File(doc.uri).arrayBuffer();
     const { error } = await supabase.storage.from("driver-documents").upload(path, bytes, { contentType: doc.mimeType, upsert: false });
     if (error) throw error;
@@ -58,15 +59,28 @@ export default function RoleApplicationFlow({ role, userId, onDone, onSignOut }:
         const years = age.trim() ? Number(age) : null;
         if (!["Motorcycle", "Bicycle", "Car", "Other"].includes(vehicle)) throw new Error("Select your vehicle type.");
         if (years !== null && (!Number.isInteger(years) || years < 18 || years > 80)) throw new Error("Enter an age between 18 and 80.");
+        const uploadedPaths: string[] = [];
         const [idPath, selfiePath, licensePath, profilePath] = await Promise.all([
           uploadDocument("id"), uploadDocument("selfie"), uploadDocument("license"), uploadDocument("profile_photo")
         ]);
+        uploadedPaths.push(...[idPath, selfiePath, licensePath, profilePath].filter((path): path is string => Boolean(path)));
         const { error: insertError } = await supabase.from("driver_profiles").insert({
           user_id: userId, vehicle_type: vehicle, vehicle_plate: plate.trim() || null, age: years,
           address: address.trim() || null, status: "pending", id_storage_path: idPath,
-          selfie_storage_path: selfiePath, license_storage_path: licensePath, profile_photo_path: profilePath
+          selfie_storage_path: selfiePath, license_storage_path: licensePath, profile_photo_path: null
         });
-        if (insertError) throw insertError;
+        if (insertError) {
+          if (uploadedPaths.length) await supabase.storage.from("driver-documents").remove(uploadedPaths);
+          throw insertError;
+        }
+        if (profilePath) {
+          const { error: photoError } = await supabase.rpc("driver_update_profile_photo", { p_profile_photo_path: profilePath });
+          if (photoError) {
+            if (uploadedPaths.length) await supabase.storage.from("driver-documents").remove(uploadedPaths);
+            await supabase.from("driver_profiles").delete().eq("user_id", userId);
+            throw photoError;
+          }
+        }
       } else {
         const cleanName = name.trim();
         const cleanSlug = (slug.trim() || cleanName).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
