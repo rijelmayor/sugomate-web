@@ -181,11 +181,14 @@ export default function ExplainerScene() {
       cancelAnimationFrame(animationId);
       observer.disconnect();
       scene.traverse((object) => {
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Sprite) {
-          object.geometry?.dispose();
+        if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+          object.geometry.dispose();
           const material = object.material;
           if (Array.isArray(material)) material.forEach((item) => item.dispose());
-          else material?.dispose();
+          else material.dispose();
+        } else if (object instanceof THREE.Sprite) {
+          object.material.map?.dispose();
+          object.material.dispose();
         }
       });
       renderer.dispose();
