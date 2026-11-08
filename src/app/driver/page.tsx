@@ -22,7 +22,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
  if(!user) redirect("/login?next=/driver");
  const [{data:profile},{data:driver}]=await Promise.all([
   supabase.from("profiles").select("display_name,phone").eq("id",user.id).maybeSingle(),
-  supabase.from("driver_profiles").select("status,vehicle_type,vehicle_plate,is_available,profile_photo_path").eq("user_id",user.id).maybeSingle()
+  supabase.from("driver_profiles").select("status,vehicle_type,vehicle_plate,is_available,profile_photo_path,municipality_id").eq("user_id",user.id).maybeSingle()
  ]);
  if(!driver) redirect("/driver/apply");
  const active=driver.status==="active";
@@ -31,9 +31,13 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
   .select("id,order_number,status,driver_assignment_status,rider_on_way_at,payment_method,subtotal,total,delivery_fee,placed_at,address_snapshot,driver_note,order_items(id,product_name,quantity,line_total),merchants(name)")
   .eq("driver_user_id",user.id).in("status",["accepted","preparing","ready_for_pickup","assigned","picked_up","in_transit","delivered"])
   .order("placed_at",{ascending:false}).limit(100):{data:[]};
- const {data:readyOrders}=active&&driver.is_available?await supabase.from("orders")
-  .select("id,order_number,status,payment_method,rider_claim_deadline_at,rider_assignment_expired_at,subtotal,total,delivery_fee,placed_at,address_snapshot,merchants(name)")
-  .in("status",["accepted","ready_for_pickup"]).is("driver_user_id",null)
+ const {data:extraLocalities}=active?await supabase.from("rider_locality_authorizations").select("municipality_id").is("revoked_at",null).lte("starts_at",new Date().toISOString()).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`):{data:[]};
+ const localityIds=[...new Set([driver.municipality_id,...(extraLocalities??[]).map(x=>x.municipality_id)].filter(Boolean))] as string[];
+ const {data:pickupBranches}=localityIds.length?await supabase.from("merchant_branches").select("id").in("municipality_id",localityIds).eq("is_active",true):{data:[]};
+ const branchIds=(pickupBranches??[]).map(b=>b.id);
+ const {data:readyOrders}=active&&driver.is_available&&branchIds.length?await supabase.from("orders")
+  .select("id,order_number,status,payment_method,rider_claim_deadline_at,rider_assignment_expired_at,subtotal,total,delivery_fee,placed_at,address_snapshot,branch_id,merchants(name)")
+  .in("branch_id",branchIds).in("status",["accepted","ready_for_pickup"]).is("driver_user_id",null)
   .order("placed_at",{ascending:true}).limit(30):{data:[]};
  const current=(orders??[]).filter(o=>["accepted","preparing","ready_for_pickup","assigned","picked_up","in_transit"].includes(o.status));
  const completed=(orders??[]).filter(o=>o.status==="delivered");
@@ -56,7 +60,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
    {!active?<section className="mt-6 rounded-3xl border border-amber-200 bg-white p-7"><h2 className="text-xl font-black">Your application is under review</h2><p className="mt-2 text-sm leading-6 text-slate-500">Delivery assignments and availability controls become available after SUGOMATE Operations approves your application.</p><Link href="/driver/apply" className="mt-4 inline-flex rounded-full bg-[#102e57] px-5 py-3 text-sm font-bold text-white">View application</Link></section>:<>
     <section className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl border border-orange-100 bg-white p-3"><p className="text-[10px] font-bold leading-tight text-slate-500">Active deliveries</p><p className="mt-1 text-2xl font-black">{current.length}</p></div><div className="rounded-2xl border border-orange-100 bg-white p-5"><p className="text-xs font-bold text-slate-500">Offers to respond</p><p className="mt-2 text-3xl font-black">{offered.length}</p></div><div className="rounded-2xl border border-orange-100 bg-white p-5"><p className="text-xs font-bold text-slate-500">Completed deliveries loaded</p><p className="mt-2 text-3xl font-black">{completed.length}</p></div></section>
     <section className="mt-8">
-     <div className="mb-4"><p className="text-xs font-black uppercase tracking-widest text-orange-600">Available now</p><h2 className="mt-1 text-2xl font-black">Available orders</h2><p className="mt-1 text-sm text-slate-500">{current.length ? "Finish your current delivery before claiming another order." : "All available orders are shown to online drivers, regardless of distance. First successful claim gets the order."}</p></div>
+     <div className="mb-4"><p className="text-xs font-black uppercase tracking-widest text-orange-600">Available now</p><h2 className="mt-1 text-2xl font-black">Available orders</h2><p className="mt-1 text-sm text-slate-500">{current.length ? "Finish your current delivery before claiming another order." : "Orders from your approved pickup locality are shown here. Your customer delivery destination may be in another approved, priced locality."}</p></div>
      {current.length ? <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">You already have an active delivery. Complete it before claiming a new one.</div> : <div className="space-y-3">{(readyOrders??[]).map(order=>{
       const addr=order.address_snapshot as {address_line?:string;landmark?:string}|null;
       return <article key={order.id} className="rounded-xl border border-orange-100 bg-white p-3 shadow-sm">
