@@ -684,3 +684,39 @@ end;
 $$;
 revoke all on function public.driver_release_order_claim(uuid) from public,anon;
 grant execute on function public.driver_release_order_claim(uuid) to authenticated;
+
+
+-- Preserve the merchant pickup origin on each order so historical rider reports
+-- do not change when a merchant later edits its address.
+alter table public.orders
+  add column if not exists pickup_address_snapshot text;
+
+update public.orders o
+set pickup_address_snapshot=m.address
+from public.merchants m
+where m.id=o.merchant_id
+  and o.pickup_address_snapshot is null
+  and nullif(trim(m.address),'') is not null;
+
+create or replace function public.snapshot_order_pickup_address()
+returns trigger
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if new.pickup_address_snapshot is null then
+    select m.address into new.pickup_address_snapshot
+    from public.merchants m
+    where m.id=new.merchant_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists snapshot_order_pickup_address on public.orders;
+create trigger snapshot_order_pickup_address
+before insert on public.orders
+for each row execute function public.snapshot_order_pickup_address();
+
+revoke all on function public.snapshot_order_pickup_address() from public,anon,authenticated;
