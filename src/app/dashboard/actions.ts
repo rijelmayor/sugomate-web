@@ -77,15 +77,18 @@ export async function applyAsDriver(formData: FormData) {
   const { supabase, user } = await requireUser();
   const vehicleType = String(formData.get("vehicle_type") ?? "").trim();
   const vehiclePlate = String(formData.get("vehicle_plate") ?? "").trim().slice(0, 20);
+  const municipalityId = String(formData.get("municipality_id") ?? "");
   const ageRaw = String(formData.get("age") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim().slice(0, 500);
   const age = ageRaw ? Number(ageRaw) : null;
-  if (!VEHICLES.includes(vehicleType)) redirect("/driver/apply?error=details");
+  if (!VEHICLES.includes(vehicleType) || !/^[0-9a-f-]{36}$/i.test(municipalityId)) redirect("/driver/apply?error=details");
+  const { data: locality } = await supabase.from("municipalities").select("id").eq("id", municipalityId).eq("is_serviceable", true).maybeSingle();
+  if (!locality) redirect("/driver/apply?error=locality");
   if (age !== null && (Number.isNaN(age) || age < 18 || age > 80)) redirect("/driver/apply?error=details");
 
   const { paths, uploaded } = await uploadDriverDocuments(supabase, user.id, formData, vehicleType, "/driver/apply");
   const { error } = await supabase.from("driver_profiles").insert({
-    user_id: user.id, vehicle_type: vehicleType, vehicle_plate: vehiclePlate || null, status: "pending",
+    user_id: user.id, vehicle_type: vehicleType, vehicle_plate: vehiclePlate || null, status: "pending", municipality_id: municipalityId,
     age, address: address || null,
     id_storage_path: paths.id, selfie_storage_path: paths.selfie, license_storage_path: paths.license, profile_photo_path: paths.profile_photo,
   });
