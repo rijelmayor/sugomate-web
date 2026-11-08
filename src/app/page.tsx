@@ -10,9 +10,9 @@ const services = [
 ];
 
 const ecosystem = [
-  { icon: ShoppingBag, title: "For customers", copy: "One simple place to order, request, and arrange local deliveries.", href: "/register" },
-  { icon: Store, title: "For local businesses", copy: "Help more people discover your store and make ordering easier.", href: "/register/merchant" },
-  { icon: Truck, title: "For delivery partners", copy: "Connect with local delivery requests and serve your community.", href: "/register/driver" },
+  { icon: ShoppingBag, title: "For customers", copy: "One simple place to order, request, and arrange local deliveries.", href: "/register?next=%2Fdashboard" },
+  { icon: Store, title: "For local businesses", copy: "Help more people discover your store and make ordering easier.", href: "/register?next=%2Fmerchant%2Fapply" },
+  { icon: Truck, title: "For delivery partners", copy: "Connect with local delivery requests and serve your community.", href: "/register?next=%2Fdriver%2Fapply" },
 ];
 
 export default function HomePage() {
