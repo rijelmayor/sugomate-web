@@ -17,6 +17,14 @@ export async function reviewMerchant(formData: FormData) {
   const id = String(formData.get("merchant_id") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(id) || !["approved","rejected","suspended"].includes(status)) redirect("/admin?error=invalid");
+  const categoryId = String(formData.get("category_id") ?? "");
+  if (status === "approved" && categoryId) {
+    if (!/^[0-9a-f-]{36}$/i.test(categoryId)) redirect("/admin/merchant-management?error=category");
+    const { data: category } = await supabase.from("merchant_categories").select("id").eq("id", categoryId).eq("is_active", true).maybeSingle();
+    if (!category) redirect("/admin/merchant-management?error=category");
+    const { error: categoryError } = await supabase.rpc("admin_assign_merchant_category", { p_merchant_id: id, p_category_id: categoryId });
+    if (categoryError) redirect("/admin/merchant-management?error=category");
+  }
   const { error } = await supabase.rpc("admin_review_merchant", { p_merchant_id: id, p_status: status });
   if (error) redirect("/admin?error=merchant");
   redirect("/admin?updated=merchant");
