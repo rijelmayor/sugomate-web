@@ -7,7 +7,7 @@ import FormSubmitButton from "@/components/FormSubmitButton";
 import PortalSignOut from "@/components/PortalSignOut";
 
 const money=(value:number|string)=>"₱"+Number(value).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
-const statusLabel:Record<string,string>={ready_for_pickup:"Ready for dispatch",assigned:"Awaiting driver response",picked_up:"Picked up",in_transit:"In transit",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
+const statusLabel:Record<string,string>={accepted:"Waiting for rider",ready_for_pickup:"Ready for dispatch",assigned:"Awaiting driver response",picked_up:"Picked up",in_transit:"In transit",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected"};
 
 export default async function AdminDispatchPage({searchParams}:{searchParams:Promise<{from?:string;to?:string;error?:string;updated?:string}>}) {
  const params=await searchParams;
@@ -26,7 +26,7 @@ export default async function AdminDispatchPage({searchParams}:{searchParams:Pro
  const [driversQ,queueQ,activeQ,reportQ]=await Promise.all([
   supabase.from("driver_profiles").select("user_id,vehicle_type,vehicle_plate,is_available").eq("status","active").eq("is_available",true).order("last_seen_at",{ascending:false}),
   supabase.from("orders").select("id,order_number,status,total,placed_at,address_snapshot,merchants(name)").eq("status","ready_for_pickup").is("driver_user_id",null).order("placed_at",{ascending:true}).limit(100),
-  supabase.from("orders").select("id,order_number,status,total,placed_at,driver_assignment_status,driver_user_id,driver_response_deadline_at,picked_up_at,address_snapshot,merchants(name)").in("status",["assigned","picked_up","in_transit"]).order("updated_at",{ascending:false}).limit(200),
+  supabase.from("orders").select("id,order_number,status,total,placed_at,driver_assignment_status,driver_user_id,driver_response_deadline_at,picked_up_at,address_snapshot,merchants(name)").in("status",["accepted","assigned","picked_up","in_transit"]).order("updated_at",{ascending:false}).limit(200),
   reportQuery
  ]);
  const drivers=driversQ.data??[],queue=queueQ.data??[],active=activeQ.data??[],reports=reportQ.data??[];
