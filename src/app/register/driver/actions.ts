@@ -9,19 +9,23 @@ export async function signUpDriver(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const municipalityId = String(formData.get("municipality_id") ?? "");
   const requestedNext = String(formData.get("next") ?? "");
   const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/driver/apply";
   const nextQuery = `&next=${encodeURIComponent(next)}`;
 
-  if (!displayName || !email || password.length < 8 || !phone) redirect(`/register/driver?error=invalid&next=${encodeURIComponent(next)}`);
+  if (!displayName || !email || password.length < 8 || !phone || !/^[0-9a-f-]{36}$/i.test(municipalityId)) redirect(`/register/driver?error=invalid&next=${encodeURIComponent(next)}`);
 
   const supabase = await createClient();
+  const { data: locality } = await supabase.from("municipalities").select("id").eq("id", municipalityId).eq("is_serviceable", true).maybeSingle();
+  if (!locality) redirect(`/register/driver?error=invalid&next=${encodeURIComponent(next)}`);
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://sugomate.com"}/auth/callback?next=${encodeURIComponent(next)}`,
-      data: { display_name: displayName, phone, intended_role: "driver" },
+      data: { display_name: displayName, phone, municipality_id: municipalityId, intended_role: "driver" },
     },
   });
   if (error || !data.user) redirect(`/register/driver?error=signup&next=${encodeURIComponent(next)}`);
