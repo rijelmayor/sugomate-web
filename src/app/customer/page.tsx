@@ -11,7 +11,7 @@ import { signOut } from "../dashboard/actions";
 type Cat = { id: string; name: string; slug: string; icon: string };
 type MerchantRel = { name: string; slug: string; logo_url: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; gcash_payment_type?: string; gcash_account_name?: string | null; gcash_mobile_number?: string | null; store_category: Cat | Cat[] | null };
 type BranchRel = { name: string; municipality_id: string; store_hours?: unknown; is_temporarily_closed?: boolean; municipalities: { name: string } | { name: string }[] | null };
-type ProductRow = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; merchant: MerchantRel | MerchantRel[] | null; branch: BranchRel | BranchRel[] | null };
+type ProductRow = { id: string; name: string; description: string | null; price: number | string; image_url: string | null; branch_id: string; category: Cat | Cat[] | null; merchant: MerchantRel | MerchantRel[] | null; branch: BranchRel | BranchRel[] | null };
 
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ error?: string; municipality?: string; storeCategory?: string; store?: string }> }) {
   const { error, municipality, storeCategory, store } = await searchParams;
@@ -20,7 +20,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
 
   // One lightweight pass over available products; stores and category counts are derived from it.
   // Needs 20261105150000_merchant_storefront_hours_payments.sql. Without it the full query errors, so we retry with the older columns instead of showing no stores.
-  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,gcash_payment_type,gcash_account_name,gcash_mobile_number,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
+  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,category:product_categories!products_category_id_fkey(id,name,slug,icon),merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,gcash_payment_type,gcash_account_name,gcash_mobile_number,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
   const buildProductQuery = (legacy: boolean) => {
     let query = supabase.from("products").select(productSelect(legacy)).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
     if (municipality) query = query.eq("branch.municipality_id", municipality);
@@ -32,7 +32,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("merchant_categories").select("id,name,slug,icon,parent_id,image_url").eq("is_active", true).order("sort_order").order("name"),
+    supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name"),
     // Optional: needs 20261105110000_customer_read_delivery_fees.sql. Without it this returns nothing and checkout shows "Calculated at checkout".
     supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
@@ -56,16 +56,16 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     return {
       ...row,
       price: Number(row.price),
-      merchant: merchant ? { ...merchant, store_category: one(merchant.store_category) } : null,
+      category: one(row.category),\n      merchant: merchant ? { ...merchant, store_category: one(merchant.store_category) } : null,
       branch: branch ? { ...branch, municipalities: one(branch.municipalities) } : null,
     };
   });
 
   // A "store" is one merchant branch, matching the one-store-per-order rule at checkout.
-  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlug: string; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null; gcashPaymentType: string; gcashAccountName: string | null; gcashMobileNumber: string | null }>();
+  const storeMap = new Map<string, { id: string; name: string; branchName: string; categorySlugs: string[]; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null; gcashPaymentType: string; gcashAccountName: string | null; gcashMobileNumber: string | null }>();
   for (const row of rows) {
     const existing = storeMap.get(row.branch_id);
-    if (existing) { existing.count += 1; continue; }
+    if (existing) { if (row.category?.slug && !existing.categorySlugs.includes(row.category.slug)) existing.categorySlugs.push(row.category.slug); existing.count += 1; continue; }
     const schedule = (row.branch?.store_hours ?? {}) as Record<string, {open?:string;close?:string;closed?:boolean}>;
     const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
     const part = (type: string) => parts.find(item => item.type === type)?.value ?? "";
@@ -75,11 +75,11 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     const openMinutes = Number((slot.open ?? "08:00").slice(0,2)) * 60 + Number((slot.open ?? "08:00").slice(3,5));
     const closeMinutes = Number((slot.close ?? "20:00").slice(0,2)) * 60 + Number((slot.close ?? "20:00").slice(3,5));
     const isOpen = !row.branch?.is_temporarily_closed && !slot.closed && nowMinutes >= openMinutes && nowMinutes < closeMinutes;
-    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlug: row.merchant?.store_category?.slug ?? "other", area: row.branch?.municipalities?.name ?? "", count: 1, image: row.merchant?.logo_url ?? null, isOpen, acceptedPaymentMethods: row.merchant?.accepted_payment_methods ?? ["cod"], gcashQrUrl: row.merchant?.gcash_qr_url ?? null, gcashPaymentType: row.merchant?.gcash_payment_type ?? "qr", gcashAccountName: row.merchant?.gcash_account_name ?? null, gcashMobileNumber: row.merchant?.gcash_mobile_number ?? null });
+    storeMap.set(row.branch_id, { id: row.branch_id, name: row.merchant?.name ?? "Local store", branchName: row.branch?.name ?? "", categorySlugs: row.category?.slug ? [row.category.slug] : [], area: row.branch?.municipalities?.name ?? "", count: 1, image: row.merchant?.logo_url ?? null, isOpen, acceptedPaymentMethods: row.merchant?.accepted_payment_methods ?? ["cod"], gcashQrUrl: row.merchant?.gcash_qr_url ?? null, gcashPaymentType: row.merchant?.gcash_payment_type ?? "qr", gcashAccountName: row.merchant?.gcash_account_name ?? null, gcashMobileNumber: row.merchant?.gcash_mobile_number ?? null });
   }
   const stores = [...storeMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   // Only the open store's menu is sent to the browser, which keeps the home page light.
-  const products = store && storeMap.get(store)?.isOpen ? rows.filter(row => row.branch_id === store) : [];
+  const products = store && storeMap.get(store)?.isOpen ? rows.filter(row => row.branch_id === store && (!storeCategory || row.category?.slug === storeCategory)) : [];
 
   const deliveryFees: Record<string, number> = {};
   for (const zone of zones ?? []) if (!(zone.municipality_id in deliveryFees)) deliveryFees[zone.municipality_id] = Number(zone.base_delivery_fee);
@@ -101,7 +101,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Unsa imong sugo karon?</h1>
       </section>
 
-      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={merchantCategories ?? []} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} merchantUsageEnabled={financialSettings?.merchant_usage_enabled??false} merchantUsageMethod={financialSettings?.merchant_usage_method??"percentage"} merchantUsageValue={Number(financialSettings?.merchant_usage_value??0)} /></section>
+      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={productCategories} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} merchantUsageEnabled={financialSettings?.merchant_usage_enabled??false} merchantUsageMethod={financialSettings?.merchant_usage_method??"percentage"} merchantUsageValue={Number(financialSettings?.merchant_usage_value??0)} /></section>
 
       <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, kami bahala.</footer>
     </div>
