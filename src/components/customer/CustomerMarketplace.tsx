@@ -17,6 +17,7 @@ type Product = {
   description: string | null;
   price: number | string;
   image_url: string | null;
+  category: { id: string; name: string; slug: string; icon: string } | null;
   merchant: { name: string; slug: string; logo_url?: string | null; accepted_payment_methods?: string[]; gcash_qr_url?: string | null; gcash_payment_type?: string; gcash_account_name?: string | null; gcash_mobile_number?: string | null; store_category?: { id: string; name: string; slug: string; icon: string } | null } | null;
   branch: { name: string; municipalities: { name: string } | null } | null;
 };
