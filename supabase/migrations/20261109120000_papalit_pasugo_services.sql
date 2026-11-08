@@ -243,7 +243,7 @@ begin
     'Customer paid the assigned rider directly by ' || upper(p_method) || '.',
     jsonb_build_object('method',p_method,'amount',round(p_amount,2),'gcash_reference',case when p_method='gcash' then left(trim(p_gcash_reference),120) else null end)
   );
-end;
+$$;
 $;
 revoke all on function public.rider_record_service_payment(uuid,text,numeric,text) from public, anon;
 grant execute on function public.rider_record_service_payment(uuid,text,numeric,text) to authenticated;
@@ -303,8 +303,7 @@ set search_path = ''
 as $$
 begin
   if auth.uid() is null then raise exception 'Sign in required.'; end if;
-  if p_path !~ ('^' || p_request_id::text || '/reference[.](jpg|png|webp)
-    raise exception 'Invalid reference image path.';
+  if p_path !~ ('^' || p_request_id::text || '/reference[.](jpg|png|webp)$') then
   end if;
   update public.service_requests
   set reference_image_path = p_path, updated_at = now()
