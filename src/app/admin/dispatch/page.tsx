@@ -16,7 +16,8 @@ export default async function AdminDispatchPage({searchParams}:{searchParams:Pro
  if(!user) redirect("/login");
  const {data:admin}=await supabase.from("user_roles").select("role").eq("user_id",user.id).eq("role","admin").maybeSingle();
  if(!admin) redirect("/dashboard?error=admin-access");
- await supabase.rpc("expire_unassigned_order_rider_targets");\n await supabase.rpc("expire_rider_response_timeouts");
+ await supabase.rpc("expire_unassigned_order_rider_targets");
+ await supabase.rpc("expire_rider_response_timeouts");
  const {data:responseSettings}=await supabase.from("rider_dispatch_settings").select("response_window_minutes,reminder_after_minutes,warning_after_minutes,updated_at").eq("id",true).maybeSingle();
  const from=params.from&&/^\d{4}-\d{2}-\d{2}$/.test(params.from)?params.from:null;
  const to=params.to&&/^\d{4}-\d{2}-\d{2}$/.test(params.to)?params.to:null;
