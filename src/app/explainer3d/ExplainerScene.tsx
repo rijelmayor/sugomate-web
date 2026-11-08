@@ -15,12 +15,12 @@ const stages = [
 ];
 
 const narration = [
-  "Welcome to SUGOMATE. One connected local-commerce network, bringing your community closer. Sa atong komunidad, mas sayon na ang pagpa-order ug pagpadala.",
-  "It begins with the customer. Browse local stores, choose what you need, place your order and follow its progress. Ikaw ang mopili; kami ang motabang sa pagpadala.",
-  "The merchant receives the order, reviews the details, accepts it and prepares the items. Ang tindahan maoy mo-confirm ug mo-andam sa imong order.",
-  "When the order is ready, it moves into dispatch. SUGOMATE coordinates the handoff to an eligible delivery partner. Andam na? Ipadala na sa rider.",
-  "The delivery partner accepts the offer, picks up the parcel and travels to the customer. Ang rider maoy modala sa imong sugo, diretso sa imong pultahan.",
-  "The customer receives the order, while proof of delivery records completion. Admin keeps an eye on the network. Usa ka order, daghang kauban, usa ka tumong: serbisyo nga kasaligan. SUGOMATE. Imong sugo, among ihatod.",
+  "Welcome to SUGOMATE, one connected local-commerce network. Sa atong komunidad, mas sayon na ang pagpa-order ug pagpadala.",
+  "Customers browse local stores, choose what they need and place an order. Ikaw ang mopili; kami ang motabang sa pagpadala.",
+  "The merchant reviews, accepts and prepares the order. Ang tindahan maoy mo-confirm ug mo-andam sa imong gipamalit.",
+  "When ready, the order enters dispatch and is matched with an eligible rider. Andam na? Ipadala na sa rider.",
+  "The delivery partner accepts, picks up and brings the order to your doorstep. Ang rider maoy modala sa imong sugo.",
+  "The customer receives the order and delivery proof is recorded. Admin oversees the network. Usa ka order, usa ka komunidad. SUGOMATE. Imong sugo, among ihatod.",
 ];
 
 const points = [
