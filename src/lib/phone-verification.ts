@@ -118,5 +118,23 @@ export async function verifyPhoneOtp(email: string, submittedCode: string) {
   }
 
   await supabase.from("phone_verification_challenges").delete().eq("user_id", challenge.user_id);
-  return { ok: true as const };
+  return { ok: true as const, userId: challenge.user_id };
+}
+
+
+export async function assignVerifiedRegistrationRole(userId: string, role: "customer" | "driver" | "merchant") {
+  const supabase = adminClient();
+  const { data: existing, error: lookupError } = await supabase
+    .from("user_roles").select("role").eq("user_id", userId);
+  if (lookupError) throw new Error("Unable to verify account registration role.");
+  if (existing?.some((row) => row.role === role)) return;
+  if (role !== "customer") {
+    const { error: removeCustomerError } = await supabase.from("user_roles")
+      .delete().eq("user_id", userId).eq("role", "customer");
+    if (removeCustomerError) throw new Error("Unable to update account registration role.");
+  }
+  const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
+  if (error && !String(error.code) .includes("23505")) {
+    throw new Error("Unable to assign account registration role.");
+  }
 }
