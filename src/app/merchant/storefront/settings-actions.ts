@@ -51,18 +51,30 @@ export async function saveMerchantStorefront(formData: FormData) {
   if (gcashEnabled && gcashPaymentType === "qr" && !/^https:\/\//i.test(qrUrl)) redirect(`/merchant/storefront?branch=${branchId}&error=qr-required`);
   if (gcashEnabled && gcashPaymentType === "number") qrUrl = "";
 
-  // Store logo (optional): keep the current one unless a new WebP is uploaded or removal is ticked.
+  // Store logo (optional): validate the actual file signature instead of trusting
+  // browser MIME metadata. Android browsers sometimes report an empty or different
+  // File.type even when the selected image is a valid JPEG/PNG/WebP.
   const existingLogo = String(formData.get("existing_logo_url") ?? "").trim();
   let logoUrl: string | null = /^https:\/\//i.test(existingLogo) ? existingLogo : null;
   let logoChanged = false;
   const logoFile = formData.get("store_logo");
   if (logoFile instanceof File && logoFile.size > 0) {
+    if (logoFile.size > 5 * 1024 * 1024) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
     const head = new Uint8Array(await logoFile.slice(0, 12).arrayBuffer());
+    const isPng = head.length >= 8 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47 && head[4] === 0x0d && head[5] === 0x0a && head[6] === 0x1a && head[7] === 0x0a;
+    const isJpeg = head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
     const tag = (from: number) => String.fromCharCode(...head.slice(from, from + 4));
-    if (logoFile.type !== "image/webp" || logoFile.size > 1024 * 1024 || tag(0) !== "RIFF" || tag(8) !== "WEBP") redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
-    const logoPath = `${merchantId}/${randomUUID()}.webp`;
-    const { error: logoUploadError } = await supabase.storage.from("merchant-logos").upload(logoPath, logoFile, { contentType: "image/webp", cacheControl: "3600", upsert: false });
-    if (logoUploadError) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    const isWebp = head.length >= 12 && tag(0) === "RIFF" && tag(8) === "WEBP";
+    const detected = isPng ? { ext: "png", type: "image/png" }
+      : isJpeg ? { ext: "jpg", type: "image/jpeg" }
+      : isWebp ? { ext: "webp", type: "image/webp" } : null;
+    if (!detected) redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    const logoPath = `${merchantId}/${randomUUID()}.${detected.ext}`;
+    const { error: logoUploadError } = await supabase.storage.from("merchant-logos").upload(logoPath, logoFile, { contentType: detected.type, cacheControl: "3600", upsert: false });
+    if (logoUploadError) {
+      console.error("[merchant-logo] storage upload failed", { code: logoUploadError.name, message: logoUploadError.message, size: logoFile.size, detectedType: detected.type });
+      redirect(`/merchant/storefront?branch=${branchId}&error=logo`);
+    }
     logoUrl = supabase.storage.from("merchant-logos").getPublicUrl(logoPath).data.publicUrl;
     logoChanged = true;
   } else if (formData.get("remove_logo") === "on" && logoUrl) {
