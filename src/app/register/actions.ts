@@ -40,8 +40,18 @@ export async function resendRegistrationPhoneOtp(formData:FormData){
   const {createClient:adminClient}=await import("@supabase/supabase-js");
   const admin=adminClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   const {data:challenge}=await admin.from("phone_verification_challenges").select("user_id,email,phone").eq("email",email).maybeSingle();
-  if(!challenge) redirect(`/register?error=invalid&next=${encodeURIComponent(next)}`);
+  if(!challenge) {
+    // A successful verification consumes the challenge. If the user revisits a stale
+    // verification page, send them to sign-in instead of reporting a resend failure.
+    const {data:user}=await admin.from("profiles").select("phone_verified_at").eq("id",(await admin.auth.admin.listUsers({page:1,perPage:1000})).data.users.find(u=>u.email?.toLowerCase()===email)?.id??"").maybeSingle();
+    if(user?.phone_verified_at) redirect(`/login?success=phone-verified&next=${encodeURIComponent(next)}`);
+    redirect(`/register?error=invalid&next=${encodeURIComponent(next)}`);
+  }
   try { await createAndSendPhoneOtp(challenge.user_id,challenge.email,challenge.phone); }
-  catch { redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`); }
+  catch (e) {
+    const message=e instanceof Error?e.message:"";
+    if(message.includes("wait 60 seconds")) redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=cooldown`);
+    redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`);
+  }
   redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&success=resent`);
 }
