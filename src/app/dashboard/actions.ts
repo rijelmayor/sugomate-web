@@ -19,7 +19,10 @@ export async function applyAsMerchant(formData: FormData) {
   const address = String(formData.get("business_address") ?? "").trim().slice(0, 500);
   const contactPhone = String(formData.get("business_phone") ?? "").trim().slice(0, 20);
   const description = String(formData.get("business_description") ?? "").trim().slice(0, 1000);
-  if (!name || slug.length < 3) redirect("/merchant/apply?error=details");
+  const municipalityId = String(formData.get("municipality_id") ?? "");
+  if (!name || slug.length < 3 || !/^[0-9a-f-]{36}$/i.test(municipalityId) || !address) redirect("/merchant/apply?error=details");
+  const { data: locality } = await supabase.from("municipalities").select("id").eq("id", municipalityId).eq("is_serviceable", true).maybeSingle();
+  if (!locality) redirect("/merchant/apply?error=locality");
 
   const { data: merchant, error } = await supabase.from("merchants")
     .insert({ owner_id: user.id, name, slug, status: "pending", address: address || null, contact_phone: contactPhone || null, description: description || null })
@@ -29,6 +32,12 @@ export async function applyAsMerchant(formData: FormData) {
   const { error: memberError } = await supabase.from("merchant_members")
     .insert({ merchant_id: merchant.id, user_id: user.id, member_role: "owner" });
   if (memberError) redirect("/merchant/apply?error=membership");
+
+  const { error: branchError } = await supabase.from("merchant_branches").insert({
+    merchant_id: merchant.id, name, municipality_id: municipalityId, address_line: address,
+    contact_phone: contactPhone || null, is_active: true,
+  });
+  if (branchError) redirect("/merchant/apply?error=branch");
   redirect("/merchant/apply?success=submitted");
 }
 
