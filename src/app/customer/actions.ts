@@ -17,13 +17,12 @@ export async function saveCustomerAddress(formData: FormData) {
   const recipientPhone = String(formData.get("recipient_phone") ?? "").trim().slice(0,40);
   const municipalityId = String(formData.get("municipality_id") ?? "");
     const serviceZoneId = String(formData.get("service_zone_id") ?? "");
-  const barangayId = String(formData.get("barangay_id") ?? "");
   const addressLine = String(formData.get("address_line") ?? "").trim().slice(0,300);
   const landmark = String(formData.get("landmark") ?? "").trim().slice(0,200);
-  if (!recipientName || !recipientPhone || !municipalityId || !/^[0-9a-f-]{36}$/i.test(barangayId) || !addressLine) redirect("/customer/addresses?error=required");
+  if (!recipientName || !recipientPhone || !municipalityId || !/^[0-9a-f-]{36}$/i.test(serviceZoneId) || !addressLine) redirect("/customer/addresses?error=required");
   const { error } = await supabase.from("customer_addresses").insert({
     customer_id:user.id,label,recipient_name:recipientName,recipient_phone:recipientPhone,
-    municipality_id:municipalityId,barangay_id:barangayId,address_line:addressLine,landmark:landmark || null
+    municipality_id:municipalityId,service_zone_id:serviceZoneId,address_line:addressLine,landmark:landmark || null
   });
   if (error) redirect("/customer/addresses?error=save");
   redirect("/customer/addresses?saved=1");
@@ -40,12 +39,13 @@ export async function placeOrder(formData: FormData) {
     const recipientName = String(formData.get("recipient_name") ?? "").trim().slice(0,120);
     const recipientPhone = String(formData.get("recipient_phone") ?? "").trim().slice(0,40);
     const municipalityId = String(formData.get("municipality_id") ?? "");
+    const serviceZoneId = String(formData.get("service_zone_id") ?? "");
     const addressLine = String(formData.get("address_line") ?? "").trim().slice(0,300);
     const landmark = String(formData.get("landmark") ?? "").trim().slice(0,200);
-    if (!recipientName || !recipientPhone || !/^[0-9a-f-]{36}$/i.test(municipalityId) || !/^[0-9a-f-]{36}$/i.test(barangayId) || addressLine.length < 5) redirect("/customer?error=address");
+    if (!recipientName || !recipientPhone || !/^[0-9a-f-]{36}$/i.test(municipalityId) || !/^[0-9a-f-]{36}$/i.test(serviceZoneId) || addressLine.length < 5) redirect("/customer?error=address");
     const { data: address, error: addressError } = await supabase.from("customer_addresses").insert({
       customer_id: user.id, label, recipient_name: recipientName,
-      recipient_phone: recipientPhone, municipality_id: municipalityId, barangay_id: barangayId, address_line: addressLine, landmark: landmark || null
+      recipient_phone: recipientPhone, municipality_id: municipalityId, service_zone_id: serviceZoneId, address_line: addressLine, landmark: landmark || null
     }).select("id").single();
     if (addressError || !address) redirect("/customer?error=address");
     addressId = address.id;
