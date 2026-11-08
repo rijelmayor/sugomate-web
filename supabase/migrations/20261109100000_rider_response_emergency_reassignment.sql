@@ -438,3 +438,69 @@ end;
 $$;
 revoke all on function public.driver_respond_to_assignment(uuid,boolean) from public,anon;
 grant execute on function public.driver_respond_to_assignment(uuid,boolean) to authenticated;
+
+
+-- Preserve the merchant's preparation stage when a rider withdraws before pickup.
+create or replace function public.merchant_release_unresponsive_rider(p_order_id uuid,p_reason text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype; v_reason text:=left(trim(coalesce(p_reason,'')),300); v_next text;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if length(v_reason)<3 then raise exception 'Provide a reason for releasing this rider.'; end if;
+  select o.* into v_order from public.orders o
+  where o.id=p_order_id
+    and exists(select 1 from public.merchant_members mm where mm.merchant_id=o.merchant_id and mm.user_id=v_actor)
+    and exists(select 1 from public.merchants m where m.id=o.merchant_id and m.status='approved')
+  for update;
+  if not found then raise exception 'Order not found or merchant access denied.'; end if;
+  if v_order.status not in ('assigned','accepted','preparing','ready_for_pickup')
+     or v_order.picked_up_at is not null or v_order.driver_user_id is null then
+    raise exception 'Only an assigned order that has not been picked up can be returned to the queue.';
+  end if;
+  v_next:=case when v_order.status='assigned' then 'ready_for_pickup' else v_order.status end;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,status=v_next,
+    assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,v_order.status,v_next,v_actor,'Merchant released rider before pickup: '||v_reason);
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'merchant_released_rider','orders',p_order_id::text,
+    jsonb_build_object('previous_driver_user_id',v_order.driver_user_id,'reason',v_reason,
+      'stock_reservations_preserved',true,'picked_up',false,'preserved_order_stage',v_next));
+end;
+$$;
+
+create or replace function public.driver_report_emergency_before_pickup(p_order_id uuid,p_reason text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
+  v_reason text:=left(trim(coalesce(p_reason,'')),300); v_next text;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if length(v_reason)<3 then raise exception 'Describe the emergency briefly.'; end if;
+  select * into v_order from public.orders where id=p_order_id and driver_user_id=v_actor for update;
+  if not found or v_order.picked_up_at is not null
+     or v_order.status not in ('assigned','accepted','preparing','ready_for_pickup') then
+    raise exception 'This delivery cannot be released through the pre-pickup emergency flow.';
+  end if;
+  v_next:=case when v_order.status='assigned' then 'ready_for_pickup' else v_order.status end;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,status=v_next,
+    assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,v_order.status,v_next,v_actor,'Rider reported emergency before pickup: '||v_reason);
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'driver_emergency_release','orders',p_order_id::text,
+    jsonb_build_object('reason',v_reason,'picked_up',false,'preserved_order_stage',v_next));
+end;
+$$;
+
+-- Admins can inspect the immutable custody-transfer ledger; other portal roles cannot.
+grant select on public.order_delivery_handoffs to authenticated;
+drop policy if exists "Admins read delivery handoffs" on public.order_delivery_handoffs;
+create policy "Admins read delivery handoffs"
+on public.order_delivery_handoffs for select to authenticated
+using ((select app_private.has_role((select auth.uid()),'admin'::public.app_role)));
