@@ -81,7 +81,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const products = store && storeMap.get(store)?.isOpen ? rows.filter(row => row.branch_id === store && (!storeCategory || row.category?.slug === storeCategory)) : [];
 
   const zoneFees: Record<string, number> = {};
-  for (const zone of zones ?? []) if (zone.id) zoneFees[zone.barangay_id] = Number(zone.base_delivery_fee);
+  for (const zone of serviceZones ?? []) zoneFees[zone.id] = Number(zone.base_delivery_fee);
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
 
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-5 text-[#102e57] sm:px-6 sm:py-8">
