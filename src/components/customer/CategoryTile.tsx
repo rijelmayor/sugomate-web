@@ -28,11 +28,11 @@ export function CategoryGlyph({ slug, size = 15 }: { slug: string; size?: number
 export default function CategoryTile({ href, name, slug, imageUrl, count }: { href: string; name: string; slug: string; imageUrl?: string | null; count: number }) {
   const [state, setState] = useState<"loading" | "ok" | "error">(imageUrl ? "loading" : "error");
   const { Icon, tint } = categoryGlyph(slug);
-  return <PendingLink href={href} className="group relative block aspect-[4/5] w-full min-w-0 overflow-hidden rounded-3xl bg-[#102e57] shadow-[0_8px_24px_rgba(16,46,87,0.14)] transition duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 active:scale-[.98] sm:aspect-[5/6]">
+  return <PendingLink href={href} className="group relative block aspect-square w-full min-w-0 overflow-hidden rounded-3xl bg-[#102e57] shadow-[0_8px_24px_rgba(16,46,87,0.14)] transition duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 active:scale-[.98] sm:aspect-square">
     <div aria-hidden="true" className={`absolute inset-0 bg-gradient-to-br ${tint} ${state === "loading" ? "skeleton" : ""}`}>
       {state !== "ok" && <Icon size={56} strokeWidth={1.25} className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 text-white/80" />}
     </div>
-    {imageUrl && state !== "error" && <img src={imageUrl} alt="" loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("error")} className={`absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105 ${state === "ok" ? "opacity-100" : "opacity-0"}`} />}
+    {imageUrl && state !== "error" && <img src={imageUrl} alt="" loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("error")} className={`absolute inset-0 h-full w-full object-contain p-3 transition duration-500 ${state === "ok" ? "opacity-100" : "opacity-0"}`} />}
     <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#0a1f3d]/90 via-[#0a1f3d]/25 to-transparent" />
     <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
       <span className="block text-sm font-extrabold leading-tight text-white sm:text-base" style={{ color: "#fff", WebkitTextFillColor: "#fff" }}>{name}</span>
