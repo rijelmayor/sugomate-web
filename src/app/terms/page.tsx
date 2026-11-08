@@ -117,7 +117,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="16. Operator and contact information">
-          <p>SUGOMATE is operated in the Philippines as a sole proprietorship. The registered proprietor's full legal name, registered business address, and dedicated customer-support contact details must be displayed here once confirmed against the business registration and official contact channels. A dedicated email address has not yet been established. Until official contact details are published, use the support or contact channel made available within the SUGOMATE Platform, if available.</p>
+          <p>SUGOMATE is operated in the Philippines as a sole proprietorship. The registered proprietor’s full legal name, registered business address, and dedicated customer-support contact details must be displayed here once confirmed against the business registration and official contact channels. A dedicated email address has not yet been established. Until official contact details are published, use the support or contact channel made available within the SUGOMATE Platform, if available.</p>
           <p>This document is a platform terms draft prepared for operational use. The operator details in this section must be completed and the Terms should receive Philippine legal review before public launch.</p>
         </Section>
 
