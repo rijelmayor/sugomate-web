@@ -192,7 +192,7 @@ export default function ExplainerScene() {
         new THREE.MeshBasicMaterial({ color: "#20df91" }),
       );
       check.add(ring);
-      const makeStroke = (start, end) => {
+      const makeStroke = (start: THREE.Vector3, end: THREE.Vector3) => {
         const direction = new THREE.Vector3().subVectors(end, start);
         const stroke = new THREE.Mesh(
           new THREE.CylinderGeometry(0.045, 0.045, direction.length(), 12),
