@@ -14,6 +14,15 @@ const stages = [
   { title: "Admin oversees the network", copy: "Operations monitors partner readiness, dispatch activity, service zones, order outcomes and the audit trail.", actor: "ADMIN CONTROL ROOM", detail: "Monitor • Verify • Improve" },
 ];
 
+const narration = [
+  "Welcome to SUGOMATE, one connected local-commerce network. Sa atong komunidad, mas sayon na ang pagpa-order ug pagpadala.",
+  "Customers browse local stores, choose what they need and place an order. Ikaw ang mopili; kami ang motabang sa pagpadala.",
+  "The merchant reviews, accepts and prepares the order. Ang tindahan maoy mo-confirm ug mo-andam sa imong gipamalit.",
+  "When ready, the order enters dispatch and is matched with an eligible rider. Andam na? Ipadala na sa rider.",
+  "The delivery partner accepts, picks up and brings the order to your doorstep. Ang rider maoy modala sa imong sugo.",
+  "The customer receives the order and delivery proof is recorded. Admin oversees the network. Usa ka order, usa ka komunidad. SUGOMATE. Imong sugo, among ihatod.",
+];
+
 const points = [
   new THREE.Vector3(-4.2, 0.15, 1.2),
   new THREE.Vector3(-2.5, 0.8, -1.2),
@@ -26,6 +35,7 @@ export default function ExplainerScene() {
   const mountRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState(true);
+  const [voiceOn, setVoiceOn] = useState(false);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -139,6 +149,17 @@ export default function ExplainerScene() {
       });
     });
     scene.add(courier);
+
+    const routeBeads = Array.from({ length: 18 }, (_, index) => {
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), new THREE.MeshBasicMaterial({ color: index % 3 === 0 ? "#fff1b8" : "#ffad16" }));
+      scene.add(bead);
+      return bead;
+    });
+    const orbiters = nodes.map((node, index) => {
+      const orbiter = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), new THREE.MeshBasicMaterial({ color: "#fff2c5" }));
+      scene.add(orbiter);
+      return { orbiter, node, index };
+    });
 
     const stars = new THREE.Points(
       new THREE.BufferGeometry().setFromPoints(Array.from({ length: 180 }, () => new THREE.Vector3((Math.random() - 0.5) * 22, Math.random() * 7 + 1, (Math.random() - 0.5) * 18))),
