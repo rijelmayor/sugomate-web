@@ -41,11 +41,9 @@ export async function resendRegistrationPhoneOtp(formData:FormData){
   const admin=adminClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   const {data:challenge}=await admin.from("phone_verification_challenges").select("user_id,email,phone").eq("email",email).maybeSingle();
   if(!challenge) {
-    // A successful verification consumes the challenge. If the user revisits a stale
-    // verification page, send them to sign-in instead of reporting a resend failure.
-    const {data:user}=await admin.from("profiles").select("phone_verified_at").eq("id",(await admin.auth.admin.listUsers({page:1,perPage:1000})).data.users.find(u=>u.email?.toLowerCase()===email)?.id??"").maybeSingle();
-    if(user?.phone_verified_at) redirect(`/login?success=phone-verified&next=${encodeURIComponent(next)}`);
-    redirect(`/register?error=invalid&next=${encodeURIComponent(next)}`);
+    // Verification consumes the challenge. A stale verification page should not
+    // attempt to send another code when there is no active challenge.
+    redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=missing`);
   }
   try { await createAndSendPhoneOtp(challenge.user_id,challenge.email,challenge.phone); }
   catch (e) {
