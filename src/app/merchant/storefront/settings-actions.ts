@@ -35,17 +35,17 @@ export async function saveMerchantStorefront(formData: FormData) {
   const gcashAccountName = String(formData.get("gcash_account_name") ?? "").trim().slice(0,100);
   const gcashMobileNumber = String(formData.get("gcash_mobile_number") ?? "").trim().replace(/[\s()-]/g,"");
   if (!acceptCod && !gcashEnabled) redirect(`/merchant/storefront?branch=${branchId}&error=payment`);
-  if (gcashEnabled && gcashPaymentType === "number" && (!gcashAccountName || !/^(09[0-9]{9}|\+639[0-9]{9})$/.test(gcashMobileNumber))) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
+  if (gcashEnabled && gcashPaymentType === "number" && (!gcashAccountName || !/^(09[0-9]{9}|\+639[0-9]{9})$/.test(gcashMobileNumber))) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-number-details`);
   if (gcashEnabled && !["number","qr"].includes(gcashPaymentType)) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
 
   let qrUrl = String(formData.get("existing_gcash_qr_url") ?? "").trim();
   const qrFile = formData.get("gcash_qr") as File | null;
   if (gcashEnabled && gcashPaymentType === "qr" && qrFile && qrFile.size > 0) {
-    if (!["image/png","image/jpeg","image/webp"].includes(qrFile.type) || qrFile.size > 5 * 1024 * 1024) redirect(`/merchant/storefront?branch=${branchId}&error=qr`);
+    if (!["image/png","image/jpeg","image/webp"].includes(qrFile.type) || qrFile.size > 5 * 1024 * 1024) redirect(`/merchant/storefront?branch=${branchId}&error=qr-upload`);
     const ext = qrFile.type === "image/png" ? "png" : qrFile.type === "image/webp" ? "webp" : "jpg";
     const path = `${merchantId}/${user.id}/${randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage.from("merchant-payment-qr").upload(path, qrFile, { contentType: qrFile.type, cacheControl: "3600", upsert: false });
-    if (uploadError) redirect(`/merchant/storefront?branch=${branchId}&error=qr`);
+    if (uploadError) redirect(`/merchant/storefront?branch=${branchId}&error=qr-upload`);
     qrUrl = supabase.storage.from("merchant-payment-qr").getPublicUrl(path).data.publicUrl;
   }
   if (gcashEnabled && gcashPaymentType === "qr" && !/^https:\/\//i.test(qrUrl)) redirect(`/merchant/storefront?branch=${branchId}&error=qr-required`);
