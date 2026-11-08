@@ -73,3 +73,46 @@ export async function assignOrderToDriver(formData: FormData) {
   if (error) redirect("/admin/dispatch?error=assignment");
   redirect("/admin/dispatch?updated=assigned");
 }
+
+
+export async function saveDeliveryRoute(formData: FormData) {
+  const supabase = await requireAdmin();
+  const origin = String(formData.get("origin_municipality_id") ?? "");
+  const destination = String(formData.get("destination_municipality_id") ?? "");
+  const fee = Number(formData.get("delivery_fee"));
+  const active = formData.get("is_active") === "on";
+  const notes = String(formData.get("notes") ?? "").trim().slice(0, 500);
+  if (!/^[0-9a-f-]{36}$/i.test(origin) || !/^[0-9a-f-]{36}$/i.test(destination) || !Number.isFinite(fee) || fee < 0) redirect("/admin/localities?error=route");
+  const { error } = await supabase.from("delivery_routes").upsert({
+    origin_municipality_id: origin, destination_municipality_id: destination,
+    delivery_fee: fee, is_active: active, notes: notes || null, updated_at: new Date().toISOString(),
+  }, { onConflict: "origin_municipality_id,destination_municipality_id" });
+  if (error) redirect("/admin/localities?error=route");
+  redirect("/admin/localities?saved=route");
+}
+
+export async function authorizeRiderLocality(formData: FormData) {
+  const supabase = await requireAdmin();
+  const rider = String(formData.get("rider_user_id") ?? "");
+  const municipality = String(formData.get("municipality_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
+  const expiryRaw = String(formData.get("expires_at") ?? "");
+  const expiryDate = expiryRaw ? new Date(expiryRaw) : null;
+  if (!/^[0-9a-f-]{36}$/i.test(rider) || !/^[0-9a-f-]{36}$/i.test(municipality) || reason.length < 3 || (expiryDate && !Number.isFinite(expiryDate.getTime()))) redirect("/admin/localities?error=authorization");
+  const expiry = expiryDate ? expiryDate.toISOString() : null;
+  const { error } = await supabase.rpc("admin_authorize_rider_locality", {
+    p_rider_user_id: rider, p_municipality_id: municipality, p_reason: reason, p_expires_at: expiry,
+  });
+  if (error) redirect("/admin/localities?error=authorization");
+  redirect("/admin/localities?saved=authorization");
+}
+
+export async function revokeRiderLocality(formData: FormData) {
+  const supabase = await requireAdmin();
+  const id = String(formData.get("authorization_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
+  if (!/^[0-9a-f-]{36}$/i.test(id) || reason.length < 3) redirect("/admin/localities?error=authorization");
+  const { error } = await supabase.rpc("admin_revoke_rider_locality", { p_authorization_id: id, p_reason: reason });
+  if (error) redirect("/admin/localities?error=authorization");
+  redirect("/admin/localities?saved=revoked");
+}

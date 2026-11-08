@@ -5,16 +5,24 @@ import DocumentUpload from "@/components/DocumentUpload";
 import FormSubmitButton from "@/components/FormSubmitButton";
 
 // mode "new": full application. mode "docs": an existing pending applicant adding missing documents.
-export default function DriverApplicationForm({ action, mode, fixedVehicle }: {
+export default function DriverApplicationForm({ action, mode, fixedVehicle, municipalities = [] }: {
   action: (formData: FormData) => void | Promise<void>;
   mode: "new" | "docs";
   fixedVehicle?: string;
+  municipalities?: { id: string; name: string; province: string }[];
 }) {
   const [vehicle, setVehicle] = useState(fixedVehicle ?? "");
   const licenseRecommended = vehicle !== "" && vehicle !== "Bicycle";
   return <form action={action} className="mt-6 space-y-5">
     {mode === "new" && <>
       <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm font-bold">Registered municipality
+          <select required name="municipality_id" defaultValue="" className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
+            <option value="" disabled>Select where you reside</option>
+            {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}, {m.province}</option>)}
+          </select>
+          <span className="mt-1 block text-xs font-normal text-slate-500">This is your default pickup locality. Admin must verify it before activation.</span>
+        </label>
         <label className="block text-sm font-bold">Age <span className="font-normal text-slate-400">(recommended)</span>
           <input name="age" type="number" min="18" max="80" placeholder="e.g. 25" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />
         </label>
