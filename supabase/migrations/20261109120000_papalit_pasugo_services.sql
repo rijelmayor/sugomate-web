@@ -200,7 +200,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_request public.service_requests%rowtype;
   v_expected numeric(12,2);
@@ -244,7 +244,7 @@ begin
     jsonb_build_object('method',p_method,'amount',round(p_amount,2),'gcash_reference',case when p_method='gcash' then left(trim(p_gcash_reference),120) else null end)
   );
 end;
-$;
+$$;
 revoke all on function public.rider_record_service_payment(uuid,text,numeric,text) from public, anon;
 grant execute on function public.rider_record_service_payment(uuid,text,numeric,text) to authenticated;
 
@@ -303,18 +303,7 @@ set search_path = ''
 as $$
 begin
   if auth.uid() is null then raise exception 'Sign in required.'; end if;
-  if p_path !~ ('^' || p_request_id::text || '/reference[.](jpg|png|webp)) then
-    raise exception 'Invalid reference image path.';
-  end if;
-  update public.service_requests
-  set reference_image_path = p_path, updated_at = now()
-  where id = p_request_id and customer_id = auth.uid() and status = 'pending_review';
-  if not found then raise exception 'Request not found or no longer editable.'; end if;
-end;
-$$;
-revoke all on function public.customer_attach_service_request_reference(uuid,text) from public, anon;
-grant execute on function public.customer_attach_service_request_reference(uuid,text) to authenticated;
-) then
+  if p_path !~ ('^' || p_request_id::text || '/reference[.](jpg|png|webp)$') then
     raise exception 'Invalid reference image path.';
   end if;
   update public.service_requests

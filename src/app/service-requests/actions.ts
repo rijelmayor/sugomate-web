@@ -36,8 +36,8 @@ export async function createServiceRequest(formData: FormData) {
     .eq("id", addressId).eq("customer_id", user.id).maybeSingle();
   if (!address) redirect(serviceType === "papalit" ? "/papalit?error=address" : "/pasugo?error=address");
 
-  const items = rawItems.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean).slice(0, 30).map(line => {
-    const match = line.match(/^(\\d+)\\s*[x×]\\s*(.+)$/i);
+  const items = rawItems.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 30).map(line => {
+    const match = line.match(/^(\d+)\s*[x×]\s*(.+)$/i);
     return { quantity: match ? Math.min(99, Number(match[1])) : 1, name: (match ? match[2] : line).slice(0, 140) };
   });
   if (!items.length || items.some(item => !item.name || item.quantity < 1)) redirect(serviceType === "papalit" ? "/papalit?error=items" : "/pasugo?error=items");
