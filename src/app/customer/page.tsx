@@ -28,7 +28,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   };
   const productQuery = buildProductQuery(false);
 
-  const [{ data: profile }, { data: municipalities }, { data: serviceZones }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: firstProductRows, error: firstProductError }, { data: financialSettings }] = await Promise.all([
+  const [{ data: profile }, { data: municipalities }, { data: serviceZones }, { data: addresses }, { data: categoryRows }, { data: firstProductRows, error: firstProductError }, { data: financialSettings }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
     supabase.from("service_zones").select("id,name,municipality_id,base_delivery_fee").eq("is_active",true).order("name"),
