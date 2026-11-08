@@ -118,7 +118,6 @@ with check (
   and receipt_path is null
   and pickup_proof_path is null
   and delivery_proof_path is null
-  and payment_confirmed_by is null
   and customer_approved_at is null
   and assigned_at is null
   and purchased_at is null
