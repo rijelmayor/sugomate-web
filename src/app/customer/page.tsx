@@ -20,7 +20,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
 
   // One lightweight pass over available products; stores and category counts are derived from it.
   // Needs 20261105150000_merchant_storefront_hours_payments.sql. Without it the full query errors, so we retry with the older columns instead of showing no stores.
-  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,category:product_categories!products_category_id_fkey(id,name,slug,icon),merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,gcash_payment_type,gcash_account_name,gcash_mobile_number,category:product_categories!products_category_id_fkey(id,name,slug,icon),store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
+  const productSelect = (legacy: boolean) => legacy ? `id,name,description,price,image_url,branch_id,category:product_categories!products_category_id_fkey(id,name,slug,icon),merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,municipalities(name))` : `id,name,description,price,image_url,branch_id,category:product_categories!products_category_id_fkey(id,name,slug,icon),merchant:merchants!products_merchant_id_fkey(name,slug,logo_url,accepted_payment_methods,gcash_qr_url,gcash_payment_type,gcash_account_name,gcash_mobile_number,store_category:merchant_categories!merchants_category_id_fkey(id,name,slug,icon)),branch:merchant_branches!products_branch_id_fkey${municipality ? "!inner" : ""}(name,municipality_id,store_hours,is_temporarily_closed,municipalities(name))`;
   const buildProductQuery = (legacy: boolean) => {
     let query = supabase.from("products").select(productSelect(legacy)).eq("is_available", true).order("created_at", { ascending: false }).limit(400);
     if (municipality) query = query.eq("branch.municipality_id", municipality);
@@ -46,8 +46,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     productRows = retry.data; productError = retry.error;
     if (retry.error) console.error("[customer] legacy product query failed:", retry.error.message);
   }
-  // If the photo migration has not run yet, fall back to the original columns so tiles still appear.
-  const merchantCategories = categoryError ? ((await supabase.from("merchant_categories").select("id,name,slug,icon,parent_id").eq("is_active", true).order("sort_order").order("name")).data ?? []).map(c => ({ ...c, image_url: null as string | null })) : categoryRows;
+  const productCategories = categoryRows ?? [];
   // Supabase types nested joins as arrays; take the first element so one-to-one relations read naturally.
   const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
   const rows = productError ? [] : ((productRows ?? []) as ProductRow[]).map(row => {
