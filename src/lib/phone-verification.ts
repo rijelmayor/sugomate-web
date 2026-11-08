@@ -105,6 +105,18 @@ export async function verifyPhoneOtp(email: string, submittedCode: string) {
   const { error: profileError } = await supabase.from("profiles")
     .update({ phone: challenge.phone, phone_verified_at: new Date().toISOString() }).eq("id", challenge.user_id);
   if (profileError) return { ok: false as const, reason: "save" };
+
+  // Mobile verification is SUGOMATE's active registration verification method.
+  // Confirm the Auth email administratively only after the OTP has been validated,
+  // so an email link is not required for the user to sign in.
+  const { error: authError } = await supabase.auth.admin.updateUserById(challenge.user_id, {
+    email_confirm: true,
+  });
+  if (authError) {
+    console.error("[phone-verification] unable to mark email optional after phone verification", authError.message);
+    return { ok: false as const, reason: "save" };
+  }
+
   await supabase.from("phone_verification_challenges").delete().eq("user_id", challenge.user_id);
   return { ok: true as const };
 }
