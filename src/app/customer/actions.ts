@@ -61,6 +61,9 @@ export async function placeOrder(formData: FormData) {
   const { data, error } = await supabase.rpc("place_customer_order", {
     p_address_id:addressId,p_items:safeItems,p_payment_method:paymentMethod,p_customer_note:note || null
   });
-  if (error || !data) redirect("/customer?error=checkout");
+  if (error || !data) {
+    console.error("[customer] place_customer_order failed:", error ? { code: error.code, message: error.message, details: error.details, hint: error.hint } : "RPC returned no order ID");
+    redirect("/customer?error=checkout");
+  }
   redirect("/customer/orders?placed=1");
 }
