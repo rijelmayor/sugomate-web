@@ -430,7 +430,8 @@ begin
     values(p_order_id,'assigned','assigned',v_actor,'Delivery partner accepted assignment within response window');
   else
     update public.orders set driver_user_id=null,driver_assignment_status=null,status='ready_for_pickup',
-      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,updated_at=now()
+      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+      rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
     where id=p_order_id;
     insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
     values(p_order_id,'assigned','ready_for_pickup',v_actor,'Delivery partner declined assignment; returned to dispatch queue');
