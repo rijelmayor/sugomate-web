@@ -55,7 +55,7 @@ create table if not exists public.rider_locality_authorization_audit (
   action text not null check (action in ('authorized','revoked','expired')),
   authorization_id uuid references public.rider_locality_authorizations(id),
   reason text,
-  actor_id uuid not null references auth.users(id),
+  actor_id uuid references auth.users(id),
   occurred_at timestamptz not null default now()
 );
 
@@ -469,9 +469,8 @@ begin
   )
   select rider_user_id,municipality_id,'expired',id,
     coalesce(reason,'Authorization expired automatically'),
-    (select id from auth.users order by created_at limit 1)
-  from expired
-  where exists(select 1 from auth.users);
+    null
+  from expired;
   get diagnostics v_count = row_count;
   return v_count;
 end;
