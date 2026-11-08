@@ -231,7 +231,11 @@ export default function ExplainerScene() {
   }, []);
 
   const start = () => {
-    if (elapsedRef.current >= DURATION) elapsedRef.current = 0;
+    if (elapsedRef.current >= DURATION) {
+      elapsedRef.current = 0;
+      setElapsed(0);
+      setActiveStep(0);
+    }
     setVoiceEnabled(true);
     setPlaying(true);
   };
