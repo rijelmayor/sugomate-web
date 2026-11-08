@@ -504,3 +504,23 @@ drop policy if exists "Admins read delivery handoffs" on public.order_delivery_h
 create policy "Admins read delivery handoffs"
 on public.order_delivery_handoffs for select to authenticated
 using ((select app_private.has_role((select auth.uid()),'admin'::public.app_role)));
+
+-- The initial marketplace rider-claim target also uses the Admin-configured window.
+create or replace function public.set_rider_claim_deadline_from_admin_setting()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+declare v_minutes integer;
+begin
+  if new.status='accepted' and old.status='pending_merchant' then
+    select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+    new.rider_claim_deadline_at:=now()+make_interval(mins=>coalesce(v_minutes,7));
+    new.rider_assignment_expired_at:=null;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists set_rider_claim_deadline_from_admin_setting on public.orders;
+create trigger set_rider_claim_deadline_from_admin_setting
+before update of status on public.orders
+for each row execute function public.set_rider_claim_deadline_from_admin_setting();
+revoke all on function public.set_rider_claim_deadline_from_admin_setting() from public,anon,authenticated;
