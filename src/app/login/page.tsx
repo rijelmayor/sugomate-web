@@ -37,15 +37,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <label className="block text-sm font-bold">Password<input required name="password" type="password" autoComplete="current-password" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label><div className="-mt-2 text-right"><Link href="/forgot-password" className="text-sm font-bold text-orange-600 hover:text-orange-700">Forgot password?</Link></div>
         <AuthSubmitButton pendingLabel="Signing you in…">Sign in</AuthSubmitButton>
       </form>
-      <div className="mt-7 border-t border-slate-100 pt-5">
-        <p className="text-center text-xs font-black uppercase tracking-wider text-slate-400">Join SUGOMATE</p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Link href={`/register?next=${encodeURIComponent(safeNext)}`} className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 text-center text-sm font-extrabold text-orange-700 transition hover:border-orange-400 hover:bg-orange-100">Customer</Link>
-          <Link href="/register/merchant" className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-extrabold text-[#102e57] transition hover:border-orange-300 hover:bg-orange-50">Merchant</Link>
-          <Link href="/register/driver" className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-extrabold text-[#102e57] transition hover:border-orange-300 hover:bg-orange-50">Delivery Partner</Link>
-        </div>
-      </div>
-    </div>
+   </div>
     </AuthIntro>
   </main>;
 }
