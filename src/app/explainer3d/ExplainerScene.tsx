@@ -1,47 +1,88 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import * as THREE from "three";
 import styles from "./explainer.module.css";
 
 const DURATION = 90;
 const IMAGE = "/images/sugomate-explainer.png";
-const shots = [
-  { time: 0, x: 0, y: 0, height: 9.7 },
-  { time: 6, x: -5.65, y: 1.55, height: 4.45 },
-  { time: 16, x: -0.45, y: 1.55, height: 4.45 },
-  { time: 26, x: 5.15, y: 1.55, height: 4.45 },
-  { time: 36, x: -5.65, y: -2.25, height: 4.45 },
-  { time: 46, x: -1.55, y: -2.25, height: 4.45 },
-  { time: 56, x: 2.85, y: -2.25, height: 4.45 },
-  { time: 66, x: 6.35, y: -2.25, height: 4.45 },
-  { time: 78, x: 0, y: 0, height: 9.7 },
-  { time: 90, x: 0, y: 0, height: 9.7 },
+const steps = [
+  {
+    title: "Customer places an order",
+    caption: "Browse a local store, choose items, set the delivery location, and place the order.",
+    voice: "First, the customer browses nearby stores, chooses the items they need, selects a delivery location, and places an order through SUGOMATE.",
+  },
+  {
+    title: "Merchant confirms and prepares",
+    caption: "The merchant receives the order, verifies GCash payment when applicable, accepts it, and prepares the items.",
+    voice: "Next, the merchant receives the order. The store verifies the payment when GCash is selected, accepts the order, and prepares the items for pickup.",
+  },
+  {
+    title: "Admin monitors the network",
+    caption: "The control room oversees orders, partners, delivery zones, and service performance.",
+    voice: "Behind the scenes, the SUGOMATE Admin control room monitors platform activity, partner operations, delivery zones, and overall service performance.",
+  },
+  {
+    title: "Driver receives and accepts",
+    caption: "An approved delivery partner receives an offer and accepts the delivery job.",
+    voice: "When the order is ready for dispatch, an eligible delivery partner receives a delivery offer, reviews the details, and accepts the job.",
+  },
+  {
+    title: "Driver picks up from merchant",
+    caption: "The driver travels to the store, confirms pickup, and secures the items.",
+    voice: "The delivery partner then travels to the merchant, confirms the pickup, and carefully secures the customer's items for the trip.",
+  },
+  {
+    title: "Driver delivers to customer",
+    caption: "The driver follows the delivery route and hands the order to the customer.",
+    voice: "The driver follows the route to the selected delivery location and hands the order directly to the customer.",
+  },
+  {
+    title: "Order completed",
+    caption: "The customer receives the order and the transaction and partner earnings are recorded.",
+    voice: "Finally, the customer receives the order. The transaction is completed, and the corresponding merchant and delivery partner earnings are recorded. Imong sugo, kami bahala.",
+  },
 ];
 
-function shotAt(seconds: number) {
-  let index = 0;
-  while (index < shots.length - 2 && seconds > shots[index + 1].time) index += 1;
-  const from = shots[index];
-  const to = shots[index + 1];
-  const raw = THREE.MathUtils.clamp((seconds - from.time) / (to.time - from.time), 0, 1);
-  const eased = raw * raw * (3 - 2 * raw);
-  return {
-    x: THREE.MathUtils.lerp(from.x, to.x, eased),
-    y: THREE.MathUtils.lerp(from.y, to.y, eased),
-    height: THREE.MathUtils.lerp(from.height, to.height, eased),
-  };
-}
+const routePoints = [
+  new THREE.Vector3(-5.35, 1.65, 0.28),
+  new THREE.Vector3(-0.15, 1.65, 0.28),
+  new THREE.Vector3(5.15, 1.65, 0.28),
+  new THREE.Vector3(-5.25, -2.25, 0.28),
+  new THREE.Vector3(-1.15, -2.25, 0.28),
+  new THREE.Vector3(2.65, -2.25, 0.28),
+  new THREE.Vector3(5.65, -2.15, 0.28),
+];
+const routeCurve = new THREE.CatmullRomCurve3(routePoints);
 
 export default function ExplainerScene() {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [activeStep, setActiveStep] = useState(0);
   const elapsedRef = useRef(0);
-  const playingRef = useRef(true);
+  const playingRef = useRef(false);
+  const voiceEnabledRef = useRef(false);
 
   useEffect(() => { playingRef.current = playing; }, [playing]);
+  useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+
+  useEffect(() => {
+    if (!playing || !voiceEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(steps[activeStep].voice);
+    utterance.lang = "en-PH";
+    utterance.rate = 0.94;
+    utterance.pitch = 1;
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find((voice) => voice.lang.toLowerCase() === "en-ph")
+      || voices.find((voice) => voice.lang.toLowerCase().startsWith("en-"));
+    if (preferred) utterance.voice = preferred;
+    window.speechSynthesis.speak(utterance);
+    return () => window.speechSynthesis.cancel();
+  }, [activeStep, playing, voiceEnabled]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -57,63 +98,63 @@ export default function ExplainerScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 1.08;
     mount.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight("#ffffff", 1.15));
-    const keyLight = new THREE.DirectionalLight("#ffffff", 1.3);
+    scene.add(new THREE.AmbientLight("#ffffff", 1.2));
+    const keyLight = new THREE.DirectionalLight("#ffffff", 1.25);
     keyLight.position.set(-4, 7, 12);
     scene.add(keyLight);
+
+    const frame = new THREE.Mesh(
+      new THREE.PlaneGeometry(16.2, 9.2),
+      new THREE.MeshStandardMaterial({ color: "#17395c", metalness: 0.5, roughness: 0.3 }),
+    );
+    frame.position.z = -0.16;
+    scene.add(frame);
 
     const imagePlane = new THREE.Mesh(
       new THREE.PlaneGeometry(16, 9),
       new THREE.MeshBasicMaterial({ color: "#ffffff" }),
     );
-    imagePlane.rotation.set(-0.035, -0.045, 0);
+    imagePlane.position.z = 0;
     scene.add(imagePlane);
 
-    const frame = new THREE.Mesh(
-      new THREE.PlaneGeometry(16.18, 9.18),
-      new THREE.MeshStandardMaterial({ color: "#17395c", metalness: 0.48, roughness: 0.34 }),
-    );
-    frame.position.z = -0.12;
-    frame.rotation.copy(imagePlane.rotation);
-    scene.add(frame);
-
-    const loader = new THREE.TextureLoader();
     let texture: THREE.Texture | null = null;
     let disposed = false;
-    loader.load(IMAGE, (loaded) => {
+    new THREE.TextureLoader().load(IMAGE, (loaded) => {
       if (disposed) { loaded.dispose(); return; }
       loaded.colorSpace = THREE.SRGBColorSpace;
       loaded.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      imagePlane.material = new THREE.MeshBasicMaterial({ map: loaded });
+      texture = loaded;
+    });
 
-      const source = loaded.image as HTMLImageElement;
-      const canvas = document.createElement("canvas");
-      canvas.width = source.naturalWidth || 1536;
-      canvas.height = source.naturalHeight || 864;
-      const context = canvas.getContext("2d");
-      if (context) {
-        context.drawImage(source, 0, 0, canvas.width, canvas.height);
-        const scale = canvas.width / 1536;
-        context.fillStyle = "#ffffff";
-        context.fillRect(590 * scale, 91 * scale, 410 * scale, 48 * scale);
-        context.fillStyle = "#071b35";
-        context.font = `italic 700 ${Math.round(31 * scale)}px Arial, sans-serif`;
-        context.textAlign = "left";
-        context.fillText("Imong sugo, kami bahala.", 603 * scale, 124 * scale);
-        const corrected = new THREE.CanvasTexture(canvas);
-        corrected.colorSpace = THREE.SRGBColorSpace;
-        corrected.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        imagePlane.material = new THREE.MeshBasicMaterial({ map: corrected });
-        texture = corrected;
-        loaded.dispose();
-      } else {
-        imagePlane.material = new THREE.MeshBasicMaterial({ map: loaded });
-        texture = loaded;
-      }
-    }, undefined, () => {
-      imagePlane.material = new THREE.MeshBasicMaterial({ color: "#102b49" });
+    const routeGeometry = new THREE.TubeGeometry(routeCurve, 160, 0.035, 8, false);
+    const route = new THREE.Mesh(
+      routeGeometry,
+      new THREE.MeshBasicMaterial({ color: "#25c9ff", transparent: true, opacity: 0.9 }),
+    );
+    route.position.z = 0.22;
+    scene.add(route);
+
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 24, 24),
+      new THREE.MeshBasicMaterial({ color: "#ffbd18" }),
+    );
+    marker.position.copy(routeCurve.getPointAt(0));
+    marker.position.z = 0.48;
+    scene.add(marker);
+
+    const nodeMeshes = routePoints.map((point, index) => {
+      const node = new THREE.Mesh(
+        new THREE.SphereGeometry(index === 0 ? 0.13 : 0.11, 20, 20),
+        new THREE.MeshBasicMaterial({ color: "#ffbd18", transparent: true, opacity: 0.82 }),
+      );
+      node.position.copy(point);
+      node.position.z = 0.42;
+      scene.add(node);
+      return node;
     });
 
     let animationId = 0;
@@ -123,7 +164,7 @@ export default function ExplainerScene() {
       const width = Math.max(1, mount.clientWidth);
       const height = Math.max(1, mount.clientHeight);
       const aspect = width / height;
-      const viewHeight = Math.max(9.7, 16 / aspect);
+      const viewHeight = Math.max(9, 16 / aspect);
       camera.left = (-viewHeight * aspect) / 2;
       camera.right = (viewHeight * aspect) / 2;
       camera.top = viewHeight / 2;
@@ -140,26 +181,34 @@ export default function ExplainerScene() {
       if (!lastTime) lastTime = now;
       const delta = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
-      if (playingRef.current) elapsedRef.current = (elapsedRef.current + delta) % DURATION;
 
-      const shot = shotAt(elapsedRef.current);
-      const aspect = Math.max(0.45, mount.clientWidth / Math.max(1, mount.clientHeight));
-      const focusedHeight = Math.max(shot.height, 3.75 / aspect);
-      const viewWidth = focusedHeight * aspect;
-      camera.left = -viewWidth / 2;
-      camera.right = viewWidth / 2;
-      camera.top = focusedHeight / 2;
-      camera.bottom = -focusedHeight / 2;
-      camera.position.x += (shot.x - camera.position.x) * 0.045;
-      camera.position.y += (shot.y - camera.position.y) * 0.045;
-      camera.position.z += (18 - camera.position.z) * 0.045;
-      camera.lookAt(camera.position.x, camera.position.y, 0);
-      camera.updateProjectionMatrix();
-      imagePlane.rotation.y = -0.045 + Math.sin(now * 0.00018) * 0.012;
+      if (playingRef.current) {
+        elapsedRef.current = Math.min(DURATION, elapsedRef.current + delta);
+        if (elapsedRef.current >= DURATION) {
+          playingRef.current = false;
+          window.setTimeout(() => setPlaying(false), 0);
+        }
+      }
+
+      const progress = Math.min(1, elapsedRef.current / DURATION);
+      marker.position.copy(routeCurve.getPointAt(progress));
+      marker.position.z = 0.5;
+      marker.scale.setScalar(1 + Math.sin(now * 0.008) * 0.16);
+      const currentStep = Math.min(steps.length - 1, Math.floor(progress * steps.length));
+      nodeMeshes.forEach((node, index) => {
+        const reached = index <= currentStep;
+        const material = node.material as THREE.MeshBasicMaterial;
+        material.color.set(reached ? "#ffbd18" : "#48bff2");
+        material.opacity = reached ? 1 : 0.45;
+        node.scale.setScalar(index === currentStep ? 1.65 : 1);
+      });
+      imagePlane.rotation.y = Math.sin(now * 0.00045) * 0.008;
+      frame.rotation.copy(imagePlane.rotation);
       renderer.render(scene, camera);
 
-      if (now - lastUiUpdate > 180) {
+      if (now - lastUiUpdate > 160) {
         setElapsed(elapsedRef.current);
+        setActiveStep(Math.min(steps.length - 1, Math.floor(Math.min(0.999, progress) * steps.length)));
         lastUiUpdate = now;
       }
     };
@@ -172,20 +221,38 @@ export default function ExplainerScene() {
       texture?.dispose();
       imagePlane.geometry.dispose();
       frame.geometry.dispose();
-      const material = imagePlane.material;
-      if (Array.isArray(material)) material.forEach((item) => item.dispose());
-      else material.dispose();
-      frame.material.dispose();
+      routeGeometry.dispose();
+      [imagePlane.material, frame.material, route.material, marker.material, ...nodeMeshes.map((node) => node.material)]
+        .forEach((material) => {
+          if (Array.isArray(material)) material.forEach((item) => item.dispose());
+          else material.dispose();
+        });
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
   }, []);
 
-  const restart = () => {
-    elapsedRef.current = 0;
-    setElapsed(0);
+  const start = () => {
+    if (elapsedRef.current >= DURATION) elapsedRef.current = 0;
+    setVoiceEnabled(true);
     setPlaying(true);
   };
+
+  const pause = () => {
+    setPlaying(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  };
+
+  const restart = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    elapsedRef.current = 0;
+    setElapsed(0);
+    setActiveStep(0);
+    setVoiceEnabled(true);
+    setPlaying(true);
+  };
+
+  const progress = (elapsed / DURATION) * 100;
 
   return (
     <main className={styles.page}>
@@ -197,15 +264,26 @@ export default function ExplainerScene() {
         <span className={styles.topLabel}>HOW SUGOMATE WORKS</span>
       </header>
       <section className={styles.explainer}>
-        <div className={styles.scene} ref={mountRef} aria-label="Animated 3D presentation of the SUGOMATE infographic" />
+        <div className={styles.intro}>
+          <span className={styles.eyebrow}>FROM ORDER TO FULFILLMENT</span>
+          <h1>One connected journey. Seven clear steps.</h1>
+          <p>Follow the moving route as each partner completes their part of the order.</p>
+        </div>
+        <div className={styles.scene} ref={mountRef} aria-label="3D SUGOMATE infographic with an animated route connecting seven order stages" />
+        <div className={styles.stepPanel} aria-live="polite">
+          <span className={styles.stepNumber}>STEP {String(activeStep + 1).padStart(2, "0")} / 07</span>
+          <h2>{steps[activeStep].title}</h2>
+          <p>{steps[activeStep].caption}</p>
+        </div>
         <div className={styles.controls}>
-          <button type="button" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
+          <button type="button" onClick={playing ? pause : start}>{playing ? "Pause" : elapsed >= DURATION ? "Play again" : "Play with voice-over"}</button>
           <button type="button" onClick={restart}>Restart</button>
           <div className={styles.timeline} aria-label={`${Math.floor(elapsed)} seconds of 90 seconds`}>
-            <span style={{ width: `${(elapsed / DURATION) * 100}%` }} />
+            <span style={{ width: `${progress}%` }} />
           </div>
           <span className={styles.time}>{Math.floor(elapsed)} / 90 sec</span>
         </div>
+        <p className={styles.tagline}>Imong sugo, kami bahala.</p>
       </section>
     </main>
   );
