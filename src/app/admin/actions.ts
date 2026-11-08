@@ -128,9 +128,9 @@ export async function revokeRiderLocality(formData: FormData) {
 export async function saveRiderResponseSettings(formData: FormData) {
   const supabase = await requireAdmin();
   const response = Number(formData.get("response_window_minutes"));
-  const reminder = Number(formData.get("reminder_after_minutes"));
-  const warning = Number(formData.get("warning_after_minutes"));
-  if (!Number.isInteger(response) || !Number.isInteger(reminder) || !Number.isInteger(warning)) redirect("/admin/dispatch?error=settings");
+  if (!Number.isInteger(response)) redirect("/admin/dispatch?error=settings");
+  const reminder = Math.min(3, response - 1);
+  const warning = Math.max(reminder, Math.min(5, response - 1));
   const { error } = await supabase.rpc("admin_save_rider_response_settings", {
     p_response_window_minutes: response,
     p_reminder_after_minutes: reminder,
