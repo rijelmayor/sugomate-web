@@ -212,8 +212,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
       {view === "home" && <>
         <div className="mt-6"><h2 className="text-xl font-black text-[#102e57]">Browse by category</h2><p className="mt-0.5 text-sm text-slate-500">Pick what you need — we&apos;ll show the stores.</p></div>
-        {topLevelTiles.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {topLevelTiles.map(item => <CategoryTile key={item.id} href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} />)}
+        {topLevelTiles.length ? <div className="-mx-1 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {topLevelTiles.map(item => <div key={item.id} className="w-[42vw] max-w-[190px] shrink-0 snap-start sm:w-44"><CategoryTile href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} /></div>)}
         </div> : null}
         <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
         {stores.length > 0 && <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div>}
@@ -233,8 +233,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <PendingLink href={href({ store: "" })} aria-label="Back to stores" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
           <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{currentStore.name}</h2><p className="flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} />{currentStore.branchName && currentStore.branchName !== currentStore.name ? `${currentStore.branchName} · ` : ""}{currentStore.area || "Leyte"} · {productMatches.length} {productMatches.length === 1 ? "item" : "items"}</p></div>
         </div>
-        {productMatches.length ? <div className="mt-4 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {productMatches.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+        {productMatches.length ? <div className="-mx-1 mt-4 flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {productMatches.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex w-[46%] min-w-0 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-[31%] lg:w-[23%]">
           <ProductImage src={product.image_url} alt={product.name} />
           <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-1 py-2">
             <div className="min-w-0">
