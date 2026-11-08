@@ -20,7 +20,7 @@ export default function RiderResponseTimer({ deadline, compact = false }: {
     if (!deadline || now < new Date(deadline).getTime() || expirationProcessed) return;
     setExpirationProcessed(true);
     void fetch("/api/rider-response-expire", { method: "POST" })
-      .finally(() => router.refresh());
+      .then(() => router.refresh(), () => router.refresh());
   }, [deadline, now, expirationProcessed, router]);
 
   if (!deadline) return null;
