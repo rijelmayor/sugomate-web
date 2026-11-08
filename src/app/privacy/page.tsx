@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <Section title="15. Privacy contact and operator details">
-          <p>SUGOMATE is operated in the Philippines as a sole proprietorship. The registered proprietor's full legal name, registered business address, and designated Data Protection Officer or privacy contact details must be confirmed and published here before public launch. A dedicated email address has not yet been established.</p>
+          <p>SUGOMATE is operated in the Philippines as a sole proprietorship. The registered proprietor’s full legal name, registered business address, and designated Data Protection Officer or privacy contact details must be confirmed and published here before public launch. A dedicated email address has not yet been established.</p>
           <p>For now, submit privacy questions or requests through the official SUGOMATE support/contact channel when it is made available. We will publish the dedicated privacy contact details on this page once established. You may also contact the National Privacy Commission through its official website at <a href="https://privacy.gov.ph/" target="_blank" rel="noreferrer" className="font-bold text-orange-600">privacy.gov.ph</a>.</p>
           <p>This Policy is a working draft and should be reviewed against SUGOMATE’s actual data flows, vendor contracts, retention schedule, and privacy compliance arrangements before public launch.</p>
         </Section>
