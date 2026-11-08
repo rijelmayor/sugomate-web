@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import AuthSubmitButton from "@/components/auth/AuthSubmitButton";
 
 export default function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
