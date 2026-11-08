@@ -216,7 +216,7 @@ begin
   where id = p_request_id and assigned_driver_id = auth.uid()
   for update;
   if not found then raise exception 'Assigned service request not found.'; end if;
-  if v_request.status <> 'delivered' then raise exception 'Record customer payment after delivery.'; end if;
+  if v_request.status <> 'in_transit' then raise exception 'Record customer payment at the delivery handover before completing the request.'; end if;
   if v_request.payment_status = 'paid' then raise exception 'Customer payment is already recorded.'; end if;
   if v_request.actual_purchase_amount is null or v_request.delivery_fee is null or v_request.service_fee is null then
     raise exception 'Final purchase and fee amounts must be recorded first.';
