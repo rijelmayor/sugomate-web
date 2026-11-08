@@ -269,27 +269,27 @@ declare
   v_new text;
 begin
   select pg_get_functiondef('public.place_customer_order(uuid,jsonb,text,text)'::regprocedure) into v_def;
-  v_old := '  v_branch uuid;' || E'\\n';
-  v_new := '  v_branch uuid;' || E'\\n' || '  v_origin_municipality uuid;' || E'\\n';
+  v_old := '  v_branch uuid;' || E'\n';
+  v_new := '  v_branch uuid;' || E'\n' || '  v_origin_municipality uuid;' || E'\n';
   if position(v_old in v_def) = 0 then raise exception 'Could not locate place_customer_order branch declaration; migration stopped safely.'; end if;
   v_def := replace(v_def, v_old, v_new);
 
-  v_old := '  select z.base_delivery_fee into v_delivery_fee from public.service_zones z' || E'\\n' ||
-           '    where z.municipality_id=v_address.municipality_id and z.is_active=true' || E'\\n' ||
-           '    order by z.created_at asc,z.id asc limit 1;' || E'\\n' ||
+  v_old := '  select z.base_delivery_fee into v_delivery_fee from public.service_zones z' || E'\n' ||
+           '    where z.municipality_id=v_address.municipality_id and z.is_active=true' || E'\n' ||
+           '    order by z.created_at asc,z.id asc limit 1;' || E'\n' ||
            '  if v_delivery_fee is null then raise exception ''Delivery fee is not configured for this area yet. Please try again later.''; end if;';
   v_new := '  -- Route fee is resolved after the basket establishes its single merchant branch.';
   if position(v_old in v_def) = 0 then raise exception 'Could not locate legacy delivery fee lookup; migration stopped safely.'; end if;
   v_def := replace(v_def, v_old, v_new);
 
   v_old := '  if v_count=0 then raise exception ''Your basket is empty.''; end if;';
-  v_new := v_old || E'\\n' ||
-    '  select b.municipality_id into v_origin_municipality from public.merchant_branches b' || E'\\n' ||
-    '    where b.id=v_branch and b.merchant_id=v_merchant and b.is_active=true;' || E'\\n' ||
-    '  if v_origin_municipality is null then raise exception ''The selected store branch has no active pickup locality.''; end if;' || E'\\n' ||
-    '  if not exists(select 1 from public.municipalities m where m.id=v_origin_municipality and m.is_serviceable=true) then raise exception ''The store pickup locality is not currently serviceable.''; end if;' || E'\\n' ||
-    '  select r.delivery_fee into v_delivery_fee from public.delivery_routes r' || E'\\n' ||
-    '    where r.origin_municipality_id=v_origin_municipality and r.destination_municipality_id=v_address.municipality_id and r.is_active=true;' || E'\\n' ||
+  v_new := v_old || E'\n' ||
+    '  select b.municipality_id into v_origin_municipality from public.merchant_branches b' || E'\n' ||
+    '    where b.id=v_branch and b.merchant_id=v_merchant and b.is_active=true;' || E'\n' ||
+    '  if v_origin_municipality is null then raise exception ''The selected store branch has no active pickup locality.''; end if;' || E'\n' ||
+    '  if not exists(select 1 from public.municipalities m where m.id=v_origin_municipality and m.is_serviceable=true) then raise exception ''The store pickup locality is not currently serviceable.''; end if;' || E'\n' ||
+    '  select r.delivery_fee into v_delivery_fee from public.delivery_routes r' || E'\n' ||
+    '    where r.origin_municipality_id=v_origin_municipality and r.destination_municipality_id=v_address.municipality_id and r.is_active=true;' || E'\n' ||
     '  if v_delivery_fee is null then raise exception ''This store-to-destination route is not currently approved or priced. Please choose another address or contact support.''; end if;';
   if position(v_old in v_def) = 0 then raise exception 'Could not locate checkout basket completion point; migration stopped safely.'; end if;
   v_def := replace(v_def, v_old, v_new);
@@ -305,12 +305,12 @@ declare
   v_new text;
 begin
   select pg_get_functiondef('public.admin_review_driver(uuid,text)'::regprocedure) into v_def;
-  v_old := '  if p_status = ''active'' and not exists (' || E'\\n' ||
-    '    select 1 from public.driver_profiles where user_id = p_user_id and nullif(trim(id_storage_path), '''') is not null' || E'\\n' ||
+  v_old := '  if p_status = ''active'' and not exists (' || E'\n' ||
+    '    select 1 from public.driver_profiles where user_id = p_user_id and nullif(trim(id_storage_path), '''') is not null' || E'\n' ||
     '  ) then raise exception ''A verified ID document is required before driver activation.''; end if;';
-  v_new := '  if p_status = ''active'' and not exists (' || E'\\n' ||
-    '    select 1 from public.driver_profiles dp join public.municipalities m on m.id=dp.municipality_id and m.is_serviceable=true' || E'\\n' ||
-    '    where dp.user_id=p_user_id and nullif(trim(dp.id_storage_path), '''') is not null' || E'\\n' ||
+  v_new := '  if p_status = ''active'' and not exists (' || E'\n' ||
+    '    select 1 from public.driver_profiles dp join public.municipalities m on m.id=dp.municipality_id and m.is_serviceable=true' || E'\n' ||
+    '    where dp.user_id=p_user_id and nullif(trim(dp.id_storage_path), '''') is not null' || E'\n' ||
     '  ) then raise exception ''A verified ID document and an Admin-verified active locality are required before driver activation.''; end if;';
   if position(v_old in v_def) = 0 then raise exception 'Could not locate driver activation validation; migration stopped safely.'; end if;
   v_def := replace(v_def, v_old, v_new);
