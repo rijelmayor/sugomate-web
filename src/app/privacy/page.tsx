@@ -45,7 +45,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Device and technical information:</strong> IP address, browser or device type, operating system, app version, access times, diagnostic logs, and security events generated when you use the Platform.</li>
             <li><strong>Support and communications:</strong> messages, feedback, reports, photographs, and other information you choose to provide when requesting assistance or reporting a problem.</li>
           </ul>
-          <p>Please provide only information requested for the relevant feature or transaction. Do not upload another person's identification, payment record, or personal information unless you are authorized to do so.</p>
+          <p>Please provide only information requested for the relevant feature or transaction. Do not upload another person’s identification, payment record, or personal information unless you are authorized to do so.</p>
         </Section>
 
         <Section title="2. How we use personal information">
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Technology and operations providers:</strong> hosting, database, authentication, SMS or email delivery, mapping, analytics, customer support, payment processing, and security providers that help operate the Platform.</li>
             <li><strong>Professional advisers and authorities:</strong> accountants, auditors, lawyers, regulators, courts, law-enforcement agencies, or government bodies when disclosure is reasonably necessary or legally required.</li>
           </ul>
-          <p>We limit disclosures to information reasonably needed for the recipient's role. Merchants and delivery partners must use customer information only to fulfill the relevant order and must not reuse it for unrelated marketing, personal contact, or other purposes.</p>
+          <p>We limit disclosures to information reasonably needed for the recipient’s role. Merchants and delivery partners must use customer information only to fulfill the relevant order and must not reuse it for unrelated marketing, personal contact, or other purposes.</p>
           <p>Some service providers may process information using systems located outside the Philippines. Where this occurs, we take steps appropriate to the circumstances to require confidentiality, security, and a level of protection consistent with applicable privacy obligations.</p>
         </Section>
 
@@ -123,7 +123,7 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <Section title="11. Children and minors">
-          <p>SUGOMATE's account and transaction services are intended for people who can legally enter into the relevant transaction. A parent or legal guardian should supervise any use by a minor where permitted. We do not knowingly seek to collect children's personal information beyond what is necessary and lawfully authorized. If you believe a child has provided personal information without appropriate authority, contact us so we can review the matter.</p>
+          <p>SUGOMATE’s account and transaction services are intended for people who can legally enter into the relevant transaction. A parent or legal guardian should supervise any use by a minor where permitted. We do not knowingly seek to collect children’s personal information beyond what is necessary and lawfully authorized. If you believe a child has provided personal information without appropriate authority, contact us so we can review the matter.</p>
         </Section>
 
         <Section title="12. Third-party services and links">
@@ -141,7 +141,7 @@ export default function PrivacyPolicyPage() {
         <Section title="15. Privacy contact and operator details">
           <p>SUGOMATE is operated in the Philippines as a sole proprietorship. The registered proprietor's full legal name, registered business address, and designated Data Protection Officer or privacy contact details must be confirmed and published here before public launch. A dedicated email address has not yet been established.</p>
           <p>For now, submit privacy questions or requests through the official SUGOMATE support/contact channel when it is made available. We will publish the dedicated privacy contact details on this page once established. You may also contact the National Privacy Commission through its official website at <a href="https://privacy.gov.ph/" target="_blank" rel="noreferrer" className="font-bold text-orange-600">privacy.gov.ph</a>.</p>
-          <p>This Policy is a working draft and should be reviewed against SUGOMATE's actual data flows, vendor contracts, retention schedule, and privacy compliance arrangements before public launch.</p>
+          <p>This Policy is a working draft and should be reviewed against SUGOMATE’s actual data flows, vendor contracts, retention schedule, and privacy compliance arrangements before public launch.</p>
         </Section>
 
         <div className="mt-10 border-t border-slate-100 pt-6 text-sm text-slate-500">
