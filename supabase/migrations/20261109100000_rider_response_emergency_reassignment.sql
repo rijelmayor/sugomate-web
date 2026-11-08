@@ -233,7 +233,7 @@ begin
     nullif(v_location,''),'admin_emergency_override');
   update public.orders set driver_user_id=p_new_driver_user_id,
     driver_assignment_status='accepted',driver_response_deadline_at=null,
-    driver_response_started_at=null,updated_at=now()
+    driver_response_started_at=null,rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
   where id=p_order_id;
   insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
   values(p_order_id,v_order.status,v_order.status,v_actor,
@@ -358,7 +358,8 @@ begin
     values(p_order_id,'assigned','assigned',v_actor,'Delivery partner accepted assignment within response window');
   else
     update public.orders set driver_user_id=null,driver_assignment_status=null,status='ready_for_pickup',
-      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,updated_at=now()
+      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+      rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
     where id=p_order_id;
     insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
     values(p_order_id,'assigned','ready_for_pickup',v_actor,'Delivery partner declined assignment; returned to dispatch queue');
@@ -524,3 +525,31 @@ create trigger set_rider_claim_deadline_from_admin_setting
 before update of status on public.orders
 for each row execute function public.set_rider_claim_deadline_from_admin_setting();
 revoke all on function public.set_rider_claim_deadline_from_admin_setting() from public,anon,authenticated;
+
+
+-- A rider who releases a claimed order before confirming departure also creates a
+-- customer-visible reassignment event, without changing the accepted order stage.
+create or replace function public.driver_release_order_claim(p_order_id uuid)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  select * into v_order from public.orders where id=p_order_id and driver_user_id=v_actor for update;
+  if not found or v_order.status<>'accepted' or v_order.driver_assignment_status<>'claimed'
+     or v_order.rider_on_way_at is not null then
+    raise exception 'You can only release an order before confirming you are on the way.';
+  end if;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,assigned_at=null,
+    driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,'accepted','accepted',v_actor,'Rider released the claim before committing to pickup');
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'driver_released_order_claim','orders',p_order_id::text,
+    jsonb_build_object('reason','Rider voluntarily released before pickup','stock_reservations_preserved',true));
+end;
+$$;
+revoke all on function public.driver_release_order_claim(uuid) from public,anon;
+grant execute on function public.driver_release_order_claim(uuid) to authenticated;
