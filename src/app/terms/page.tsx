@@ -57,7 +57,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="5. Delivery partners">
-          <p>Delivery partners must provide truthful onboarding information and maintain any driver's license, vehicle registration, insurance, permits, and other qualifications required by law for the delivery activity they undertake. They must obey traffic laws, use appropriate safety equipment, and never operate a vehicle while impaired or otherwise unfit to drive.</p>
+          <p>Delivery partners must provide truthful onboarding information and maintain any driver’s license, vehicle registration, insurance, permits, and other qualifications required by law for the delivery activity they undertake. They must obey traffic laws, use appropriate safety equipment, and never operate a vehicle while impaired or otherwise unfit to drive.</p>
           <p>Delivery partners must handle orders carefully, protect customer and merchant information, follow pickup and drop-off instructions, update delivery statuses accurately, and provide proof of delivery only when the delivery has actually occurred. They must not misuse customer addresses, contact details, order contents, photographs, or location information.</p>
           <p>Cash-on-delivery (COD) orders must be handled using the amount and collection instructions shown in the Platform. Delivery partners must collect and account for the correct amount, keep transaction records, and follow the applicable remittance and reconciliation process. They must not demand undisclosed charges.</p>
           <p>For electronic payments, a submitted receipt or screenshot is not by itself confirmation that payment has cleared. The Platform or authorized merchant process may require verification before an order is treated as paid or preparation is authorized. Users must not submit altered, reused, or misleading payment evidence.</p>
@@ -67,7 +67,7 @@ export default function TermsPage() {
         <Section title="6. Prices, delivery fees, and payments">
           <p>The order total may include item prices, delivery fees, service charges, and other charges disclosed before order confirmation. The amount payable and available payment methods will be shown in the checkout or order flow. Do not pay amounts that are not shown in the Platform or otherwise properly communicated by an authorized merchant or delivery partner.</p>
           <p>Available payment methods may include COD and supported electronic payment methods. For electronic payments, follow the displayed payment instructions and submit accurate transaction references or proof when requested. An order is not considered paid merely because a user uploaded an image; payment must be confirmed through the applicable verification process.</p>
-          <p>For COD, the customer must pay the amount displayed as due at delivery. Delivery partners and merchants must follow the Platform's collection, delivery-fee, and remittance instructions. Users must not privately alter the order total or agree to off-platform charges that bypass required records.</p>
+          <p>For COD, the customer must pay the amount displayed as due at delivery. Delivery partners and merchants must follow the Platform’s collection, delivery-fee, and remittance instructions. Users must not privately alter the order total or agree to off-platform charges that bypass required records.</p>
           <p>Refunds, reversals, adjustments, and payment disputes will be assessed using the order record, payment confirmation, merchant and delivery status, evidence provided, and applicable law. Processing time may depend on the payment provider or financial institution. Nothing in these Terms excludes a refund or remedy required by law.</p>
         </Section>
 
@@ -79,11 +79,11 @@ export default function TermsPage() {
 
         <Section title="8. Prohibited conduct">
           <p>You must not use the Platform for fraud, theft, harassment, discrimination, threats, unlawful transactions, money laundering, or the sale or delivery of prohibited goods. You must not falsify identities, addresses, order statuses, ratings, delivery evidence, or payment records.</p>
-          <p>You must not interfere with Platform security, probe or attack systems without authorization, introduce malicious code, scrape or harvest personal information, manipulate dispatch or pricing, evade legitimate fees, or use another person's account. You must not use customer, merchant, or rider information for unrelated marketing or personal purposes.</p>
+          <p>You must not interfere with Platform security, probe or attack systems without authorization, introduce malicious code, scrape or harvest personal information, manipulate dispatch or pricing, evade legitimate fees, or use another person’s account. You must not use customer, merchant, or rider information for unrelated marketing or personal purposes.</p>
         </Section>
 
         <Section title="9. Ratings, communications, and user content">
-          <p>Ratings, reviews, photographs, messages, and other content you submit must be truthful, lawful, relevant, and respectful. Do not post another person's personal information, confidential material, threats, defamatory statements, or content you do not have the right to share.</p>
+          <p>Ratings, reviews, photographs, messages, and other content you submit must be truthful, lawful, relevant, and respectful. Do not post another person’s personal information, confidential material, threats, defamatory statements, or content you do not have the right to share.</p>
           <p>You retain ownership of content you submit. You grant SUGOMATE a limited, non-exclusive permission to host, display, reproduce, and use that content as reasonably necessary to operate, secure, support, and improve the Platform. We may remove content that violates these Terms or applicable law.</p>
         </Section>
 
@@ -104,7 +104,7 @@ export default function TermsPage() {
 
         <Section title="13. Disclaimers and liability">
           <p>SUGOMATE provides the technology and coordination described in these Terms. Unless expressly stated otherwise, merchants remain responsible for their goods, product descriptions, preparation, and legal compliance; delivery partners remain responsible for their delivery conduct and legal compliance.</p>
-          <p>To the extent permitted by law, SUGOMATE is not liable for indirect or consequential loss, interruptions outside its reasonable control, or independent acts or omissions of users. This provision does not exclude liability for SUGOMATE's own obligations where liability cannot lawfully be excluded, nor does it limit consumer rights or remedies under Philippine law.</p>
+          <p>To the extent permitted by law, SUGOMATE is not liable for indirect or consequential loss, interruptions outside its reasonable control, or independent acts or omissions of users. This provision does not exclude liability for SUGOMATE’s own obligations where liability cannot lawfully be excluded, nor does it limit consumer rights or remedies under Philippine law.</p>
         </Section>
 
         <Section title="14. Complaints and dispute handling">
