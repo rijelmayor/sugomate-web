@@ -15,12 +15,12 @@ const stages = [
 ];
 
 const narration = [
-  "Welcome to SUGOMATE, one connected local-commerce network. Sa atong komunidad, mas sayon na ang pagpa-order ug pagpadala.",
-  "Customers browse local stores, choose what they need and place an order. Ikaw ang mopili; kami ang motabang sa pagpadala.",
-  "The merchant reviews, accepts and prepares the order. Ang tindahan maoy mo-confirm ug mo-andam sa imong gipamalit.",
-  "When ready, the order enters dispatch and is matched with an eligible rider. Andam na? Ipadala na sa rider.",
-  "The delivery partner accepts, picks up and brings the order to your doorstep. Ang rider maoy modala sa imong sugo.",
-  "The customer receives the order and delivery proof is recorded. Admin oversees the network. Usa ka order, usa ka komunidad. SUGOMATE. Imong sugo, among ihatod.",
+  "Welcome to SUGOMATE, your community's connected local-commerce service. Food, groceries, pabili, parcels and everyday errands can all begin in one place. Imong sugo, kami bahala.",
+  "First, the customer chooses a service, browses available local stores or sends a request, checks the order details and places the order. Sa sayon nga paagi, makapili ka sa imong kinahanglan.",
+  "Next, the merchant receives the new order, checks the items and delivery details, then accepts it before preparing everything. Ang tindahan maoy mo-confirm ug mo-andam sa imong order.",
+  "When preparation is complete, the order is marked ready for dispatch. SUGOMATE then makes it available for an eligible, approved delivery partner. Andam na ang order, sunod na ang pickup.",
+  "The delivery partner accepts the delivery, travels to the merchant, confirms pickup and brings the order to the customer. Ang rider maoy motabang nga maabot ang imong sugo sa hustong destinasyon.",
+  "Finally, the customer receives the order and proof of delivery is recorded. Admin oversees partner readiness, dispatch and service quality. Usa ka komunidad, konektado pinaagi sa SUGOMATE. Imong sugo, kami bahala.",
 ];
 
 const points = [
@@ -220,16 +220,40 @@ export default function ExplainerScene() {
 
   useEffect(() => {
     if (!playing) return;
-    const timer = window.setInterval(() => setActive((current) => (current + 1) % stages.length), 6500);
+    const timer = window.setInterval(() => setActive((current) => (current + 1) % stages.length), 15000);
     return () => window.clearInterval(timer);
   }, [playing]);
+
+  useEffect(() => {
+    if (!voiceOn || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(narration[active]);
+    const voices = synth.getVoices();
+    const preferred = voices.find((voice) =>
+      /male|david|mark|guy|daniel|alex/i.test(voice.name) &&
+      /ceb|fil|tl|en[-_]PH|en[-_]US/i.test(voice.lang)
+    ) || voices.find((voice) => /ceb|fil|tl|en[-_]PH/i.test(voice.lang)) ||
+      voices.find((voice) => /en[-_]US|en[-_]GB/i.test(voice.lang));
+    if (preferred) {
+      utterance.voice = preferred;
+      utterance.lang = preferred.lang;
+    } else {
+      utterance.lang = "en-PH";
+    }
+    utterance.rate = 0.86;
+    utterance.pitch = 0.9;
+    utterance.volume = 1;
+    synth.speak(utterance);
+    return () => synth.cancel();
+  }, [active, voiceOn]);
 
   const stage = stages[active];
 
   return (
     <main className={styles.page}>
       <header className={styles.topbar}>
-        <Link href="/" className={styles.brand}><span className={styles.brandMark}>S</span><span>SUGOMATE <small>IMONG SUGO, AMONG IHATOD.</small></span></Link>
+        <Link href="/" className={styles.brand}><span className={styles.brandMark}>S</span><span>SUGOMATE <small>IMONG SUGO, KAMI BAHALA.</small></span></Link>
         <span className={styles.topLabel}>THE DELIVERY NETWORK, IN MOTION</span>
       </header>
 
@@ -252,7 +276,22 @@ export default function ExplainerScene() {
           <div><span className={styles.eyebrow}>THE ORDER JOURNEY</span><h2>One order. A coordinated team.</h2></div>
           <div className={styles.controls}>
             <button type="button" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"} <span>{playing ? "Ⅱ" : "▶"}</span></button>
-            <button type="button" onClick={() => { setActive(0); setPlaying(false); }}>Restart ↺</button>
+            <button type="button" onClick={() => {
+              if (voiceOn) {
+                window.speechSynthesis?.cancel();
+                setVoiceOn(false);
+              } else {
+                setActive(0);
+                setPlaying(true);
+                setVoiceOn(true);
+              }
+            }}>{voiceOn ? "Voice-over On" : "Play 90-sec voice tour"} <span>{voiceOn ? "♫" : "▶"}</span></button>
+            <button type="button" onClick={() => {
+              window.speechSynthesis?.cancel();
+              setVoiceOn(false);
+              setActive(0);
+              setPlaying(false);
+            }}>Restart ↺</button>
           </div>
         </div>
         <div className={styles.progress}><span style={{ width: `${((active + 1) / stages.length) * 100}%` }} /></div>
@@ -284,7 +323,7 @@ export default function ExplainerScene() {
         </div>
       </section>
 
-      <footer className={styles.footer}><div className={styles.footerBrand}>SUGOMATE</div><p>Imong sugo, among ihatod.</p><span>A connected local delivery network for communities.</span></footer>
+      <footer className={styles.footer}><div className={styles.footerBrand}>SUGOMATE</div><p>Imong sugo, kami bahala.</p><span>A connected local delivery network for communities.</span></footer>
     </main>
   );
 }
