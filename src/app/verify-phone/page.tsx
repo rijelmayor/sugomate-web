@@ -6,7 +6,8 @@ const messages: Record<string,string> = {
   invalid: "That code is incorrect. You have up to five attempts.",
   expired: "Your code has expired. Request a new one.",
   locked: "Too many incorrect attempts. Request a new code after the cooldown.",
-  missing: "No active verification request was found. Please register again.",
+  missing: "There is no active verification code to resend. If you have already verified your mobile number, sign in to continue. Otherwise, return to registration and try again.",
+  cooldown: "Please wait 60 seconds after the last send attempt before requesting another code.",
   save: "We couldn't save your verification. Please try again.",
   sms: "We couldn't send your SMS. Check the phone number and try again.",
 };
