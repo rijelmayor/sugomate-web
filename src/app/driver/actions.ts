@@ -163,3 +163,45 @@ export async function reportDriverEmergencyBeforePickup(formData: FormData) {
   revalidatePath("/driver");
   redirect("/driver?updated=emergency");
 }
+
+
+export async function acceptServiceRequest(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const requestId = String(formData.get("request_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) redirect("/driver?error=service-request");
+  const { error } = await supabase.rpc("driver_accept_service_request", { p_request_id: requestId });
+  if (error) {
+    console.error("[service-request] rider acceptance failed:", error.message);
+    redirect("/driver?error=service-request");
+  }
+  revalidatePath("/driver");
+}
+
+export async function updateServiceRequest(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const requestId = String(formData.get("request_id") ?? "");
+  const nextStatus = String(formData.get("next_status") ?? "");
+  const amountRaw = String(formData.get("actual_purchase_amount") ?? "").trim();
+  const amount = amountRaw ? Number(amountRaw) : null;
+  const paymentMethod = String(formData.get("payment_method") ?? "");
+  const gcashReference = String(formData.get("gcash_reference") ?? "").trim().slice(0,120);
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) ||
+      !["purchased","picked_up","in_transit","delivered"].includes(nextStatus) ||
+      (amount !== null && (!Number.isFinite(amount) || amount < 0)) ||
+      (nextStatus === "delivered" && !["cash","gcash"].includes(paymentMethod)) ||
+      (nextStatus === "delivered" && paymentMethod === "gcash" && !gcashReference)) {
+    redirect("/driver?error=service-request");
+  }
+  const { error } = await supabase.rpc("driver_update_service_request", {
+    p_request_id: requestId,
+    p_next_status: nextStatus,
+    p_actual_purchase_amount: amount,
+    p_payment_method: nextStatus === "delivered" ? paymentMethod : null,
+    p_gcash_reference: nextStatus === "delivered" && paymentMethod === "gcash" ? gcashReference : null,
+  });
+  if (error) {
+    console.error("[service-request] rider update failed:", error.message);
+    redirect("/driver?error=service-request");
+  }
+  revalidatePath("/driver");
+}
