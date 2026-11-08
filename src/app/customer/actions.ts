@@ -16,7 +16,7 @@ export async function saveCustomerAddress(formData: FormData) {
   const recipientName = String(formData.get("recipient_name") ?? "").trim().slice(0,120);
   const recipientPhone = String(formData.get("recipient_phone") ?? "").trim().slice(0,40);
   const municipalityId = String(formData.get("municipality_id") ?? "");
-    const barangayId = String(formData.get("barangay_id") ?? "");
+    const serviceZoneId = String(formData.get("service_zone_id") ?? "");
   const barangayId = String(formData.get("barangay_id") ?? "");
   const addressLine = String(formData.get("address_line") ?? "").trim().slice(0,300);
   const landmark = String(formData.get("landmark") ?? "").trim().slice(0,200);
