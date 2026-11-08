@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as THREE from "three";
 import styles from "./explainer.module.css";
@@ -64,10 +64,8 @@ export default function ExplainerScene() {
   const [activeStep, setActiveStep] = useState(0);
   const elapsedRef = useRef(0);
   const playingRef = useRef(false);
-  const voiceEnabledRef = useRef(false);
 
   useEffect(() => { playingRef.current = playing; }, [playing]);
-  useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
 
   useEffect(() => {
     if (!playing || !voiceEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
