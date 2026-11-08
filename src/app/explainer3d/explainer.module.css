@@ -1,19 +1,28 @@
-/* Focused 3D infographic presentation */
+/* Cinematic narrated SUGOMATE order journey */
 .page{min-height:100vh;background:#06162b;color:#f5f8fc;overflow:hidden}
 .topbar{height:76px;padding:0 clamp(16px,5vw,64px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff18;background:#081d37}
 .brand{display:flex;align-items:center;gap:12px;color:#fff;font-weight:950;letter-spacing:.13em;font-size:14px;text-decoration:none}
 .brand small{display:block;color:#ffbd18;font-size:8px;letter-spacing:.14em;margin-top:5px}
 .brandMark{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#ffbd18,#ff6a00);display:grid;place-items:center;color:#102846;font-size:22px;font-weight:1000}
 .topLabel{font-size:10px;letter-spacing:.18em;color:#91a9c6;font-weight:800}
-.explainer{min-height:calc(100vh - 76px);display:flex;flex-direction:column;justify-content:center;gap:16px;padding:clamp(12px,3vw,32px);max-width:1700px;margin:auto}
-.scene{height:min(72vh,850px);min-height:380px;width:100%;position:relative;overflow:hidden;border:1px solid #ffffff22;border-radius:24px;background:radial-gradient(ellipse at center,#153c63,#07182e 75%);box-shadow:0 28px 80px #0006}
+.explainer{min-height:calc(100vh - 76px);display:flex;flex-direction:column;justify-content:center;gap:16px;padding:clamp(16px,3vw,36px);max-width:1500px;margin:auto}
+.intro{max-width:760px}
+.eyebrow{color:#ffbd18;font-size:11px;font-weight:900;letter-spacing:.2em}
+.intro h1{font-size:clamp(25px,4vw,46px);line-height:1.08;letter-spacing:-.04em;margin:10px 0}
+.intro p{color:#a9bad0;font-size:clamp(13px,1.6vw,17px);line-height:1.6;margin:0}
+.scene{width:100%;aspect-ratio:16/9;position:relative;overflow:hidden;border:1px solid #ffffff28;border-radius:24px;background:radial-gradient(ellipse at center,#153c63,#07182e 75%);box-shadow:0 28px 80px #0006}
 .scene canvas{display:block;width:100%;height:100%}
+.stepPanel{padding:16px 20px;border:1px solid #ffffff20;border-left:4px solid #ffad16;border-radius:14px;background:linear-gradient(110deg,#123456,#0b2039)}
+.stepNumber{color:#ffbd18;font-size:10px;font-weight:900;letter-spacing:.18em}
+.stepPanel h2{font-size:clamp(18px,2.5vw,25px);margin:5px 0}
+.stepPanel p{margin:0;color:#b6c7dc;font-size:14px;line-height:1.5}
 .controls{display:flex;align-items:center;gap:10px;max-width:100%;padding:0 2px}
 .controls button{border:1px solid #ffffff30;background:#ffffff0b;color:#eaf2fc;border-radius:999px;padding:11px 18px;font-size:12px;font-weight:800;cursor:pointer}
 .controls button:first-child{background:#ffad16;border-color:#ffad16;color:#132945}
 .controls button:focus-visible{outline:2px solid #ffbd18;outline-offset:3px}
-.timeline{height:5px;flex:1;min-width:40px;border-radius:99px;background:#ffffff20;overflow:hidden}
-.timeline span{display:block;height:100%;background:linear-gradient(90deg,#ff6a00,#ffbd18);transition:width .18s linear}
+.timeline{height:6px;flex:1;min-width:40px;border-radius:99px;background:#ffffff20;overflow:hidden}
+.timeline span{display:block;height:100%;background:linear-gradient(90deg,#ff6a00,#ffbd18);transition:width .16s linear}
 .time{font-size:10px;font-variant-numeric:tabular-nums;color:#9eb2cb;white-space:nowrap}
-@media(max-width:600px){.topbar{height:66px;padding:0 16px}.topLabel{display:none}.explainer{min-height:calc(100vh - 66px);padding:12px;gap:12px}.scene{height:68vh;min-height:420px;border-radius:18px}.controls{gap:7px;flex-wrap:wrap}.controls button{padding:10px 14px;font-size:11px}.timeline{order:3;flex-basis:100%}.time{margin-left:auto}}
+.tagline{text-align:center;color:#ffbd18;font-size:12px;font-weight:900;letter-spacing:.15em;margin:0}
+@media(max-width:600px){.topbar{height:66px;padding:0 16px}.topLabel{display:none}.explainer{min-height:calc(100vh - 66px);padding:14px;gap:12px}.scene{border-radius:16px}.stepPanel{padding:13px 15px}.stepPanel p{font-size:12px}.controls{gap:7px;flex-wrap:wrap}.controls button{padding:10px 13px;font-size:11px}.timeline{order:3;flex-basis:100%}.time{margin-left:auto}}
 @media(prefers-reduced-motion:reduce){.timeline span{transition:none}}
