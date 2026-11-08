@@ -1,18 +1,55 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next");
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+export async function GET(request: NextRequest) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const next = requestUrl.searchParams.get("next");
+  const safeNext =
+    next && next.startsWith("/") && !next.startsWith("//")
+      ? next
+      : "/dashboard";
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(safeNext, url.origin));
+  const destination = new URL(safeNext, requestUrl.origin);
+  const response = NextResponse.redirect(destination);
+
+  if (!code) {
+    destination.pathname = safeNext === "/reset-password" ? "/forgot-password" : "/login";
+    destination.searchParams.set("error", safeNext === "/reset-password" ? "recovery" : "confirmation");
+    return NextResponse.redirect(destination);
   }
 
-  const isRecovery = safeNext === "/reset-password";
-  return NextResponse.redirect(new URL(isRecovery ? "/forgot-password?error=send" : "/login?error=confirmation", url.origin));
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    console.error("[auth/callback] Code exchange failed:", error.message);
+    const failure = new URL(
+      safeNext === "/reset-password" ? "/forgot-password" : "/login",
+      requestUrl.origin,
+    );
+    failure.searchParams.set(
+      "error",
+      safeNext === "/reset-password" ? "recovery" : "confirmation",
+    );
+    return NextResponse.redirect(failure);
+  }
+
+  return response;
 }
