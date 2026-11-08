@@ -150,3 +150,16 @@ export async function requestDriverPayout(formData: FormData) {
   revalidatePath("/driver/earnings");
   redirect("/driver/earnings?requested=1");
 }
+
+export async function reportDriverEmergencyBeforePickup(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const orderId = String(formData.get("order_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
+  if (!/^[0-9a-f-]{36}$/i.test(orderId) || reason.length < 3) redirect("/driver?error=emergency");
+  const { error } = await supabase.rpc("driver_report_emergency_before_pickup", {
+    p_order_id: orderId, p_reason: reason,
+  });
+  if (error) redirect("/driver?error=emergency");
+  revalidatePath("/driver");
+  redirect("/driver?updated=emergency");
+}
