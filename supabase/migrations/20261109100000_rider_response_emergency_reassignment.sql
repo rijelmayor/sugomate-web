@@ -34,6 +34,7 @@ create table if not exists public.order_delivery_handoffs (
   initiated_by uuid not null references auth.users(id),
   reason text not null,
   custody_location text,
+  custody_verified boolean not null default false,
   handoff_type text not null check (handoff_type in ('pre_pickup_release','admin_emergency_override')),
   created_at timestamptz not null default now()
 );
@@ -204,7 +205,7 @@ $$;
 -- After pickup, only Admin can reassign. The handoff record preserves custody history;
 -- stock is already committed and is never reserved or deducted a second time.
 create or replace function public.admin_emergency_reassign_picked_up_order(
-  p_order_id uuid,p_new_driver_user_id uuid,p_reason text,p_custody_location text default null
+  p_order_id uuid,p_new_driver_user_id uuid,p_reason text,p_custody_location text default null,p_custody_verified boolean default false
 ) returns void language plpgsql security definer set search_path=''
 as $$
 declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
@@ -215,6 +216,7 @@ begin
     raise exception 'Admin access required.';
   end if;
   if length(v_reason)<5 then raise exception 'A detailed emergency reason is required.'; end if;
+  if p_custody_verified is not true then raise exception 'Admin must confirm physical custody and handover before reassignment.'; end if;
   select * into v_order from public.orders where id=p_order_id for update;
   if not found or v_order.status not in ('picked_up','in_transit') or v_order.picked_up_at is null then
     raise exception 'Only an order already picked up can use emergency transfer.';
@@ -228,9 +230,9 @@ begin
     raise exception 'The replacement rider already has an active delivery.';
   end if;
   insert into public.order_delivery_handoffs(order_id,from_driver_user_id,to_driver_user_id,
-    initiated_by,reason,custody_location,handoff_type)
+    initiated_by,reason,custody_location,custody_verified,handoff_type)
   values(p_order_id,v_order.driver_user_id,p_new_driver_user_id,v_actor,v_reason,
-    nullif(v_location,''),'admin_emergency_override');
+    nullif(v_location,''),true,'admin_emergency_override');
   update public.orders set driver_user_id=p_new_driver_user_id,
     driver_assignment_status='accepted',driver_response_deadline_at=null,
     driver_response_started_at=null,rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
@@ -251,12 +253,12 @@ revoke all on function public.admin_save_rider_response_settings(integer,integer
 revoke all on function public.expire_rider_response_timeouts() from public,anon;
 revoke all on function public.merchant_release_unresponsive_rider(uuid,text) from public,anon;
 revoke all on function public.driver_report_emergency_before_pickup(uuid,text) from public,anon;
-revoke all on function public.admin_emergency_reassign_picked_up_order(uuid,uuid,text,text) from public,anon;
+revoke all on function public.admin_emergency_reassign_picked_up_order(uuid,uuid,text,text,boolean) from public,anon;
 grant execute on function public.admin_save_rider_response_settings(integer,integer,integer) to authenticated;
 grant execute on function public.expire_rider_response_timeouts() to authenticated;
 grant execute on function public.merchant_release_unresponsive_rider(uuid,text) to authenticated;
 grant execute on function public.driver_report_emergency_before_pickup(uuid,text) to authenticated;
-grant execute on function public.admin_emergency_reassign_picked_up_order(uuid,uuid,text,text) to authenticated;
+grant execute on function public.admin_emergency_reassign_picked_up_order(uuid,uuid,text,text,boolean) to authenticated;
 
 
 -- A rider who claims an accepted order must also confirm departure within the same
