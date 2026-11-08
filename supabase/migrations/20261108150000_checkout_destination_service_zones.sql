@@ -26,16 +26,19 @@ begin
     '  select z.base_delivery_fee into v_delivery_fee from public.service_zones z' || E'\n' ||
     '    where z.id=v_address.service_zone_id and z.municipality_id=v_address.municipality_id and z.is_active=true;' || E'\n' ||
     '  if v_delivery_fee is null then raise exception ''The selected barangay/zone has no active delivery fee. Please choose another zone or contact support.''; end if;';
-  if position(v_old in v_def)=0 then
+  if position(v_old in v_def)>0 then
+    v_def := replace(v_def,v_old,v_new);
+  elsif position('z.base_delivery_fee' in v_def)=0 then
     raise exception 'Could not locate current route-fee lookup in place_customer_order; migration stopped safely.';
   end if;
-  v_def := replace(v_def,v_old,v_new);
 
   v_old := '''landmark'',v_address.landmark,''municipality_id'',v_address.municipality_id,''barangay_id'',v_address.barangay_id)';
   v_new := '''landmark'',v_address.landmark,''municipality_id'',v_address.municipality_id,''service_zone_id'',v_address.service_zone_id,';
   v_new := v_new || '''service_zone_name'',(select z.name from public.service_zones z where z.id=v_address.service_zone_id))';
   if position(v_old in v_def)>0 then
     v_def := replace(v_def,v_old,v_new);
+  elsif position('service_zone_name' in v_def)=0 then
+    raise exception 'Could not locate address snapshot fields in place_customer_order; migration stopped safely.';
   end if;
 
   execute v_def;
