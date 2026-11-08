@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function RiderResponseTimer({ deadline, compact = false }: {
   deadline: string | null;
   compact?: boolean;
 }) {
+  const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
   const [expirationProcessed, setExpirationProcessed] = useState(false);
 
@@ -17,8 +19,9 @@ export default function RiderResponseTimer({ deadline, compact = false }: {
   useEffect(() => {
     if (!deadline || now < new Date(deadline).getTime() || expirationProcessed) return;
     setExpirationProcessed(true);
-    void fetch("/api/rider-response-expire", { method: "POST" }).catch(() => undefined);
-  }, [deadline, now, expirationProcessed]);
+    void fetch("/api/rider-response-expire", { method: "POST" })
+      .finally(() => router.refresh());
+  }, [deadline, now, expirationProcessed, router]);
 
   if (!deadline) return null;
   const remaining = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
