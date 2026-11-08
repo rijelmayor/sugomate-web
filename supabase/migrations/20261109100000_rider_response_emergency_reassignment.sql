@@ -322,3 +322,48 @@ end;
 $$;
 
 revoke all on function public.set_claimed_rider_response_deadline() from public,anon,authenticated;
+
+
+-- Enforce the deadline at the database boundary, not only in the countdown UI.
+create or replace function public.driver_respond_to_assignment(p_order_id uuid,p_accept boolean)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if not exists(select 1 from public.driver_profiles where user_id=v_actor and status='active') then
+    raise exception 'An approved delivery partner account is required.';
+  end if;
+  select * into v_order from public.orders
+  where id=p_order_id and driver_user_id=v_actor
+  for update;
+  if not found or v_order.status<>'assigned' or v_order.driver_assignment_status<>'offered' then
+    raise exception 'This delivery offer is no longer available.';
+  end if;
+  if v_order.driver_response_deadline_at is not null and v_order.driver_response_deadline_at<=now() then
+    update public.orders set driver_user_id=null,driver_assignment_status=null,status='ready_for_pickup',
+      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+      rider_assignment_expired_at=now(),rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+    where id=p_order_id;
+    insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+    values(p_order_id,'assigned','ready_for_pickup',v_actor,'Rider response arrived after the deadline; order returned to dispatch queue');
+    insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+    values(v_actor,'late_rider_response','orders',p_order_id::text,
+      jsonb_build_object('deadline',v_order.driver_response_deadline_at,'response_rejected',true));
+    return;
+  end if;
+  if p_accept then
+    update public.orders set driver_assignment_status='accepted',updated_at=now() where id=p_order_id;
+    insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+    values(p_order_id,'assigned','assigned',v_actor,'Delivery partner accepted assignment within response window');
+  else
+    update public.orders set driver_user_id=null,driver_assignment_status=null,status='ready_for_pickup',
+      assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,updated_at=now()
+    where id=p_order_id;
+    insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+    values(p_order_id,'assigned','ready_for_pickup',v_actor,'Delivery partner declined assignment; returned to dispatch queue');
+  end if;
+end;
+$$;
+revoke all on function public.driver_respond_to_assignment(uuid,boolean) from public,anon;
+grant execute on function public.driver_respond_to_assignment(uuid,boolean) to authenticated;
