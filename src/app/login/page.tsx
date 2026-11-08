@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signIn, resendConfirmation } from "./actions";
 import AuthSubmitButton from "@/components/auth/AuthSubmitButton";
 import AuthIntro from "@/components/auth/AuthIntro";
+import PasswordInput from "@/components/auth/PasswordInput";
 
 const errors: Record<string, string> = {
   missing: "Enter your email and password.",
@@ -34,7 +35,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       {success === "resent" && <p role="status" className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900">If the address is registered and still needs confirmation, a new confirmation email has been requested. Check your Inbox and Spam folders.</p>}{success === "phone-verified" && <p role="status" className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900">Your mobile number is verified. Sign in to continue.</p>}
       <form action={signIn} className="mt-7 space-y-4"><input type="hidden" name="next" value={safeNext}/>
         <label className="block text-sm font-bold">Email address<input required name="email" type="email" autoComplete="email" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label>
-        <label className="block text-sm font-bold">Password<input required name="password" type="password" autoComplete="current-password" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"/></label><div className="-mt-2 text-right"><Link href="/forgot-password" className="text-sm font-bold text-orange-600 hover:text-orange-700">Forgot password?</Link></div>
+        <PasswordInput label="Password" inputProps={{ required: true, name: "password", autoComplete: "current-password", className: "w-full rounded-xl border border-slate-200 px-4 py-3 pr-14 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" }} /><div className="-mt-2 text-right"><Link href="/forgot-password" className="text-sm font-bold text-orange-600 hover:text-orange-700">Forgot password?</Link></div>
         <AuthSubmitButton pendingLabel="Signing you in…">Sign in</AuthSubmitButton>
       </form>
    </div>
