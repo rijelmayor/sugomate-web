@@ -556,3 +556,131 @@ end;
 $$;
 revoke all on function public.driver_release_order_claim(uuid) from public,anon;
 grant execute on function public.driver_release_order_claim(uuid) to authenticated;
+
+
+-- When a claimed rider withdraws or times out, restart the marketplace claim window
+-- so the next eligible rider gets the full Admin-configured response period.
+create or replace function public.expire_rider_response_timeouts()
+returns integer language plpgsql security definer set search_path=''
+as $$
+declare v_count integer; v_minutes integer;
+begin
+  select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+  v_minutes:=coalesce(v_minutes,7);
+  with expired as (
+    update public.orders
+    set driver_user_id=null,driver_assignment_status=null,
+        status=case when status='assigned' then 'ready_for_pickup' else 'accepted' end,
+        assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+        rider_claim_deadline_at=case when status='accepted' then now()+make_interval(mins=>v_minutes) else rider_claim_deadline_at end,
+        rider_assignment_expired_at=case when status='accepted' then null else now() end,
+        rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+    where ((status='assigned' and driver_assignment_status='offered')
+        or (status='accepted' and driver_assignment_status='claimed'))
+      and driver_response_deadline_at is not null and driver_response_deadline_at<=now()
+    returning id,order_number,status
+  ), history as (
+    insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+    select id,case when status='ready_for_pickup' then 'assigned' else 'accepted' end,
+      status,auth.uid(),'Rider response window expired; assignment released and response window restarted'
+    from expired
+  )
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  select auth.uid(),'rider_response_timeout','orders',id::text,
+    jsonb_build_object('order_number',order_number,'returned_status',status,'new_response_window_minutes',v_minutes)
+  from expired;
+  get diagnostics v_count=row_count;
+  return v_count;
+end;
+$$;
+
+create or replace function public.merchant_release_unresponsive_rider(p_order_id uuid,p_reason text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
+  v_reason text:=left(trim(coalesce(p_reason,'')),300); v_next text; v_minutes integer;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if length(v_reason)<3 then raise exception 'Provide a reason for releasing this rider.'; end if;
+  select o.* into v_order from public.orders o
+  where o.id=p_order_id
+    and exists(select 1 from public.merchant_members mm where mm.merchant_id=o.merchant_id and mm.user_id=v_actor)
+    and exists(select 1 from public.merchants m where m.id=o.merchant_id and m.status='approved')
+  for update;
+  if not found then raise exception 'Order not found or merchant access denied.'; end if;
+  if v_order.status not in ('assigned','accepted','preparing','ready_for_pickup')
+     or v_order.picked_up_at is not null or v_order.driver_user_id is null then
+    raise exception 'Only an assigned order that has not been picked up can be returned to the queue.';
+  end if;
+  v_next:=case when v_order.status='assigned' then 'ready_for_pickup' else v_order.status end;
+  select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,status=v_next,
+    assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_claim_deadline_at=case when v_order.status='accepted' then now()+make_interval(mins=>coalesce(v_minutes,7)) else rider_claim_deadline_at end,
+    rider_assignment_expired_at=case when v_order.status='accepted' then null else rider_assignment_expired_at end,
+    rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,v_order.status,v_next,v_actor,'Merchant released rider before pickup: '||v_reason);
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'merchant_released_rider','orders',p_order_id::text,
+    jsonb_build_object('previous_driver_user_id',v_order.driver_user_id,'reason',v_reason,
+      'stock_reservations_preserved',true,'picked_up',false,'preserved_order_stage',v_next));
+end;
+$$;
+
+create or replace function public.driver_report_emergency_before_pickup(p_order_id uuid,p_reason text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype;
+  v_reason text:=left(trim(coalesce(p_reason,'')),300); v_next text; v_minutes integer;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  if length(v_reason)<3 then raise exception 'Describe the emergency briefly.'; end if;
+  select * into v_order from public.orders where id=p_order_id and driver_user_id=v_actor for update;
+  if not found or v_order.picked_up_at is not null
+     or v_order.status not in ('assigned','accepted','preparing','ready_for_pickup') then
+    raise exception 'This delivery cannot be released through the pre-pickup emergency flow.';
+  end if;
+  v_next:=case when v_order.status='assigned' then 'ready_for_pickup' else v_order.status end;
+  select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,status=v_next,
+    assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_claim_deadline_at=case when v_order.status='accepted' then now()+make_interval(mins=>coalesce(v_minutes,7)) else rider_claim_deadline_at end,
+    rider_assignment_expired_at=case when v_order.status='accepted' then null else rider_assignment_expired_at end,
+    rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,v_order.status,v_next,v_actor,'Rider reported emergency before pickup: '||v_reason);
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'driver_emergency_release','orders',p_order_id::text,
+    jsonb_build_object('reason',v_reason,'picked_up',false,'preserved_order_stage',v_next));
+end;
+$$;
+
+create or replace function public.driver_release_order_claim(p_order_id uuid)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_actor uuid:=auth.uid(); v_order public.orders%rowtype; v_minutes integer;
+begin
+  if v_actor is null then raise exception 'Sign in required.'; end if;
+  select * into v_order from public.orders where id=p_order_id and driver_user_id=v_actor for update;
+  if not found or v_order.status<>'accepted' or v_order.driver_assignment_status<>'claimed'
+     or v_order.rider_on_way_at is not null then
+    raise exception 'You can only release an order before confirming you are on the way.';
+  end if;
+  select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+  update public.orders set driver_user_id=null,driver_assignment_status=null,assigned_at=null,
+    driver_response_deadline_at=null,driver_response_started_at=null,
+    rider_claim_deadline_at=now()+make_interval(mins=>coalesce(v_minutes,7)),
+    rider_assignment_expired_at=null,rider_reassignment_count=rider_reassignment_count+1,updated_at=now()
+  where id=p_order_id;
+  insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+  values(p_order_id,'accepted','accepted',v_actor,'Rider released the claim before committing to pickup');
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  values(v_actor,'driver_released_order_claim','orders',p_order_id::text,
+    jsonb_build_object('reason','Rider voluntarily released before pickup','stock_reservations_preserved',true));
+end;
+$$;
+revoke all on function public.driver_release_order_claim(uuid) from public,anon;
+grant execute on function public.driver_release_order_claim(uuid) to authenticated;
