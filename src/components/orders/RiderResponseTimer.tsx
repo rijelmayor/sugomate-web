@@ -7,11 +7,18 @@ export default function RiderResponseTimer({ deadline, compact = false }: {
   compact?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [expirationProcessed, setExpirationProcessed] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!deadline || now < new Date(deadline).getTime() || expirationProcessed) return;
+    setExpirationProcessed(true);
+    void fetch("/api/rider-response-expire", { method: "POST" }).catch(() => setExpirationProcessed(false));
+  }, [deadline, now, expirationProcessed]);
 
   if (!deadline) return null;
   const remaining = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
