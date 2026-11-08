@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import * as THREE from "three";
 import styles from "./explainer.module.css";
 
@@ -207,7 +208,7 @@ export default function ExplainerScene() {
   return (
     <main className={styles.page}>
       <header className={styles.topbar}>
-        <a href="/" className={styles.brand}><span className={styles.brandMark}>S</span><span>SUGOMATE <small>IMONG SUGO, AMONG IHATOD.</small></span></a>
+        <Link href="/" className={styles.brand}><span className={styles.brandMark}>S</span><span>SUGOMATE <small>IMONG SUGO, AMONG IHATOD.</small></span></Link>
         <span className={styles.topLabel}>THE DELIVERY NETWORK, IN MOTION</span>
       </header>
 
