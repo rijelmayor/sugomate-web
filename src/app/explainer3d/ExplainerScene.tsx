@@ -136,23 +136,82 @@ export default function ExplainerScene() {
     route.position.z = 0.22;
     scene.add(route);
 
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 24, 24),
-      new THREE.MeshBasicMaterial({ color: "#ffbd18" }),
+    // A bright, dimensional SUGOMATE delivery cart replaces the tiny route dot.
+    const vehicle = new THREE.Group();
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: "#ff8a00", metalness: 0.28, roughness: 0.32 });
+    const navyMaterial = new THREE.MeshStandardMaterial({ color: "#09234a", metalness: 0.38, roughness: 0.28 });
+    const glassMaterial = new THREE.MeshStandardMaterial({ color: "#79dcff", metalness: 0.55, roughness: 0.16 });
+    const tireMaterial = new THREE.MeshStandardMaterial({ color: "#101827", roughness: 0.82 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.34, 0.34), bodyMaterial);
+    body.position.y = 0.02;
+    vehicle.add(body);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.31, 0.31), navyMaterial);
+    cabin.position.set(-0.08, 0.29, 0);
+    vehicle.add(cabin);
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.25), glassMaterial);
+    windshield.position.set(0.145, 0.3, 0);
+    vehicle.add(windshield);
+    const cargo = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.25, 0.29), new THREE.MeshStandardMaterial({ color: "#ffd166", roughness: 0.55 }));
+    cargo.position.set(0.27, 0.31, 0);
+    vehicle.add(cargo);
+    [-0.25, 0.29].forEach((x) => {
+      [-0.19, 0.19].forEach((z) => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.075, 20), tireMaterial);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(x, -0.17, z);
+        vehicle.add(wheel);
+      });
+    });
+    const headlight = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), new THREE.MeshBasicMaterial({ color: "#fff2a6" }));
+    headlight.position.set(0.425, 0.08, 0.08);
+    vehicle.add(headlight);
+    const vehicleGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.52, 32),
+      new THREE.MeshBasicMaterial({ color: "#20cfff", transparent: true, opacity: 0.3, depthWrite: false }),
     );
-    marker.position.copy(routeCurve.getPointAt(0));
-    marker.position.z = 0.48;
-    scene.add(marker);
+    vehicleGlow.rotation.x = 0;
+    vehicleGlow.position.z = -0.12;
+    vehicle.add(vehicleGlow);
+    vehicle.position.copy(routeCurve.getPointAt(0));
+    vehicle.position.z = 0.78;
+    vehicle.scale.setScalar(1.12);
+    scene.add(vehicle);
 
     const nodeMeshes = routePoints.map((point, index) => {
       const node = new THREE.Mesh(
         new THREE.SphereGeometry(index === 0 ? 0.13 : 0.11, 20, 20),
-        new THREE.MeshBasicMaterial({ color: "#ffbd18", transparent: true, opacity: 0.82 }),
+        new THREE.MeshBasicMaterial({ color: "#48bff2", transparent: true, opacity: 0.75 }),
       );
       node.position.copy(point);
       node.position.z = 0.42;
       scene.add(node);
-      return node;
+
+      const check = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.045, 10, 28),
+        new THREE.MeshBasicMaterial({ color: "#20df91" }),
+      );
+      check.add(ring);
+      const makeStroke = (start: THREE.Vector3, end: THREE.Vector3) => {
+        const direction = new THREE.Vector3().subVectors(end, start);
+        const stroke = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.045, 0.045, direction.length(), 12),
+          new THREE.MeshBasicMaterial({ color: "#ffffff" }),
+        );
+        stroke.position.copy(start).add(end).multiplyScalar(0.5);
+        stroke.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+        return stroke;
+      };
+      check.add(
+        makeStroke(new THREE.Vector3(-0.105, 0.005, 0.055), new THREE.Vector3(-0.025, -0.075, 0.055)),
+        makeStroke(new THREE.Vector3(-0.025, -0.075, 0.055), new THREE.Vector3(0.12, 0.105, 0.055)),
+      );
+      check.position.copy(point);
+      check.position.z = 0.9;
+      check.scale.setScalar(0.72);
+      check.visible = false;
+      scene.add(check);
+      return { node, check };
     });
 
     let animationId = 0;
@@ -189,16 +248,21 @@ export default function ExplainerScene() {
       }
 
       const progress = Math.min(1, elapsedRef.current / DURATION);
-      marker.position.copy(routeCurve.getPointAt(progress));
-      marker.position.z = 0.5;
-      marker.scale.setScalar(1 + Math.sin(now * 0.008) * 0.16);
-      const currentStep = Math.min(steps.length - 1, Math.floor(progress * steps.length));
-      nodeMeshes.forEach((node, index) => {
-        const reached = index <= currentStep;
+      const cartPosition = routeCurve.getPointAt(progress);
+      const tangent = routeCurve.getTangentAt(progress);
+      vehicle.position.set(cartPosition.x, cartPosition.y + 0.16, 0.78);
+      vehicle.rotation.z = Math.atan2(tangent.y, tangent.x);
+      vehicle.position.z = 0.78 + Math.sin(now * 0.009) * 0.035;
+      vehicleGlow.material.opacity = 0.22 + Math.sin(now * 0.01) * 0.08;
+      const currentStep = Math.min(steps.length - 1, Math.floor(Math.min(0.9999, progress) * steps.length));
+      nodeMeshes.forEach(({ node, check }, index) => {
+        const completed = progress >= (index + 1) / steps.length;
         const material = node.material as THREE.MeshBasicMaterial;
-        material.color.set(reached ? "#ffbd18" : "#48bff2");
-        material.opacity = reached ? 1 : 0.45;
-        node.scale.setScalar(index === currentStep ? 1.65 : 1);
+        material.color.set(completed ? "#20df91" : index === currentStep ? "#ffbd18" : "#48bff2");
+        material.opacity = completed || index === currentStep ? 1 : 0.45;
+        node.scale.setScalar(index === currentStep ? 1.75 + Math.sin(now * 0.009) * 0.12 : 1);
+        check.visible = completed;
+        if (completed) check.scale.setScalar(0.72 + Math.sin(now * 0.006 + index) * 0.035);
       });
       imagePlane.rotation.y = Math.sin(now * 0.00045) * 0.008;
       frame.rotation.copy(imagePlane.rotation);
@@ -220,7 +284,7 @@ export default function ExplainerScene() {
       imagePlane.geometry.dispose();
       frame.geometry.dispose();
       routeGeometry.dispose();
-      [imagePlane.material, frame.material, route.material, marker.material, ...nodeMeshes.map((node) => node.material)]
+      [imagePlane.material, frame.material, route.material, bodyMaterial, navyMaterial, glassMaterial, tireMaterial, cargo.material, vehicleGlow.material, ...vehicle.children.map((child) => child instanceof THREE.Mesh ? child.material : null).filter(Boolean), ...nodeMeshes.flatMap(({ node, check }) => [node.material, ...check.children.map((child) => (child as THREE.Mesh).material)])]
         .forEach((material) => {
           if (Array.isArray(material)) material.forEach((item) => item.dispose());
           else material.dispose();
