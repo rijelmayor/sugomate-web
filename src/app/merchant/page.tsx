@@ -81,7 +81,7 @@ export default async function MerchantPortal({ searchParams }: {
   return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new} headerActions={<MerchantNewOrderAlert merchantIds={approvedIds} snapshot={Object.fromEntries((orders ?? []).map(o => [o.id, { status: o.status as string, sig: String(o.updated_at ?? "") }]))} />}>
 
     {params.updated && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">Order status updated.</p>}
-    {params.paymentConfirmed && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">GCash payment confirmed and marked as paid.</p>}
+    {params.paymentConfirmed && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">GCash payment confirmed and marked as paid. This order remains in New until you accept it.</p>}
     {params.error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{params.error==="payment"?"We could not confirm that GCash payment. Refresh and check the submitted proof.":"We could not update that order. Refresh and try again."}</p>}
 
     {merchantRows.some(m => m.merchant?.status !== "approved") && <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-extrabold">Store approval pending</h2><p className="mt-1 text-sm text-amber-900/75">SUGOMATE operations must approve your store before you can receive orders.</p>{merchantRows.filter(m => m.merchant?.status !== "approved").map(m => <p key={m.id} className="mt-2 text-sm font-semibold">{m.merchant?.name}: <span className="capitalize">{m.merchant?.status}</span></p>)}</section>}
