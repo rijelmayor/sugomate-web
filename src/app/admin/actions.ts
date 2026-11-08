@@ -97,8 +97,9 @@ export async function authorizeRiderLocality(formData: FormData) {
   const municipality = String(formData.get("municipality_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
   const expiryRaw = String(formData.get("expires_at") ?? "");
-  const expiry = expiryRaw ? new Date(expiryRaw).toISOString() : null;
-  if (!/^[0-9a-f-]{36}$/i.test(rider) || !/^[0-9a-f-]{36}$/i.test(municipality) || reason.length < 3 || (expiry && !Number.isFinite(Date.parse(expiry)))) redirect("/admin/localities?error=authorization");
+  const expiryDate = expiryRaw ? new Date(expiryRaw) : null;
+  if (!/^[0-9a-f-]{36}$/i.test(rider) || !/^[0-9a-f-]{36}$/i.test(municipality) || reason.length < 3 || (expiryDate && !Number.isFinite(expiryDate.getTime()))) redirect("/admin/localities?error=authorization");
+  const expiry = expiryDate ? expiryDate.toISOString() : null;
   const { error } = await supabase.rpc("admin_authorize_rider_locality", {
     p_rider_user_id: rider, p_municipality_id: municipality, p_reason: reason, p_expires_at: expiry,
   });
