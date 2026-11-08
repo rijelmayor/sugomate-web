@@ -106,6 +106,22 @@ with check (
   and rider_reimbursement_amount = 0
   and actual_purchase_amount is null
   and quoted_total is null
+  and approved_purchase_budget is null
+  and delivery_fee is null
+  and service_fee is null
+  and payment_reference is null
+  and payment_proof_path is null
+  and receipt_path is null
+  and pickup_proof_path is null
+  and delivery_proof_path is null
+  and payment_confirmed_by is null
+  and customer_approved_at is null
+  and assigned_at is null
+  and purchased_at is null
+  and picked_up_at is null
+  and delivered_at is null
+  and cancelled_at is null
+  and cancellation_reason is null
 );
 
 drop policy if exists "Customers read own service requests" on public.service_requests;
@@ -215,3 +231,24 @@ with check (
       and sr.assigned_driver_id = (select auth.uid())
   )
 );
+
+
+create or replace function public.customer_attach_service_request_reference(p_request_id uuid, p_path text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in required.'; end if;
+  if p_path !~ ('^' || p_request_id::text || '/reference\\.(jpg|png|webp)$') then
+    raise exception 'Invalid reference image path.';
+  end if;
+  update public.service_requests
+  set reference_image_path = p_path, updated_at = now()
+  where id = p_request_id and customer_id = auth.uid() and status = 'pending_review';
+  if not found then raise exception 'Request not found or no longer editable.'; end if;
+end;
+$$;
+revoke all on function public.customer_attach_service_request_reference(uuid,text) from public, anon;
+grant execute on function public.customer_attach_service_request_reference(uuid,text) to authenticated;
