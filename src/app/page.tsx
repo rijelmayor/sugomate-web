@@ -10,9 +10,8 @@ const services = [
 ];
 
 const ecosystem = [
-  { icon: ShoppingBag, title: "For customers", copy: "One simple place to order, request, and arrange local deliveries.", href: "/register?next=%2Fdashboard" },
-  { icon: Store, title: "For local businesses", copy: "Help more people discover your store and make ordering easier.", href: "/register?next=%2Fmerchant%2Fapply" },
-  { icon: Truck, title: "For delivery partners", copy: "Connect with local delivery requests and serve your community.", href: "/register?next=%2Fdriver%2Fapply" },
+  { icon: Store, title: "Join SUGOMATE as a merchant", copy: "Register your local business, list your store, and reach more customers in your community.", href: "/register?next=%2Fmerchant%2Fapply" },
+  { icon: Truck, title: "Join SUGOMATE as a delivery partner", copy: "Apply to deliver local orders and serve customers in your community.", href: "/register?next=%2Fdriver%2Fapply" },
 ];
 
 export default function HomePage() {
@@ -56,7 +55,7 @@ export default function HomePage() {
     <section id="ecosystem" className="py-16 sm:py-20">
       <div className="mx-auto w-[min(1080px,calc(100%-40px))]">
         <div className="mx-auto mb-10 max-w-2xl text-center"><p className="text-xs font-extrabold uppercase tracking-[.18em] text-orange-600">The SUGOMATE ecosystem</p><h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Good things happen when a community connects.</h2><p className="mt-3 text-sm leading-7 text-slate-500">A shared local marketplace designed to make ordering and delivery simpler for everyone.</p></div>
-        <div className="grid gap-5 md:grid-cols-3">{ecosystem.map(item=>{const Icon=item.icon;return <a key={item.title} href={item.href} className="group block rounded-2xl border border-slate-200 p-6 transition hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"><div className="grid size-12 place-items-center rounded-xl bg-[#102e57] text-white"><Icon size={22}/></div><h3 className="mt-5 text-lg font-black">{item.title}</h3><p className="mt-2 text-sm leading-7 text-slate-500">{item.copy}</p><p className="mt-4 text-sm font-extrabold text-orange-600">Continue <ArrowRight size={15} className="ml-1 inline"/></p></a>})}</div>
+        <div className="grid gap-5 md:grid-cols-2">{ecosystem.map(item=>{const Icon=item.icon;return <a key={item.title} href={item.href} className="group block rounded-2xl border border-slate-200 p-6 transition hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"><div className="grid size-12 place-items-center rounded-xl bg-[#102e57] text-white"><Icon size={22}/></div><h3 className="mt-5 text-lg font-black">{item.title}</h3><p className="mt-2 text-sm leading-7 text-slate-500">{item.copy}</p><p className="mt-4 text-sm font-extrabold text-orange-600">Continue <ArrowRight size={15} className="ml-1 inline"/></p></a>})}</div>
       </div>
     </section>
 
