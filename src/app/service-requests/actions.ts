@@ -29,6 +29,7 @@ export async function createServiceRequest(formData: FormData) {
     redirect(serviceType === "papalit" ? "/papalit?error=details" : "/pasugo?error=details");
   }
   if (serviceType === "pasugo" && pickupLocation.length < 3) redirect("/pasugo?error=pickup");
+  if (serviceType === "pasugo" && purchaseRequired && budget === null) redirect("/pasugo?error=details");
 
   const { data: address } = await supabase.from("customer_addresses")
     .select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,municipalities(name)")
