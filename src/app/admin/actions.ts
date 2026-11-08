@@ -146,9 +146,10 @@ export async function emergencyReassignPickedUpOrder(formData: FormData) {
   const driverId = String(formData.get("driver_user_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
   const location = String(formData.get("custody_location") ?? "").trim().slice(0, 300);
-  if (!/^[0-9a-f-]{36}$/i.test(orderId) || !/^[0-9a-f-]{36}$/i.test(driverId) || reason.length < 5) redirect("/admin/dispatch?error=handoff");
+  const custodyVerified = formData.get("custody_verified") === "yes";
+  if (!/^[0-9a-f-]{36}$/i.test(orderId) || !/^[0-9a-f-]{36}$/i.test(driverId) || reason.length < 5 || !custodyVerified) redirect("/admin/dispatch?error=handoff");
   const { error } = await supabase.rpc("admin_emergency_reassign_picked_up_order", {
-    p_order_id: orderId, p_new_driver_user_id: driverId, p_reason: reason, p_custody_location: location || null,
+    p_order_id: orderId, p_new_driver_user_id: driverId, p_reason: reason, p_custody_location: location || null, p_custody_verified: custodyVerified,
   });
   if (error) redirect("/admin/dispatch?error=handoff");
   redirect("/admin/dispatch?updated=handoff");
