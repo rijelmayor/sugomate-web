@@ -102,6 +102,7 @@ as $$
   select exists (
     select 1
     from public.driver_profiles dp
+    join public.municipalities m on m.id=dp.municipality_id and m.is_serviceable=true
     where dp.user_id = p_rider_user_id
       and dp.status = 'active'
       and dp.municipality_id = p_municipality_id
