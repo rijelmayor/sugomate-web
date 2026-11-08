@@ -378,3 +378,116 @@ begin
   return new;
 end;
 $$;
+
+
+-- Save the customer residential locality captured during signup.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_municipality uuid;
+begin
+  if nullif(new.raw_user_meta_data ->> 'municipality_id','') is not null then
+    begin
+      v_municipality := (new.raw_user_meta_data ->> 'municipality_id')::uuid;
+    exception when invalid_text_representation then
+      raise exception 'Choose a valid residential municipality.';
+    end;
+    if not exists(select 1 from public.municipalities m where m.id=v_municipality and m.is_serviceable=true) then
+      raise exception 'Choose an active residential municipality.';
+    end if;
+  end if;
+  insert into public.profiles (id,display_name,phone,municipality_id)
+  values (
+    new.id,
+    nullif(trim(coalesce(new.raw_user_meta_data ->> 'display_name',new.raw_user_meta_data ->> 'full_name')),''),
+    nullif(trim(new.phone),''),
+    v_municipality
+  );
+  insert into public.user_roles(user_id,role) values(new.id,'customer')
+    on conflict do nothing;
+  return new;
+end;
+$function$;
+
+-- Revalidate the rider's pickup authorization on assignment acceptance and
+-- all later order transitions, including if an additional grant has expired.
+create or replace function app_private.enforce_rider_pickup_locality()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_origin uuid;
+begin
+  if new.driver_user_id is null then return new; end if;
+  if tg_op='UPDATE'
+    and new.driver_user_id is not distinct from old.driver_user_id
+    and new.branch_id is not distinct from old.branch_id
+    and new.merchant_id is not distinct from old.merchant_id
+    and new.status is not distinct from old.status
+    and new.driver_assignment_status is not distinct from old.driver_assignment_status then
+    return new;
+  end if;
+  select b.municipality_id into v_origin
+  from public.merchant_branches b
+  where b.id=new.branch_id and b.merchant_id=new.merchant_id and b.is_active=true;
+  if v_origin is null then raise exception 'The order pickup branch has no active, valid locality.'; end if;
+  if not app_private.rider_is_authorized_for_locality(new.driver_user_id,v_origin) then
+    raise exception 'This rider is no longer authorized to accept or handle orders from the merchant pickup locality.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_order_rider_pickup_locality on public.orders;
+create trigger enforce_order_rider_pickup_locality
+before insert or update of driver_user_id,branch_id,merchant_id,status,driver_assignment_status on public.orders
+for each row execute function app_private.enforce_rider_pickup_locality();
+
+-- Expiry is enforced synchronously by the authorization predicate. This
+-- maintenance routine additionally records expired grants for the audit trail.
+create or replace function app_private.audit_expired_rider_locality_authorizations()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_count integer;
+begin
+  with expired as (
+    update public.rider_locality_authorizations
+      set revoked_at=expires_at
+      where revoked_at is null and expires_at is not null and expires_at<=now()
+      returning id,rider_user_id,municipality_id,reason
+  )
+  insert into public.rider_locality_authorization_audit(
+    rider_user_id,municipality_id,action,authorization_id,reason,actor_id
+  )
+  select rider_user_id,municipality_id,'expired',id,
+    coalesce(reason,'Authorization expired automatically'),
+    (select id from auth.users order by created_at limit 1)
+  from expired
+  where exists(select 1 from auth.users);
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+revoke all on function app_private.audit_expired_rider_locality_authorizations() from public,anon,authenticated;
+
+do $schedule$
+begin
+  if exists(select 1 from pg_extension where extname='pg_cron') then
+    perform cron.schedule(
+      'sugomate-audit-expired-rider-localities',
+      '*/5 * * * *',
+      'select app_private.audit_expired_rider_locality_authorizations();'
+    );
+  end if;
+exception when others then
+  raise notice 'pg_cron scheduling unavailable; authorization expiry remains enforced at runtime.';
+end;
+$schedule$;
