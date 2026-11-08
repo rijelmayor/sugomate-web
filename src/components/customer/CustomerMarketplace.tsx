@@ -38,7 +38,7 @@ function CheckoutSubmitButton({ disabled, paymentMethod }: { disabled: boolean; 
 
 function ProductImage({ src, alt }: { src: string | null; alt: string }) {
   const [state, setState] = useState<"loading" | "ok" | "error">(src ? "loading" : "error");
-  return <div className={`relative aspect-square w-[40%] max-w-44 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-amber-50 ${state === "loading" ? "skeleton" : ""}`}>
+  return <div className={`relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-white ${state === "loading" ? "skeleton" : ""}`}>
     {state !== "ok" && <div aria-hidden="true" className="absolute inset-0 grid place-items-center text-orange-300"><ShoppingBasket size={34} strokeWidth={1.5} /></div>}
     {src && state !== "error" && <img src={src} alt={alt} loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("error")} className={`absolute inset-0 h-full w-full object-contain p-2 transition-opacity duration-300 ${state === "ok" ? "opacity-100" : "opacity-0"}`} />}
   </div>;
@@ -233,10 +233,10 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <PendingLink href={href({ store: "" })} aria-label="Back to stores" className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-[#102e57]"><ChevronLeft size={18} /></PendingLink>
           <div className="min-w-0"><h2 className="truncate text-xl font-black text-[#102e57]">{currentStore.name}</h2><p className="flex items-center gap-1 text-xs text-slate-400"><MapPin aria-hidden="true" size={12} />{currentStore.branchName && currentStore.branchName !== currentStore.name ? `${currentStore.branchName} · ` : ""}{currentStore.area || "Leyte"} · {productMatches.length} {productMatches.length === 1 ? "item" : "items"}</p></div>
         </div>
-        {productMatches.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          {productMatches.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 overflow-hidden rounded-3xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+        {productMatches.length ? <div className="mt-4 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {productMatches.map(product => { const qty = cart[product.id]?.quantity ?? 0; return <article key={product.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-orange-100/90 bg-white p-2 shadow-[0_5px_18px_rgba(16,46,87,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
           <ProductImage src={product.image_url} alt={product.name} />
-          <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3">
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-1 py-2">
             <div className="min-w-0">
               <h3 className="line-clamp-2 break-words text-sm font-extrabold leading-snug text-[#102e57] sm:text-base">{product.name}</h3>
               <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-600 sm:text-xs"><Store aria-hidden="true" size={13} className="shrink-0" /><span className="line-clamp-1">{product.merchant?.name || "Local store"}</span></p>
