@@ -11,5 +11,5 @@ export default async function DashboardPage() {
   if (roleSet.has("driver")) redirect("/driver");
   if (roleSet.has("merchant")) redirect("/merchant");
   if (roleSet.has("customer")) redirect("/customer");
-  redirect("/login?error=role");
+  redirect("/account/setup");
 }
