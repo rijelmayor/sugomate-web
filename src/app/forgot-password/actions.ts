@@ -6,18 +6,19 @@ import { createClient } from "@/lib/supabase/server";
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
-  // Validate a conventional email shape without over-escaping regex tokens.
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
     redirect("/forgot-password?error=invalid");
   }
 
   const supabase = await createClient();
+
+  // Use the stable Vercel branch alias for preview recovery so it can be
+  // explicitly allowlisted in Supabase Auth (deployment-specific URLs change).
   const siteOrigin =
     process.env.VERCEL_ENV === "production"
       ? (process.env.NEXT_PUBLIC_SITE_URL || "https://sugomate.com")
-      : (process.env.VERCEL_URL
-          ? "https://" + process.env.VERCEL_URL
-          : "https://sugomate.com");
+      : "https://sugomate-web-git-feat-web-password-159a5c-rijelmayors-projects.vercel.app";
+
   const redirectTo = new URL(
     "/auth/callback?next=%2Freset-password",
     siteOrigin,
