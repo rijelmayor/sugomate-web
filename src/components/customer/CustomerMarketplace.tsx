@@ -81,7 +81,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const [customerNote, setCustomerNote] = useState("");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "__new__");
   const [newMunicipalityId, setNewMunicipalityId] = useState("");
-  const [newBarangayId, setNewBarangayId] = useState("");
+  const [newServiceZoneId, setNewServiceZoneId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cod");
 
   // Recheck server-calculated store hours periodically so a storefront closes without a manual reload.
@@ -153,8 +153,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   // The basket store can sit outside the current area filter; the server re-verifies hours and stock on checkout.
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && !storeClosed;
   const selectedAddress = addresses.find(a => a.id === addressId);
-  const feeBarangay = addressId === "__new__" ? newBarangayId : selectedAddress?.service_zone_id ?? "";
-  const fee = feeBarangay ? zoneFees[feeBarangay] : undefined;
+  const feeZoneId = addressId === "__new__" ? newBarangayId : selectedAddress?.service_zone_id ?? "";
+  const fee = feeZoneId ? zoneFees[feeZoneId] : undefined;
   const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
   const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
   const gcashPaymentType = cartStore?.gcashPaymentType ?? firstItem?.merchant?.gcash_payment_type ?? "qr";
