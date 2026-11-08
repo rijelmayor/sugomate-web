@@ -28,13 +28,12 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   };
   const productQuery = buildProductQuery(false);
 
-  const [{ data: profile }, { data: municipalities }, { data: addresses }, { data: categoryRows, error: categoryError }, { data: zones }, { data: firstProductRows, error: firstProductError }, { data: financialSettings }] = await Promise.all([
+  const [{ data: profile }, { data: municipalities }, { data: serviceZones }, { data: addresses }, { data: categoryRows }, { data: firstProductRows, error: firstProductError }, { data: financialSettings }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
     supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
-    supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("service_zones").select("id,name,municipality_id,base_delivery_fee").eq("is_active",true).order("name"),
+    supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,municipality_id,service_zone_id,service_zones(name),municipalities(name)").eq("customer_id", user.id).order("created_at", { ascending: false }),
     supabase.from("product_categories").select("id,name,slug,icon").eq("is_active", true).order("sort_order").order("name"),
-    // Optional: needs 20261105110000_customer_read_delivery_fees.sql. Without it this returns nothing and checkout shows "Calculated at checkout".
-    supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true).order("created_at", { ascending: true }),
     productQuery,
     supabase.from("platform_financial_settings").select("merchant_usage_enabled,merchant_usage_method,merchant_usage_value").eq("id",1).maybeSingle(),
   ]);
@@ -81,8 +80,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   // Only the open store's menu is sent to the browser, which keeps the home page light.
   const products = store && storeMap.get(store)?.isOpen ? rows.filter(row => row.branch_id === store && (!storeCategory || row.category?.slug === storeCategory)) : [];
 
-  const deliveryFees: Record<string, number> = {};
-  for (const zone of zones ?? []) if (!(zone.municipality_id in deliveryFees)) deliveryFees[zone.municipality_id] = Number(zone.base_delivery_fee);
+  const zoneFees: Record<string, number> = {};
+  for (const zone of serviceZones ?? []) zoneFees[zone.id] = Number(zone.base_delivery_fee);
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
 
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-5 text-[#102e57] sm:px-6 sm:py-8">
@@ -101,7 +100,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Unsa imong sugo karon?</h1>
       </section>
 
-      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={productCategories} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} deliveryFees={deliveryFees} merchantUsageEnabled={financialSettings?.merchant_usage_enabled??false} merchantUsageMethod={financialSettings?.merchant_usage_method??"percentage"} merchantUsageValue={Number(financialSettings?.merchant_usage_value??0)} /></section>
+      <section id="marketplace" className="scroll-mt-6"><CustomerMarketplace serviceZones={serviceZones ?? []} products={products as never} stores={stores} selectedStore={store ?? ""} selectedMunicipality={municipality ?? ""} municipalities={municipalities ?? []} merchantCategories={productCategories} selectedMerchantCategory={storeCategory ?? ""} addresses={(addresses ?? []) as never} checkoutError={error} zoneFees={zoneFees} merchantUsageEnabled={financialSettings?.merchant_usage_enabled??false} merchantUsageMethod={financialSettings?.merchant_usage_method??"percentage"} merchantUsageValue={Number(financialSettings?.merchant_usage_value??0)} /></section>
 
       <footer className="mt-8 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, kami bahala.</footer>
     </div>
