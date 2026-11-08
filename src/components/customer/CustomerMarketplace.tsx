@@ -153,7 +153,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   // The basket store can sit outside the current area filter; the server re-verifies hours and stock on checkout.
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && !storeClosed;
   const selectedAddress = addresses.find(a => a.id === addressId);
-  const feeZoneId = addressId === "__new__" ? newBarangayId : selectedAddress?.service_zone_id ?? "";
+  const feeZoneId = addressId === "__new__" ? newServiceZoneId : selectedAddress?.service_zone_id ?? "";
   const fee = feeZoneId ? zoneFees[feeZoneId] : undefined;
   const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
   const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
@@ -290,7 +290,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
             <input name="new_label" defaultValue="Home" placeholder="Address label (Home, Work)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="recipient_name" required placeholder="Recipient full name" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="recipient_phone" required type="tel" placeholder="Mobile number" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
-            <select name="municipality_id" required value={newMunicipalityId} onChange={e => { setNewMunicipalityId(e.target.value); setNewBarangayId(""); }} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <select name="municipality_id" required value={newMunicipalityId} onChange={e => { setNewMunicipalityId(e.target.value); setNewServiceZoneId(""); }} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
             <select name="service_zone_id" required value={newBarangayId} onChange={e => setNewBarangayId(e.target.value)} disabled={!newMunicipalityId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57] disabled:bg-slate-100"><option value="" disabled>Select barangay / zone</option>{serviceZones.filter(z => z.municipality_id === newMunicipalityId).map(z => <option key={z.id} value={z.id}>{z.name}</option>)}</select>
             <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
