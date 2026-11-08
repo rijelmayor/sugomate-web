@@ -257,3 +257,68 @@ grant execute on function public.expire_rider_response_timeouts() to authenticat
 grant execute on function public.merchant_release_unresponsive_rider(uuid,text) to authenticated;
 grant execute on function public.driver_report_emergency_before_pickup(uuid,text) to authenticated;
 grant execute on function public.admin_emergency_reassign_picked_up_order(uuid,uuid,text,text) to authenticated;
+
+
+-- A rider who claims an accepted order must also confirm departure within the same
+-- Admin-configured response window.
+create or replace function public.set_claimed_rider_response_deadline()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+declare v_minutes integer;
+begin
+  if new.status='accepted' and new.driver_user_id is not null
+     and new.driver_assignment_status='claimed'
+     and (tg_op='INSERT' or old.driver_user_id is distinct from new.driver_user_id
+       or old.driver_assignment_status is distinct from new.driver_assignment_status
+       or new.driver_response_deadline_at is null) then
+    select response_window_minutes into v_minutes from public.rider_dispatch_settings where id=true;
+    new.driver_response_started_at:=now();
+    new.driver_response_deadline_at:=now()+make_interval(mins=>coalesce(v_minutes,7));
+  end if;
+  if tg_op='UPDATE' and old.driver_assignment_status='claimed'
+     and new.driver_assignment_status='en_route'
+     and old.driver_response_deadline_at is not null
+     and old.driver_response_deadline_at<=now() then
+    raise exception 'The rider response window expired. The order is being returned to the queue; refresh the portal.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists set_claimed_rider_response_deadline on public.orders;
+create trigger set_claimed_rider_response_deadline
+before insert or update of driver_user_id,driver_assignment_status,driver_response_deadline_at
+on public.orders for each row execute function public.set_claimed_rider_response_deadline();
+
+-- Extend timeout processing to the global claim -> "I'm on my way" commitment too.
+create or replace function public.expire_rider_response_timeouts()
+returns integer language plpgsql security definer set search_path=''
+as $$
+declare v_count integer;
+begin
+  with expired as (
+    update public.orders
+    set driver_user_id=null,driver_assignment_status=null,
+        status=case when status='assigned' then 'ready_for_pickup' else 'accepted' end,
+        assigned_at=null,driver_response_deadline_at=null,driver_response_started_at=null,
+        rider_assignment_expired_at=now(),rider_reassignment_count=rider_reassignment_count+1,
+        updated_at=now()
+    where ((status='assigned' and driver_assignment_status='offered')
+        or (status='accepted' and driver_assignment_status='claimed'))
+      and driver_response_deadline_at is not null and driver_response_deadline_at<=now()
+    returning id,order_number,status
+  ), history as (
+    insert into public.order_status_history(order_id,from_status,to_status,actor_id,note)
+    select id,case when status='ready_for_pickup' then 'assigned' else 'accepted' end,
+      status,auth.uid(),'Rider response window expired; assignment released automatically'
+    from expired
+  )
+  insert into public.audit_logs(actor_id,action,entity_table,entity_id,details)
+  select auth.uid(),'rider_response_timeout','orders',id::text,
+    jsonb_build_object('order_number',order_number,'returned_status',status)
+  from expired;
+  get diagnostics v_count=row_count;
+  return v_count;
+end;
+$$;
+
+revoke all on function public.set_claimed_rider_response_deadline() from public,anon,authenticated;
