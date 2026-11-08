@@ -35,7 +35,7 @@ export async function saveMerchantStorefront(formData: FormData) {
   const gcashAccountName = String(formData.get("gcash_account_name") ?? "").trim().slice(0,100);
   const gcashMobileNumber = String(formData.get("gcash_mobile_number") ?? "").trim().replace(/[\s()-]/g,"");
   if (!acceptCod && !gcashEnabled) redirect(`/merchant/storefront?branch=${branchId}&error=payment`);
-  if (gcashEnabled && gcashPaymentType === "number" && (!gcashAccountName || !/^(09[0-9]{9}|\+639[0-9]{9})$/.test(gcashMobileNumber))) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
+  if (gcashEnabled && gcashPaymentType === "number" && (!gcashAccountName || !/^(09[0-9]{9}|\+639[0-9]{9})$/.test(gcashMobileNumber))) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-number-details`);
   if (gcashEnabled && !["number","qr"].includes(gcashPaymentType)) redirect(`/merchant/storefront?branch=${branchId}&error=gcash-details`);
 
   let qrUrl = String(formData.get("existing_gcash_qr_url") ?? "").trim();
