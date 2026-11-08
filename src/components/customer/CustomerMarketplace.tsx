@@ -23,7 +23,8 @@ type Product = {
 };
 type Store = { id: string; name: string; branchName: string; categorySlugs: string[]; area: string; count: number; image: string | null; isOpen: boolean; acceptedPaymentMethods: string[]; gcashQrUrl: string | null; gcashPaymentType: string; gcashAccountName: string | null; gcashMobileNumber: string | null };
 type Cart = Record<string, { product: Product; quantity: number }>;
-type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; municipalities: { name: string } | null };
+type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; municipality_id?: string; barangay_id?: string | null; barangays?: { name: string } | null; municipalities: { name: string } | null };
+type Barangay = { id: string; name: string; municipality_id: string };
 
 const peso = (value: number) => `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -55,17 +56,18 @@ function StoreCard({ item, href }: { item: Store; href: string }) {
   return item.isOpen ? <PendingLink href={href} className={className}>{content}</PendingLink> : <div aria-disabled="true" className={className}>{content}</div>;
 }
 
-export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, deliveryFees = {}, merchantUsageEnabled = false, merchantUsageMethod = "percentage", merchantUsageValue = 0 }: {
+export default function CustomerMarketplace({ products, stores, selectedStore = "", selectedMunicipality, municipalities, barangays = [], merchantCategories = [], selectedMerchantCategory = "", addresses, checkoutError, zoneFees = {}, merchantUsageEnabled = false, merchantUsageMethod = "percentage", merchantUsageValue = 0 }: {
   products: Product[];
   stores: Store[];
   selectedStore?: string;
   selectedMunicipality: string;
   municipalities: { id: string; name: string }[];
+  barangays?: Barangay[];
   merchantCategories?: { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null }[];
   selectedMerchantCategory?: string;
   addresses: Address[];
   checkoutError?: string;
-  deliveryFees?: Record<string, number>;
+  zoneFees?: Record<string, number>;
   merchantUsageEnabled?: boolean;
   merchantUsageMethod?: "percentage" | "fixed" | string;
   merchantUsageValue?: number;
@@ -79,6 +81,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const [customerNote, setCustomerNote] = useState("");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "__new__");
   const [newMunicipalityId, setNewMunicipalityId] = useState("");
+  const [newBarangayId, setNewBarangayId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cod");
 
   // Recheck server-calculated store hours periodically so a storefront closes without a manual reload.
@@ -150,8 +153,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   // The basket store can sit outside the current area filter; the server re-verifies hours and stock on checkout.
   const canCheckout = items.length > 0 && sameStore && Boolean(addressId) && !storeClosed;
   const selectedAddress = addresses.find(a => a.id === addressId);
-  const feeMunicipality = addressId === "__new__" ? newMunicipalityId : selectedAddress?.municipality_id ?? "";
-  const fee = feeMunicipality ? deliveryFees[feeMunicipality] : undefined;
+  const feeBarangay = addressId === "__new__" ? newBarangayId : selectedAddress?.barangay_id ?? "";
+  const fee = feeBarangay ? zoneFees[feeBarangay] : undefined;
   const acceptedPaymentMethods = cartStore?.acceptedPaymentMethods ?? firstItem?.merchant?.accepted_payment_methods ?? ["cod"];
   const gcashQrUrl = cartStore?.gcashQrUrl ?? firstItem?.merchant?.gcash_qr_url ?? null;
   const gcashPaymentType = cartStore?.gcashPaymentType ?? firstItem?.merchant?.gcash_payment_type ?? "qr";
@@ -279,7 +282,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
           <h3 className="font-extrabold text-[#102e57]">Delivery details</h3>
           <label htmlFor="checkout-address" className="block text-xs font-bold text-slate-600">Delivery address <span className="text-rose-600">· required</span></label>
           <select id="checkout-address" name="address_id" required value={addressId} onChange={e => setAddressId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-[#102e57]">
-            {addresses.map(a => <option key={a.id} value={a.id}>{a.label} · {a.address_line} ({a.municipalities?.name ?? "Area"})</option>)}
+            {addresses.map(a => <option key={a.id} value={a.id}>{a.label} · {a.address_line} ({a.barangays?.name ?? "Barangay missing"}, {a.municipalities?.name ?? "Area"})</option>)}
             <option value="__new__">＋ Enter a new delivery address</option>
           </select>
           {addressId === "__new__" && <div className="space-y-2 rounded-xl border border-orange-100 bg-orange-50/60 p-3">
@@ -287,8 +290,9 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
             <input name="new_label" defaultValue="Home" placeholder="Address label (Home, Work)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="recipient_name" required placeholder="Recipient full name" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="recipient_phone" required type="tel" placeholder="Mobile number" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
-            <select name="municipality_id" required value={newMunicipalityId} onChange={e => setNewMunicipalityId(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-            <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio, barangay" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
+            <select name="municipality_id" required value={newMunicipalityId} onChange={e => { setNewMunicipalityId(e.target.value); setNewBarangayId(""); }} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]"><option value="" disabled>Select municipality</option>{municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <select name="barangay_id" required value={newBarangayId} onChange={e => setNewBarangayId(e.target.value)} disabled={!newMunicipalityId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57] disabled:bg-slate-100"><option value="" disabled>Select barangay / zone</option>{barangays.filter(b => b.municipality_id === newMunicipalityId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+            <textarea name="address_line" required minLength={5} rows={2} placeholder="House no., street, purok / sitio" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
             <input name="landmark" placeholder="Nearby landmark (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#102e57]" />
           </div>}
           <label htmlFor="checkout-note" className="block text-xs font-bold text-slate-600">Delivery note (optional)</label>
