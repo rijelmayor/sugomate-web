@@ -19,6 +19,8 @@ const messages: Record<string, string> = {
   delivered: "Your order was delivered. Enjoy!",
   rejected: "Sorry, the store could not accept your order.",
   cancelled: "Your order was cancelled.",
+  rider_unavailable: "Your assigned rider became unavailable. SUGOMATE is arranging a replacement.",
+  rider_reassigned: "A replacement rider has been assigned to continue your delivery.",
 };
 const MAX_NOTES = 30;
 
@@ -35,6 +37,7 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
   const [ring, setRing] = useState(false);
   const liveRef = useRef(false);
   const known = useRef<Record<string, string>>({});
+  const knownReassignments = useRef<Record<string, number>>({});
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,22 +66,30 @@ export default function NotificationBell({ userId, ordersHref = "/customer/order
     let cancelled = false;
     // Seeds known statuses on connect, and catches up on anything missed while the phone slept or the network dropped.
     const sync = async () => {
-      const { data } = await supabase.from("orders").select("id,order_number,status").eq("customer_id", userId).order("placed_at", { ascending: false }).limit(50);
+      const { data } = await supabase.from("orders").select("id,order_number,status,rider_reassignment_count,driver_user_id").eq("customer_id", userId).order("placed_at", { ascending: false }).limit(50);
       if (cancelled || !data) return;
       for (const row of data) {
         const prev = known.current[row.id];
+        const reassignmentCount = Number(row.rider_reassignment_count ?? 0);
+        const previousReassignmentCount = knownReassignments.current[row.id];
         known.current[row.id] = row.status;
-        if (prev && prev !== row.status) notify(row.id, row.order_number ?? "Order", row.status);
+        knownReassignments.current[row.id] = reassignmentCount;
+        if (previousReassignmentCount !== undefined && reassignmentCount > previousReassignmentCount) notify(row.id, row.order_number ?? "Order", row.driver_user_id ? "rider_reassigned" : "rider_unavailable");
+        else if (prev && prev !== row.status) notify(row.id, row.order_number ?? "Order", row.status);
       }
     };
     const channel = supabase
       .channel(`customer-bell-${userId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `customer_id=eq.${userId}` }, payload => {
-        const row = payload.new as { id?: string; order_number?: string; status?: string };
+        const row = payload.new as { id?: string; order_number?: string; status?: string; rider_reassignment_count?: number; driver_user_id?: string | null };
         if (!row?.id || !row.status) return;
         const prev = known.current[row.id];
+        const reassignmentCount = Number(row.rider_reassignment_count ?? 0);
+        const previousReassignmentCount = knownReassignments.current[row.id];
         known.current[row.id] = row.status;
-        if (prev !== row.status) notify(row.id, row.order_number ?? "Order", row.status);
+        knownReassignments.current[row.id] = reassignmentCount;
+        if (previousReassignmentCount !== undefined && reassignmentCount > previousReassignmentCount) notify(row.id, row.order_number ?? "Order", "rider_reassigned");
+        else if (prev !== row.status) notify(row.id, row.order_number ?? "Order", row.status);
       })
       .subscribe(status => { const ok = status === "SUBSCRIBED"; liveRef.current = ok; setLive(ok); if (ok) void sync(); });
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void sync(); }, 60000);

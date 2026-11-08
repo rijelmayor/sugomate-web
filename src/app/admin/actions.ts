@@ -124,3 +124,33 @@ export async function revokeRiderLocality(formData: FormData) {
   if (error) redirect("/admin/localities?error=authorization");
   redirect("/admin/localities?saved=revoked");
 }
+
+export async function saveRiderResponseSettings(formData: FormData) {
+  const supabase = await requireAdmin();
+  const response = Number(formData.get("response_window_minutes"));
+  if (!Number.isInteger(response)) redirect("/admin/dispatch?error=settings");
+  const reminder = Math.min(3, response - 1);
+  const warning = Math.max(reminder, Math.min(5, response - 1));
+  const { error } = await supabase.rpc("admin_save_rider_response_settings", {
+    p_response_window_minutes: response,
+    p_reminder_after_minutes: reminder,
+    p_warning_after_minutes: warning,
+  });
+  if (error) redirect("/admin/dispatch?error=settings");
+  redirect("/admin/dispatch?updated=settings");
+}
+
+export async function emergencyReassignPickedUpOrder(formData: FormData) {
+  const supabase = await requireAdmin();
+  const orderId = String(formData.get("order_id") ?? "");
+  const driverId = String(formData.get("driver_user_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
+  const location = String(formData.get("custody_location") ?? "").trim().slice(0, 300);
+  const custodyVerified = formData.get("custody_verified") === "yes";
+  if (!/^[0-9a-f-]{36}$/i.test(orderId) || !/^[0-9a-f-]{36}$/i.test(driverId) || reason.length < 5 || !custodyVerified) redirect("/admin/dispatch?error=handoff");
+  const { error } = await supabase.rpc("admin_emergency_reassign_picked_up_order", {
+    p_order_id: orderId, p_new_driver_user_id: driverId, p_reason: reason, p_custody_location: location || null, p_custody_verified: custodyVerified,
+  });
+  if (error) redirect("/admin/dispatch?error=handoff");
+  redirect("/admin/dispatch?updated=handoff");
+}
