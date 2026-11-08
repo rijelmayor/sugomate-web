@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, MapPin, Minus, Plus, Search, ShoppingBasket, Store, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Download, ExternalLink, MapPin, Minus, Plus, Search, ShoppingBasket, Store, X } from "lucide-react";
 import { placeOrder } from "@/app/customer/actions";
 import PendingLink from "@/components/PendingLink";
 import { CART_KEY } from "@/lib/cart";
