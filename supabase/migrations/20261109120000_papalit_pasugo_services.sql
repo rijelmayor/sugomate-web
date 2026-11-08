@@ -1,6 +1,6 @@
 -- Papalit and Pasugo: independent customer service requests, separate from merchant orders.
--- First release supports shopping and item pickup only. Customer payment is confirmed by Admin
--- after the platform payment instructions are configured; no merchant checkout/COD is reused.
+-- First release supports shopping and item pickup only. Customer pays the assigned rider directly
+-- at delivery, in cash or GCash. The rider records collection; SUGOMATE does not collect payment.
 
 create table if not exists public.service_requests (
   id uuid primary key default gen_random_uuid(),
@@ -28,11 +28,12 @@ create table if not exists public.service_requests (
   delivery_fee numeric(12,2) check (delivery_fee is null or delivery_fee >= 0),
   service_fee numeric(12,2) check (service_fee is null or service_fee >= 0),
   quoted_total numeric(12,2) check (quoted_total is null or quoted_total >= 0),
-  payment_status text not null default 'unpaid' check (payment_status in ('unpaid','proof_submitted','paid','refunded','partially_refunded')),
-  payment_reference text,
-  payment_proof_path text,
-  payment_confirmed_at timestamptz,
-  payment_confirmed_by uuid references auth.users(id) on delete set null,
+  payment_status text not null default 'unpaid' check (payment_status in ('unpaid','paid')),
+  payment_method text check (payment_method in ('cash','gcash')),
+  amount_collected numeric(12,2) check (amount_collected is null or amount_collected >= 0),
+  collected_at timestamptz,
+  collected_by uuid references auth.users(id) on delete set null,
+  gcash_reference text,
   rider_advance_amount numeric(12,2) not null default 0 check (rider_advance_amount >= 0),
   rider_reimbursement_amount numeric(12,2) not null default 0 check (rider_reimbursement_amount >= 0),
   receipt_path text,
@@ -101,7 +102,7 @@ with check (
   and assigned_driver_id is null
   and status = 'pending_review'
   and payment_status = 'unpaid'
-  and payment_confirmed_at is null
+  and collected_at is null
   and rider_advance_amount = 0
   and rider_reimbursement_amount = 0
   and actual_purchase_amount is null
@@ -109,8 +110,11 @@ with check (
   and approved_purchase_budget is null
   and delivery_fee is null
   and service_fee is null
-  and payment_reference is null
-  and payment_proof_path is null
+  and payment_method is null
+  and amount_collected is null
+  and collected_by is null
+  and gcash_reference is null
+  
   and receipt_path is null
   and pickup_proof_path is null
   and delivery_proof_path is null
@@ -185,6 +189,65 @@ create policy "Admins manage service reimbursements" on public.service_request_r
 for all to authenticated
 using (exists (select 1 from public.user_roles ur where ur.user_id = (select auth.uid()) and ur.role = 'admin'))
 with check (exists (select 1 from public.user_roles ur where ur.user_id = (select auth.uid()) and ur.role = 'admin'));
+
+-- Assigned rider records the amount collected directly from the customer at delivery.
+create or replace function public.rider_record_service_payment(
+  p_request_id uuid,
+  p_method text,
+  p_amount numeric,
+  p_gcash_reference text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_request public.service_requests%rowtype;
+  v_expected numeric(12,2);
+begin
+  if auth.uid() is null then raise exception 'Sign in required.'; end if;
+  if p_method not in ('cash','gcash') then raise exception 'Choose cash or GCash.'; end if;
+  if p_amount is null or p_amount < 0 then raise exception 'Invalid amount collected.'; end if;
+  if p_method = 'gcash' and nullif(trim(p_gcash_reference),'') is null then
+    raise exception 'GCash reference is required.';
+  end if;
+
+  select * into v_request from public.service_requests
+  where id = p_request_id and assigned_driver_id = auth.uid()
+  for update;
+  if not found then raise exception 'Assigned service request not found.'; end if;
+  if v_request.status <> 'delivered' then raise exception 'Record customer payment after delivery.'; end if;
+  if v_request.payment_status = 'paid' then raise exception 'Customer payment is already recorded.'; end if;
+  if v_request.actual_purchase_amount is null or v_request.delivery_fee is null or v_request.service_fee is null then
+    raise exception 'Final purchase and fee amounts must be recorded first.';
+  end if;
+
+  v_expected := v_request.actual_purchase_amount + v_request.delivery_fee + v_request.service_fee;
+  if round(p_amount,2) <> round(v_expected,2) then
+    raise exception 'Collected amount must match the final purchase cost and agreed fees.';
+  end if;
+
+  update public.service_requests
+  set payment_status = 'paid',
+      payment_method = p_method,
+      amount_collected = round(p_amount,2),
+      collected_at = now(),
+      collected_by = auth.uid(),
+      gcash_reference = case when p_method = 'gcash' then left(trim(p_gcash_reference),120) else null end,
+      updated_at = now()
+  where id = p_request_id;
+
+  insert into public.service_request_events(service_request_id,actor_user_id,actor_role,event_type,note,details)
+  values (
+    p_request_id, auth.uid(), 'driver', 'customer_payment_collected',
+    'Customer paid the assigned rider directly by ' || upper(p_method) || '.',
+    jsonb_build_object('method',p_method,'amount',round(p_amount,2),'gcash_reference',case when p_method='gcash' then left(trim(p_gcash_reference),120) else null end)
+  );
+end;
+$;
+revoke all on function public.rider_record_service_payment(uuid,text,numeric,text) from public, anon;
+grant execute on function public.rider_record_service_payment(uuid,text,numeric,text) to authenticated;
 
 -- Private evidence bucket for reference photos, receipts, pickup proof and delivery proof.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
