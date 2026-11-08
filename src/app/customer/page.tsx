@@ -56,7 +56,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     return {
       ...row,
       price: Number(row.price),
-      category: one(row.category),\n      merchant: merchant ? { ...merchant, store_category: one(merchant.store_category) } : null,
+      category: one(row.category),
+      merchant: merchant ? { ...merchant, store_category: one(merchant.store_category) } : null,
       branch: branch ? { ...branch, municipalities: one(branch.municipalities) } : null,
     };
   });
