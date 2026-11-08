@@ -317,3 +317,64 @@ begin
   execute v_def;
 end;
 $migration$;
+
+
+-- Preserve same-municipality ordering during rollout by carrying forward each
+-- municipality's existing active service-zone fee. Cross-municipality routes
+-- remain disabled until Admin explicitly configures and activates them.
+insert into public.delivery_routes(
+  origin_municipality_id, destination_municipality_id, delivery_fee,
+  is_active, notes, created_at, updated_at
+)
+select z.municipality_id, z.municipality_id, z.base_delivery_fee,
+       true, 'Seeded from the existing active service-zone fee; Admin may revise.',
+       now(), now()
+from public.service_zones z
+join public.municipalities m on m.id=z.municipality_id and m.is_serviceable=true
+where z.is_active=true
+  and not exists (
+    select 1 from public.delivery_routes r
+    where r.origin_municipality_id=z.municipality_id
+      and r.destination_municipality_id=z.municipality_id
+  )
+order by z.created_at asc, z.id asc
+on conflict (origin_municipality_id, destination_municipality_id) do nothing;
+
+-- Re-check authorization when either the assigned rider OR pickup branch changes.
+create or replace function app_private.enforce_rider_pickup_locality()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_origin uuid;
+begin
+  if new.driver_user_id is null then
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE'
+     and new.driver_user_id is not distinct from old.driver_user_id
+     and new.branch_id is not distinct from old.branch_id
+     and new.merchant_id is not distinct from old.merchant_id then
+    return new;
+  end if;
+
+  select b.municipality_id into v_origin
+  from public.merchant_branches b
+  where b.id = new.branch_id
+    and b.merchant_id = new.merchant_id
+    and b.is_active = true;
+
+  if v_origin is null then
+    raise exception 'The order pickup branch has no active, valid locality.';
+  end if;
+
+  if not app_private.rider_is_authorized_for_locality(new.driver_user_id, v_origin) then
+    raise exception 'This rider is not authorized to accept orders from the merchant pickup locality.';
+  end if;
+
+  return new;
+end;
+$$;
