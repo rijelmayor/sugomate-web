@@ -226,7 +226,7 @@ begin
     raise exception 'Choose an approved, online replacement rider.';
   end if;
   if exists(select 1 from public.orders o where o.driver_user_id=p_new_driver_user_id
-    and o.status in ('assigned','picked_up','in_transit')) then
+    and o.status in ('accepted','preparing','ready_for_pickup','assigned','picked_up','in_transit')) then
     raise exception 'The replacement rider already has an active delivery.';
   end if;
   insert into public.order_delivery_handoffs(order_id,from_driver_user_id,to_driver_user_id,
