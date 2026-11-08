@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { assignVerifiedRegistrationRole } from "@/lib/phone-verification";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -38,6 +39,11 @@ export async function applyAsMerchant(formData: FormData) {
     contact_phone: contactPhone || null, is_active: true,
   });
   if (branchError) redirect("/merchant/apply?error=branch");
+  try { await assignVerifiedRegistrationRole(user.id, "merchant"); }
+  catch (roleError) {
+    console.error("[merchant-application] role assignment failed", roleError);
+    redirect("/merchant/apply?error=role");
+  }
   redirect("/merchant/apply?success=submitted");
 }
 
@@ -104,6 +110,11 @@ export async function applyAsDriver(formData: FormData) {
   if (error) {
     await supabase.storage.from("driver-documents").remove(uploaded);
     redirect("/driver/apply?error=application");
+  }
+  try { await assignVerifiedRegistrationRole(user.id, "driver"); }
+  catch (roleError) {
+    console.error("[driver-application] role assignment failed", roleError);
+    redirect("/driver/apply?error=role");
   }
   redirect("/driver/apply?success=submitted");
 }

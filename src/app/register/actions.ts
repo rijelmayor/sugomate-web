@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAndSendPhoneOtp, verifyPhoneOtp } from "@/lib/phone-verification";
+import { assignVerifiedRegistrationRole, createAndSendPhoneOtp, verifyPhoneOtp } from "@/lib/phone-verification";
 export async function signUp(formData: FormData) {
   const displayName=String(formData.get("display_name")??"").trim(), phone=String(formData.get("phone")??"").trim(), email=String(formData.get("email")??"").trim().toLowerCase(), password=String(formData.get("password")??"");
   const requestedNext=String(formData.get("next")??"");
@@ -29,6 +29,12 @@ export async function verifyRegistrationPhone(formData:FormData){
   if(!email) redirect(`/register?error=invalid&next=${encodeURIComponent(next)}`);
   const result=await verifyPhoneOtp(email,code);
   if(!result.ok) redirect(`/verify-phone?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}&error=${result.reason}`);
+  const role = next === "/driver/apply" ? "driver" : next === "/merchant/apply" ? "merchant" : "customer";
+  try { await assignVerifiedRegistrationRole(result.userId, role); }
+  catch (error) {
+    console.error("[registration] role assignment failed after phone verification", error);
+    redirect(`/login?error=role&next=${encodeURIComponent(next)}`);
+  }
   redirect(`/login?success=phone-verified&next=${encodeURIComponent(next)}`);
 }
 export async function resendRegistrationPhoneOtp(formData:FormData){
