@@ -53,7 +53,8 @@ export default async function CustomerOrders({searchParams}:{searchParams:Promis
     return [...accepted, ...driver];
   });
   const hasActive=(orders??[]).some(order=>!finished.has(order.status));
-  return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">\n    <OrderEventModal events={eventItems}/>
+  return <main className="min-h-screen bg-[#fff7ef] px-4 py-8 text-[#102e57]"><div className="mx-auto max-w-3xl">
+    <OrderEventModal events={eventItems}/>
     {params.placed&&<ClearCartOnPlaced/>}
     <div className="flex items-center justify-between gap-3"><PendingLink href="/customer" className="text-sm font-bold text-orange-600">← Back to marketplace</PendingLink><div className="flex items-center gap-2"><NotificationBell userId={user.id}/><PortalSignOut className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold"/></div></div>
     <div className="mt-5 flex flex-wrap items-center justify-between gap-2"><h1 className="text-3xl font-black">My orders</h1><OrderLive userId={user.id} hasActive={hasActive}/></div><p className="mt-2 text-sm text-slate-500">Follow your orders from store confirmation through delivery.</p>
