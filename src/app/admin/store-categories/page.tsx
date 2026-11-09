@@ -20,13 +20,13 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
     supabase.from("merchant_categories").select("id,name,slug,icon,parent_id,image_url,sort_order,is_active").order("sort_order").order("name"),
     supabase.from("merchants").select("id,name,slug,status,category_id,merchant_categories(name)").order("name"),
   ]);
-  return <main className="min-h-screen bg-[#f3f5f9] px-4 py-7 text-[#102b4e] sm:px-6">
+  return <main className="min-h-screen bg-[#070a0e] px-4 py-7 text-white sm:px-6">
     <div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-black uppercase tracking-[.18em] text-orange-600">SUGOMATE / Admin</p><h1 className="mt-1 text-3xl font-black">Store categories</h1><p className="mt-1 text-sm text-slate-400">Create the types of businesses that can join the marketplace, then assign each merchant to a category.</p></div>
         <div className="flex flex-wrap items-center gap-2"><Link href="/admin" className="rounded-full bg-[#102b4e] px-5 py-3 text-sm font-bold text-white">Back to operations</Link><PortalSignOut className="rounded-full border border-white/10 bg-[#101820] px-4 py-3 text-sm font-bold"/></div>
       </header>
-      {(params.error || params.saved || params.assigned) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-red-500/10 text-red-300" : "bg-emerald-500/10 text-emerald-200"}`}>{params.error === "image" ? "The photo could not be uploaded. Choose a JPG, PNG or WebP image under 20 MB and try again." : params.error ? "The change could not be saved. Check that the name is unique and the fields are valid." : params.assigned ? "Merchant category updated." : "Store category saved."}</p>}
+      {(params.error || params.saved || params.assigned) && <p role="status" className={`mt-5 rounded-xl p-3 text-sm ${params.error ? "bg-red-500/100/10 text-red-300" : "bg-emerald-500/100/10 text-emerald-200"}`}>{params.error === "image" ? "The photo could not be uploaded. Choose a JPG, PNG or WebP image under 20 MB and try again." : params.error ? "The change could not be saved. Check that the name is unique and the fields are valid." : params.assigned ? "Merchant category updated." : "Store category saved."}</p>}
       <section className="mt-6 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
         <div className="rounded-3xl border border-white/10 bg-[#101820] p-5 sm:p-6">
           <h2 className="text-lg font-black">Add a store category</h2>
@@ -43,7 +43,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
         <div className="rounded-3xl border border-white/10 bg-[#101820] p-5 sm:p-6">
           <h2 className="text-lg font-black">Existing store categories</h2>
           <div className="mt-4 space-y-3">
-            {(categories ?? []).map(c => <form key={c.id} action={saveMerchantCategory} className="grid gap-2 rounded-2xl border border-slate-100 p-3 sm:grid-cols-[1fr_110px_90px_auto] sm:items-end">
+            {(categories ?? []).map(c => <form key={c.id} action={saveMerchantCategory} className="grid gap-2 rounded-2xl border border-white/10 p-3 sm:grid-cols-[1fr_110px_90px_auto] sm:items-end">
               <input type="hidden" name="category_id" value={c.id}/>
               <label className="text-[11px] font-bold sm:col-span-2">Parent category<select name="parent_id" defaultValue={c.parent_id ?? ""} className="mt-1 w-full rounded-lg border border-white/10 bg-[#101820] p-2 text-sm"><option value="">Top-level category</option>{(categories ?? []).filter(parent => !parent.parent_id && parent.id !== c.id).map(parent => <option key={parent.id} value={parent.id}>{parent.name}</option>)}</select></label>
               <label className="text-[11px] font-bold">Name<input name="name" required defaultValue={c.name} className="mt-1 w-full rounded-lg border border-white/10 p-2 text-sm"/></label>
@@ -59,7 +59,7 @@ export default async function StoreCategoriesPage({ searchParams }: { searchPara
       <section className="mt-6 rounded-3xl border border-white/10 bg-[#101820] p-5 sm:p-6">
         <h2 className="text-lg font-black">Assign categories to merchants</h2>
         <p className="mt-1 text-xs text-slate-400">Store categories describe the merchant business type. Product categories remain separate and are managed in the product catalogue.</p>
-        <div className="mt-4 divide-y divide-slate-100">
+        <div className="mt-4 divide-y divide-white/10">
           {(merchants ?? []).map(m => <form key={m.id} action={assignMerchantCategory} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <input type="hidden" name="merchant_id" value={m.id}/>
             <div><p className="text-sm font-bold">{m.name}</p><p className="text-xs text-slate-400">{m.slug} · {m.status}</p></div>
