@@ -205,3 +205,18 @@ export async function updateServiceRequest(formData: FormData) {
   }
   revalidatePath("/driver");
 }
+
+
+export async function cancelServiceRequest(formData: FormData) {
+  const { supabase } = await requireActiveDriver();
+  const requestId = String(formData.get("request_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || reason.length < 3) redirect("/driver?error=service-request");
+  const { error } = await supabase.rpc("driver_cancel_service_request", { p_request_id: requestId, p_reason: reason });
+  if (error) {
+    console.error("[service-request] rider cancellation failed:", error.message);
+    redirect("/driver?error=service-request");
+  }
+  revalidatePath("/driver");
+  redirect("/driver?updated=service-cancelled");
+}
