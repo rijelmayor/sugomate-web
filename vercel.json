@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/order-completion-receipts",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
