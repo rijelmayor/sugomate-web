@@ -212,8 +212,8 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
       <div className={`transition-opacity duration-200 ${isFiltering ? "pointer-events-none opacity-50" : ""}`}>
       {view === "home" && <>
         <div className="mt-6"><h2 className="text-xl font-black text-[#102e57]">Browse by category</h2><p className="mt-0.5 text-sm text-slate-500">Pick what you need — we&apos;ll show the stores.</p></div>
-        {topLevelTiles.length ? <div className="-mx-1 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {topLevelTiles.map(item => <div key={item.id} className="w-[42vw] max-w-[190px] shrink-0 snap-start sm:w-44"><CategoryTile href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} /></div>)}
+        {topLevelTiles.length ? <div className="-mx-1 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:snap-none lg:grid-cols-3 xl:grid-cols-4">
+          {topLevelTiles.map(item => <div key={item.id} className="w-[42vw] max-w-[190px] shrink-0 snap-start sm:w-44 md:w-auto md:max-w-none md:shrink md:snap-align-none"><CategoryTile href={href({ storeCategory: item.slug })} name={item.name} slug={item.slug} imageUrl={item.image_url} count={item.count} /></div>)}
         </div> : null}
         <div className="mt-8"><h2 className="text-xl font-black text-[#102e57]">Stores near you</h2></div>
         {stores.length > 0 && <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{stores.slice(0, 6).map(item => <StoreCard key={item.id} item={item} href={href({ store: item.id })} />)}</div>}
