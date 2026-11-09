@@ -5,6 +5,23 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+async function dispatchCompletedOrderReceiptWorker() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const secret = process.env.CRON_SECRET;
+  if (!siteUrl || !secret) return;
+  try {
+    const response = await fetch(new URL("/api/cron/order-completion-receipts", siteUrl), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) console.error("[order-receipt] worker dispatch returned", response.status);
+  } catch (error) {
+    console.error("[order-receipt] immediate dispatch failed; queued retry remains available", error);
+  }
+}
+
 async function requireActiveDriver() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -125,6 +142,7 @@ export async function updateDriverOrderStatus(formData: FormData) {
     if (proofPath) await supabase.storage.from("delivery-proofs").remove([proofPath]);
     redirect("/driver?error=delivery");
   }
+  if (nextStatus === "delivered") await dispatchCompletedOrderReceiptWorker();
   revalidatePath("/driver");
 }
 
