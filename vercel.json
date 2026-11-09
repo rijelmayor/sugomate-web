@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/order-completion-receipts",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
