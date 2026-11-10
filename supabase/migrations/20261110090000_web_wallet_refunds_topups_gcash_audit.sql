@@ -79,7 +79,7 @@ create table if not exists public.order_refund_cases (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete restrict,
   customer_id uuid not null references auth.users(id) on delete restrict,
-  merchant_id uuid not null references auth.users(id) on delete restrict,
+  merchant_id uuid not null references public.merchants(id) on delete restrict,
   requested_amount numeric(12,2) not null check (requested_amount > 0),
   refund_method_preference text check (refund_method_preference in ('direct_gcash','sugomate_wallet')),
   settlement_method text check (settlement_method in ('direct_gcash','sugomate_wallet')),
