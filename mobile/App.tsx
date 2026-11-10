@@ -642,6 +642,13 @@ function CustomerApp() {
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
           </TouchableOpacity>)}</View>}
+          {!selectedParentCategory && !selectedCategory && <>
+            <View style={styles.storesHeading}><Text style={styles.sectionTitle}>Stores near you</Text><Text style={styles.storeCount}>{stores.length} {stores.length === 1 ? "store" : "stores"}</Text></View>
+            {stores.length > 0 ? stores.slice(0, 6).map(s => <TouchableOpacity key={"nearby-" + s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
+              {s.image ? <Image source={{ uri: s.image }} style={styles.storeImage} /> : <View style={styles.storeImageFallback}><Text style={{ fontSize: 25 }}>🏪</Text></View>}
+              <View style={styles.storeInfo}><Text style={styles.storeName}>{s.name}</Text>{!!s.branchName && <Text style={styles.storeBranch}>{s.branchName}</Text>}<Text style={styles.storeArea}>⌖  {s.area || "Leyte"}</Text><Text style={[styles.openLabel, s.isOpen ? styles.open : styles.closed]}>{s.isOpen ? "Open now" : "Closed"}</Text></View>{s.isOpen ? <Text style={styles.chevron}>›</Text> : <Text style={styles.storeCount}>Unavailable</Text>}
+            </TouchableOpacity>) : <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛍️</Text><Text style={styles.emptyTitle}>Your local marketplace is getting ready</Text><Text style={styles.muted}>Approved stores will appear here as they join.</Text></View>}
+          </>}
           {selectedParentCategory && !selectedCategory && childCategories.length > 0 && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
