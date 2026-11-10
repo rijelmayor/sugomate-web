@@ -33,7 +33,7 @@ export async function placeOrder(formData: FormData) {
   let addressId = String(formData.get("address_id") ?? "");
   const note = String(formData.get("customer_note") ?? "").trim().slice(0,500);
   const paymentMethod = String(formData.get("payment_method") ?? "cod");
-  if (!["cod","gcash"].includes(paymentMethod)) redirect("/customer?error=checkout");
+  if (!["cod","gcash","wallet"].includes(paymentMethod)) redirect("/customer?error=checkout");
   if (addressId === "__new__" || !addressId) {
     const label = String(formData.get("new_label") ?? "Home").trim().slice(0,40) || "Home";
     const recipientName = String(formData.get("recipient_name") ?? "").trim().slice(0,120);
@@ -58,9 +58,13 @@ export async function placeOrder(formData: FormData) {
     return { product_id:String(row.product_id ?? ""), quantity:Number(row.quantity) };
   });
   if (safeItems.some(item => !/^[0-9a-f-]{36}$/i.test(item.product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) redirect("/customer?error=basket");
-  const { data, error } = await supabase.rpc("place_customer_order", {
-    p_address_id:addressId,p_items:safeItems,p_payment_method:paymentMethod,p_customer_note:note || null
-  });
+  const { data, error } = paymentMethod === "wallet"
+    ? await supabase.rpc("place_customer_order_with_wallet", {
+        p_address_id:addressId,p_items:safeItems,p_customer_note:note || null
+      })
+    : await supabase.rpc("place_customer_order", {
+        p_address_id:addressId,p_items:safeItems,p_payment_method:paymentMethod,p_customer_note:note || null
+      });
   if (error || !data) {
     console.error("[customer] place_customer_order failed:", error ? { code: error.code, message: error.message, details: error.details, hint: error.hint } : "RPC returned no order ID");
     redirect("/customer?error=checkout");
