@@ -45,6 +45,6 @@ Merchant product images: the product catalogue supports direct camera capture on
 ## Project workflow guides
 
 - [Sugomate Workflow Web.md](./Sugomate%20Workflow%20Web.md) — web platform overview, role workflows, business rules, integrations, database, deployment and maintenance.
-- [Sugomate Worklow Android.md](./Sugomate%20Worklow%20Android.md) — Android app scope, Expo architecture, shared backend, EAS builds and maintenance.
+- [Sugomate Workflow Android.md](./Sugomate%20Workflow%20Android.md) — Android app scope, Expo architecture, shared backend, EAS builds and maintenance.
 
 Keep both guides current. Update the relevant guide whenever a feature, business rule, schema, integration, build/release process, or verified production behavior changes.
