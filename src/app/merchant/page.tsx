@@ -73,6 +73,7 @@ export default async function MerchantPortal({ searchParams }: {
   const paymentProofUrls = new Map<string,string>();
   for (const [id,url] of proofEntries) if (url) paymentProofUrls.set(id,url);
 
+  const { count: refundActionCount } = approvedIds.length ? await supabase.from("order_refund_cases").select("id", { count: "exact", head: true }).in("merchant_id", approvedIds).in("status", ["awaiting_merchant","wallet_remittance_pending","wallet_remittance_submitted"]) : { count: 0 };
   const all = orders ?? [];
   const count = (tab: Tab) => all.filter(o => (groups[tab] as readonly string[]).includes(o.status)).length;
   const counts = { new: count("new"), active: count("active"), history: count("history") };
@@ -82,7 +83,7 @@ export default async function MerchantPortal({ searchParams }: {
 
   return <MerchantShell active="orders" store={storeInfo ? { name: storeInfo.name, logoUrl: storeInfo.logo_url } : null} newCount={counts.new} headerActions={<MerchantNewOrderAlert merchantIds={approvedIds} snapshot={Object.fromEntries((orders ?? []).map(o => [o.id, { status: o.status as string, sig: String(o.updated_at ?? "") }]))} />}>
 
-    <div className="mt-3"><Link href="/merchant/refunds" className="inline-flex rounded-full border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-[#102e57]">Direct GCash refunds</Link></div>
+    <div className="mt-3"><Link href="/merchant/refunds" className="relative inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-[#102e57]">Refunds & settlement {(refundActionCount ?? 0) > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] text-white">{refundActionCount}</span>}</Link></div>
     {params.updated && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">{params.updated==="rider-released"?"Rider released. The order is back in the dispatch workflow; stock and payment remain intact.":"Order status updated."}</p>}
     {params.paymentConfirmed && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">GCash payment confirmed and marked as paid. This order remains in New until you accept it.</p>}
     {params.error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{params.error==="payment"?"We could not confirm that GCash payment. Refresh and check the submitted proof.":"We could not update that order. Refresh and try again."}</p>}
