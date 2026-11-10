@@ -83,3 +83,12 @@ A PR is not ready to merge until the relevant checks above have been reviewed.
 - Keep the archive filtered by delivery completion timestamp, separate from live dispatch and order-placement reporting.
 - Use authenticated Admin-only access and short-lived signed URLs. Never make the delivery proof bucket public.
 - Verify metadata and photo access on mobile and desktop before production release.
+## 9. Customer marketplace category and product layout — mandatory responsive SOP
+
+- **Category navigation:** On narrow mobile screens, categories may use a horizontally swipeable row with touch scrolling and snap points. Keep the scrollbar visually unobtrusive, but do not hide or disable the swipe interaction.
+- **Tablet category layout:** At tablet breakpoints, show all categories in a responsive 2-column grid; do not require horizontal scrolling.
+- **Desktop category layout:** At large desktop widths, show categories in 3 columns and expand to 4 columns on wide screens. All categories must be discoverable through normal page scrolling, with no horizontal category carousel or clipped tiles.
+- **Product listing:** Always use a normal vertical-scrolling responsive grid: 2 columns on narrow phones, 3 on medium/tablet screens, and 4 on desktop. Never use a horizontally swipeable product carousel for the main product catalog.
+- Category and product cards must use consistent spacing, image proportions, readable names/prices, and responsive sizing. Prevent horizontal page overflow at every breakpoint.
+- Apply these rules to every customer marketplace category list, store category list, and product catalog—not only the home page. Reuse the existing responsive pattern instead of introducing page-specific carousel behavior.
+- **Required regression check:** Verify category swipe on a phone; verify all categories display in a 2/3/4-column grid on tablet/desktop; verify products display in a 2/3/4-column vertical grid; verify no horizontal page overflow and that every item is reachable by normal scrolling.
