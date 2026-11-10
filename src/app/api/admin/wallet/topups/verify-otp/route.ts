@@ -20,10 +20,9 @@ export async function POST(request: Request) {
     }
     const { data: topup } = await admin.from("wallet_top_up_requests").select("id,customer_id,amount,status").eq("id", requestId).maybeSingle();
     if (!topup || topup.status !== "otp_pending") return NextResponse.json({ error: "Top-up is no longer awaiting authorization." }, { status: 409 });
-    const { error: consumeError } = await admin.from("wallet_authorization_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id).is("consumed_at", null);
-    if (consumeError) throw consumeError;
     const { data: transactionId, error: creditError } = await admin.rpc("wallet_admin_credit_topup", { p_request_id: requestId, p_admin_id: user.id });
     if (creditError) throw creditError;
+    await admin.from("wallet_authorization_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id).is("consumed_at", null);
     const [{ data: wallet }, { data: profile }] = await Promise.all([
       admin.from("customer_wallets").select("available_balance").eq("customer_id", topup.customer_id).single(),
       admin.from("profiles").select("phone").eq("id", topup.customer_id).maybeSingle()
