@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -112,6 +112,7 @@ function OrderProgressTracker({ status }: { status: string }) {
 }
 
 function CustomerApp() {
+  const insets = useSafeAreaInsets();
   const [session, setSession] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
@@ -596,7 +597,7 @@ function CustomerApp() {
     onDone={() => { setApplicationRole(null); supabase.auth.signOut(); }}
     onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
   />;
-  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
+  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
     <View style={{ alignItems: "center" }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></View>
     <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
       <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
@@ -620,7 +621,7 @@ function CustomerApp() {
       {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => setSelectedMunicipality(m.id)} style={[styles.areaChip, selectedMunicipality === m.id && styles.areaChipActive]}><Text style={[styles.areaChipText, selectedMunicipality === m.id && styles.areaChipTextActive]}>{m.name}</Text></TouchableOpacity>)}
     </ScrollView>}
     {loading && <ActivityIndicator style={{ marginVertical: 8 }} color={ORANGE} />}
-    <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
+    <ScrollView style={styles.content} contentContainerStyle={[styles.contentInner, { paddingBottom: Math.max(105, insets.bottom + 105) }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
       {tab === "market" && <>
         {selectedStore && currentStore ? <>
           <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedStore(""); setSearch(""); }}><Text style={styles.backLinkText}>‹  Back to stores</Text></TouchableOpacity>
@@ -701,7 +702,7 @@ function CustomerApp() {
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => Linking.openURL("https://sugomate.com/customer/addresses")}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
-    {tab === "market" && cartCount > 0 && <TouchableOpacity style={styles.basketBar} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
+    {tab === "market" && cartCount > 0 && <TouchableOpacity style={[styles.basketBar, { bottom: 72 + insets.bottom }]} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
       {activeOrderEvent && <View style={styles.eventOverlay}>
         <View style={styles.eventCard}>
@@ -774,12 +775,12 @@ function CustomerApp() {
         </ScrollView>
       </SafeAreaView>
     </Modal>
-    <View style={styles.tabbar}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
+    <View style={[styles.tabbar, { paddingBottom: Math.max(8, insets.bottom + 6) }]}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
   </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
+  safe: { flex: 1, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
   loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42, flexShrink: 0 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
   loginCard: { marginTop: 34, padding: 22, borderRadius: 26, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8" }, heading: { fontSize: 24, fontWeight: "900", color: NAVY }, muted: { fontSize: 12, color: "#738096", marginTop: 5, lineHeight: 18 },
   input: { marginTop: 16, paddingHorizontal: 15, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#e5eaf0", fontSize: 15, color: NAVY, backgroundColor: "#fff" },
@@ -799,7 +800,7 @@ const styles = StyleSheet.create({
   productCard: { flexDirection: "row", padding: 10, backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", marginBottom: 10, gap: 10 }, productImage: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff7ef" }, productPlaceholder: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, productInfo: { flex: 1, justifyContent: "space-between", paddingVertical: 3 }, productName: { fontSize: 13, fontWeight: "900", color: NAVY }, productDescription: { fontSize: 10, color: "#8995a7", marginTop: 4 }, productBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5, marginTop: 7 }, price: { fontSize: 14, fontWeight: "900", color: RED }, qtyRow: { flexDirection: "row", alignItems: "center", gap: 8 }, qtyButton: { width: 27, height: 27, borderRadius: 14, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, qtyText: { fontSize: 17, color: "#fff", fontWeight: "900" }, qtyValue: { fontSize: 12, fontWeight: "900", color: NAVY }, addButton: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: NAVY }, addButtonText: { fontSize: 10, fontWeight: "900", color: "#fff" },
   emptyCard: { alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ffead8", padding: 25, marginTop: 10 }, emptyIcon: { fontSize: 34 }, emptyTitle: { fontSize: 14, fontWeight: "900", color: NAVY, marginTop: 8 },
   basketBar: { position: "absolute", bottom: 72, left: 15, right: 15, backgroundColor: ORANGE, borderRadius: 25, paddingHorizontal: 18, paddingVertical: 13, flexDirection: "row", justifyContent: "space-between", alignItems: "center", elevation: 5 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" },
-  tabbar: { minHeight: 66, marginBottom: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", alignItems: "center", paddingHorizontal: 9, paddingTop: 7, paddingBottom: 7, gap: 8 }, tab: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: "#e4e8ee", backgroundColor: "#f8fafc", paddingVertical: 5 }, activeTab: { backgroundColor: "#fff0e5", borderColor: "#e66b2e", borderWidth: 1.5 }, tabIcon: { fontSize: 18, lineHeight: 21, color: "#40516a", fontWeight: "800" }, tabText: { fontSize: 10, lineHeight: 14, fontWeight: "900", color: "#34445c", marginTop: 2 }, activeTabText: { color: "#c95522" },
+  tabbar: { minHeight: 66, marginBottom: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", alignItems: "center", paddingHorizontal: 9, paddingTop: 7, paddingBottom: 8, gap: 8 }, tab: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: "#e4e8ee", backgroundColor: "#f8fafc", paddingVertical: 5 }, activeTab: { backgroundColor: "#fff0e5", borderColor: "#e66b2e", borderWidth: 1.5 }, tabIcon: { fontSize: 18, lineHeight: 21, color: "#40516a", fontWeight: "800" }, tabText: { fontSize: 10, lineHeight: 14, fontWeight: "900", color: "#34445c", marginTop: 2 }, activeTabText: { color: "#c95522" },
   driverCard: { marginTop: 12, borderRadius: 16, padding: 13, backgroundColor: "#effaf3", borderWidth: 1, borderColor: "#d5f0df" },
   driverCardTitle: { fontSize: 10, fontWeight: "900", color: "#166534", marginBottom: 10, letterSpacing: 0.5 },
   driverCardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
