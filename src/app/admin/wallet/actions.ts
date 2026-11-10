@@ -48,3 +48,13 @@ export async function rejectWalletTopup(formData:FormData){
  revalidatePath("/admin/wallet"); revalidatePath("/customer/wallet");
  redirect("/admin/wallet?topupRejected=1");
 }
+
+export async function approveWalletRefund(formData:FormData){
+ const {user,admin}=await walletAdminContext();
+ const caseId=String(formData.get("case_id")??"");
+ if(!/^[0-9a-f-]{36}$/i.test(caseId)) redirect("/admin/wallet?error=refund");
+ const {error}=await admin.rpc("admin_credit_wallet_refund",{p_case_id:caseId,p_admin_id:user.id});
+ if(error) redirect("/admin/wallet?error=refund");
+ revalidatePath("/admin/wallet"); revalidatePath("/customer/wallet"); revalidatePath("/customer/refunds");
+ redirect("/admin/wallet?walletRefundCredited=1");
+}
