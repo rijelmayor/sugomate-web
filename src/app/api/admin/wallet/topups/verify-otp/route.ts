@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { walletAdminContext, walletOtpHash, safeOtpCompare, sendWalletSms } from "@/lib/wallet-server";
+import { walletAdminContext, walletOtpHash, sendWalletSms } from "@/lib/wallet-server";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
