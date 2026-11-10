@@ -67,3 +67,13 @@ A PR is not ready to merge until the relevant checks above have been reviewed.
 - Subscribe only to orders belonging to the authenticated merchant memberships and rely on database row-level security. Never expose service-role credentials in the browser.
 - Show a visible fallback alert if audio is unavailable or disabled. Do not rely on sound alone.
 - Realtime subscriptions must be cleaned up when the merchant dashboard unmounts.
+
+
+## 7. Literal escape and generated-text artifact prevention
+
+- Never allow source-code escape sequences such as the two visible characters `\\n`, `\\r`, `\\t`, or malformed HTML entities to leak into rendered page text.
+- When composing JSX/TSX, use actual source line breaks for formatting. Do not insert a quoted or unquoted literal backslash escape between sibling JSX elements unless the user is intentionally meant to see that exact text.
+- Before every PR is marked ready, search all changed `.tsx`, `.jsx`, and relevant `.ts` files for accidental literal escape sequences (especially `\\n`) and inspect each match in context. Distinguish intentional escaped sequences in string literals, regular expressions, tests, and code examples from accidental JSX text nodes.
+- Run the production build, lint, and type-check after the scan. Review the rendered preview on customer, merchant, driver, and admin portals, including checkout, order lists/history, and forms touched by the PR.
+- Add a visual regression check for stray text such as `\\n`, `\\t`, `undefined`, `[object Object]`, raw template placeholders, and unescaped entity fragments.
+- Treat any accidental visible artifact as a release blocker. Do not merge or deploy until it is removed and the preview is rechecked.
