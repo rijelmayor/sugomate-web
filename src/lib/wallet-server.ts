@@ -19,7 +19,7 @@ export async function walletCustomerContext() {
   if (!user) redirect("/login");
   const { data: role } = await db.from("user_roles").select("role").eq("user_id", user.id).eq("role", "customer").maybeSingle();
   if (!role) redirect("/dashboard?error=customer-access");
-  return { user, db, admin: walletServiceClient() };
+  return { user, db };
 }
 
 export function walletServiceClient() {
