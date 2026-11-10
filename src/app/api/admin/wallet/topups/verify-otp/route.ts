@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     }
     if (!transactionId) return NextResponse.json({ error: "OTP is incorrect. Check the code and try again." }, { status: 400 });
     const { data: topup } = await admin.from("wallet_top_up_requests").select("id,customer_id,amount,status").eq("id", requestId).maybeSingle();
+    if (!topup) return NextResponse.json({ ok: true, transactionId, notification: "Wallet credited; customer details could not be loaded for SMS." });
     const [{ data: wallet }, { data: profile }] = await Promise.all([
       admin.from("customer_wallets").select("available_balance").eq("customer_id", topup.customer_id).single(),
       admin.from("profiles").select("phone").eq("id", topup.customer_id).maybeSingle()
