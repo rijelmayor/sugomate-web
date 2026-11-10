@@ -41,3 +41,10 @@ Cash on delivery is the initial checkout method. Do not enable GCash until a sep
 
 
 Merchant product images: the product catalogue supports direct camera capture on compatible phones and gallery selection. Images are validated (JPG/PNG/WEBP, maximum 5 MB), uploaded to the `product-images` Supabase Storage bucket, and saved as public product image URLs. Apply `20261104110000_merchant_product_image_storage.sql` after the delivery proof migration.
+
+## Project workflow guides
+
+- [Sugomate Workflow Web.md](./Sugomate%20Workflow%20Web.md) — web platform overview, role workflows, business rules, integrations, database, deployment and maintenance.
+- [Sugomate Worklow Android.md](./Sugomate%20Worklow%20Android.md) — Android app scope, Expo architecture, shared backend, EAS builds and maintenance.
+
+Keep both guides current. Update the relevant guide whenever a feature, business rule, schema, integration, build/release process, or verified production behavior changes.
