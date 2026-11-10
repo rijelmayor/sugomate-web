@@ -13,9 +13,10 @@ export async function saveWalletPaymentInstructions(formData:FormData){
  const instructions=String(formData.get("instructions")??"").trim().slice(0,1000);
  const enabled=formData.get("is_enabled")==="on";
  if(!["gcash","bank"].includes(method)||displayName.length<2||accountName.length<2||accountNumber.length<5) redirect("/admin/wallet?error=payment-instructions");
- const {error}=await admin.from("wallet_payment_instructions").upsert({payment_method:method,display_name:displayName,account_name:accountName,account_number:accountNumber,bank_name:bankName||null,instructions,is_enabled:enabled,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:"payment_method"});
- if(error) redirect("/admin/wallet?error=payment-instructions");
- await admin.from("wallet_audit_events").insert({actor_user_id:user.id,actor_role:"admin",event_type:"wallet_payment_instructions_updated",entity_type:"wallet_payment_instructions",entity_id:method==="gcash"?"00000000-0000-0000-0000-000000000001":"00000000-0000-0000-0000-000000000002",details:{payment_method:method,enabled}});
+ const {data:saved,error}=await admin.from("wallet_payment_instructions").upsert({payment_method:method,display_name:displayName,account_name:accountName,account_number:accountNumber,bank_name:bankName||null,instructions,is_enabled:enabled,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:"payment_method"}).select("id").single();
+ if(error||!saved) redirect("/admin/wallet?error=payment-instructions");
+ const {error:auditError}=await admin.from("wallet_audit_events").insert({actor_user_id:user.id,actor_role:"admin",event_type:"wallet_payment_instructions_updated",entity_type:"wallet_payment_instructions",entity_id:saved.id,details:{payment_method:method,enabled}});
+ if(auditError) redirect("/admin/wallet?error=payment-instructions-audit");
  revalidatePath("/admin/wallet"); revalidatePath("/customer/wallet");
  redirect("/admin/wallet?saved=1");
 }
