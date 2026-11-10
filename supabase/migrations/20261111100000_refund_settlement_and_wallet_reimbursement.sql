@@ -38,6 +38,13 @@ for select to authenticated using (
 );
 revoke insert,update,delete on public.merchant_reimbursement_obligations from anon,authenticated;
 
+drop policy if exists "merchant reads enabled refund remittance instructions" on public.wallet_payment_instructions;
+create policy "merchant reads enabled refund remittance instructions" on public.wallet_payment_instructions
+for select to authenticated using (
+  payment_method='gcash' and is_enabled
+  and exists(select 1 from public.merchant_members mm where mm.user_id=auth.uid())
+);
+
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('merchant-refund-proofs','merchant-refund-proofs',false,5242880,array['image/jpeg','image/png','image/webp'])
 on conflict(id) do update set public=false,file_size_limit=5242880,allowed_mime_types=array['image/jpeg','image/png','image/webp'];
