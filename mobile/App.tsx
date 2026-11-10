@@ -597,15 +597,18 @@ function CustomerApp() {
     onDone={() => { setApplicationRole(null); supabase.auth.signOut(); }}
     onSignOut={() => { setApplicationRole(null); supabase.auth.signOut(); }}
   />;
-  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginWrap}>
-    <View style={{ alignItems: "center" }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></View>
-    <View style={styles.loginCard}><Text style={styles.heading}>Welcome back</Text><Text style={styles.muted}>Sign in to order from local stores.</Text>
-      <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
-      <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}>{busy ? <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color="#fff" /><Text style={styles.primaryText}>Signing in…</Text></View> : <Text style={styles.primaryText}>Sign in</Text>}</TouchableOpacity>
-      <TouchableOpacity style={styles.linkButton} onPress={() => setRegistrationOpen(true)}><Text style={styles.link}>Create an account</Text></TouchableOpacity>
-      <Text style={styles.footnote}>New accounts complete email confirmation and Philippine mobile SMS verification before ordering.</Text>
-    </View>
+  if (!session) return registrationOpen ? <RegistrationFlow onBack={() => setRegistrationOpen(false)} /> : <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} /><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={[styles.loginWrap, { paddingBottom: Math.max(24, insets.bottom + 18) }]} keyboardShouldPersistTaps="handled">
+      <View style={{ alignItems: "center" }}><Image source={BRAND_LOGO} style={styles.loginLogo} resizeMode="contain" /><Text style={styles.tagline}>Imong sugo, kami bahala.</Text></View>
+      <View style={styles.loginCard}><Text style={styles.heading}>Welcome to SUGOMATE</Text><Text style={styles.muted}>Your local errands, made simple. Sign in to continue.</Text>
+        <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#8995a7" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+        <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#8995a7" secureTextEntry value={password} onChangeText={setPassword} />
+        <TouchableOpacity style={[styles.primary, busy && styles.disabled]} onPress={signIn} disabled={busy}>{busy ? <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color="#fff" /><Text style={styles.primaryText}>Signing in…</Text></View> : <Text style={styles.primaryText}>Sign in</Text>}</TouchableOpacity>
+        <View style={styles.signupDivider}><View style={styles.signupRule}/><Text style={styles.signupOr}>NEW TO SUGOMATE?</Text><View style={styles.signupRule}/></View>
+        <TouchableOpacity style={styles.signupButton} onPress={() => setRegistrationOpen(true)}><Text style={styles.signupButtonText}>Create an account</Text></TouchableOpacity>
+        <Text style={styles.footnote}>Customer, merchant and delivery partner registration are available. Merchant and driver accounts require Admin approval.</Text>
+      </View>
+    </ScrollView>
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
@@ -781,11 +784,11 @@ function CustomerApp() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG }, center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
-  loginWrap: { flex: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42, flexShrink: 0 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
+  loginWrap: { flexGrow: 1, justifyContent: "center", padding: 24 }, loginLogo: { alignSelf: "center", width: 260, height: 126, marginBottom: 8 }, headerLogo: { width: 116, height: 42, flexShrink: 0 }, tagline: { textAlign: "center", color: RED, marginTop: 4, fontWeight: "700" },
   loginCard: { marginTop: 34, padding: 22, borderRadius: 26, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ffead8" }, heading: { fontSize: 24, fontWeight: "900", color: NAVY }, muted: { fontSize: 12, color: "#738096", marginTop: 5, lineHeight: 18 },
   input: { marginTop: 16, paddingHorizontal: 15, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#e5eaf0", fontSize: 15, color: NAVY, backgroundColor: "#fff" },
   primary: { marginTop: 18, backgroundColor: ORANGE, padding: 14, borderRadius: 15, alignItems: "center" }, disabled: { opacity: .6 }, primaryText: { color: "#fff", fontWeight: "900", fontSize: 14 },
-  linkButton: { alignItems: "center", padding: 15 }, link: { color: RED, fontWeight: "800" }, footnote: { fontSize: 11, color: "#8995a7", lineHeight: 17, textAlign: "center" },
+  linkButton: { alignItems: "center", padding: 15 }, link: { color: RED, fontWeight: "800" }, signupDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 22 }, signupRule: { flex: 1, height: 1, backgroundColor: "#edf0f3" }, signupOr: { fontSize: 9, fontWeight: "900", letterSpacing: 1, color: "#8995a7" }, signupButton: { marginTop: 13, paddingVertical: 13, borderRadius: 15, alignItems: "center", borderWidth: 1.5, borderColor: NAVY, backgroundColor: "#fff" }, signupButtonText: { color: NAVY, fontWeight: "900", fontSize: 13 }, footnote: { fontSize: 11, color: "#8995a7", lineHeight: 17, textAlign: "center" },
   topbar: { paddingHorizontal: 16, paddingVertical: 11, minHeight: 64, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }, brandRow: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 9 }, taglineWrap: { flex: 1, minWidth: 0 },
   smallMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, smallMarkText: { fontSize: 22, fontWeight: "900", color: ORANGE },
   topTag: { flexShrink: 1, fontSize: 9, color: RED, marginTop: 1 }, ordersShortcut: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "#ffead8" }, ordersShortcutText: { fontSize: 11, fontWeight: "800", color: NAVY },
