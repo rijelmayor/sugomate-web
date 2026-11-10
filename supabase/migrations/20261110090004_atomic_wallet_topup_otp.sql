@@ -26,7 +26,7 @@ begin
   if v_challenge.otp_hash <> p_candidate_hash then
     update public.wallet_authorization_challenges
       set attempts=least(attempts+1,5) where id=v_challenge.id;
-    raise exception 'otp_invalid';
+    return null;
   end if;
   v_tx := public.wallet_admin_credit_topup(p_request_id,p_admin_id);
   update public.wallet_authorization_challenges
