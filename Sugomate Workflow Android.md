@@ -78,6 +78,34 @@ The app shares the web platform's Supabase database, Auth, Storage, RLS and RPCs
 
 The mobile app must call the trusted server OTP endpoints. Do not implement Textbee sending or OTP validation with a secret embedded in the APK.
 
+
+## 4A. Android portal expansion plan and current implementation checkpoint
+
+Approved product direction (10 November 2026):
+- One installed SUGOMATE Android app with role-aware navigation and dashboards.
+- Customer, merchant and driver experiences share the same Supabase project and trusted web/database business rules.
+- Merchant implementation priority: order queue, order details, payment verification and accept/prepare/ready transitions.
+- Driver implementation priority: availability, incoming assignments/offers, accept/decline and active delivery workflow.
+- Admin approval remains required for merchant and driver applicants.
+
+Authentication and customer safe-area foundation (feature branch `feat/android-auth-safe-area-foundation`):
+- Sign-in remains a single minimalist screen with email/password and one Create an account entry point.
+- Registration now begins with a separate account-type choice screen (Customer, Merchant, Delivery partner); the role choice is no longer mixed into the registration form fields.
+- Role-specific account metadata, existing Supabase email confirmation, and existing server-side SMS OTP send/verify endpoints are preserved.
+- Customer root safe-area handling now explicitly reserves the Android system navigation inset for the bottom tab bar.
+- Customer scroll content receives additional bottom clearance; the floating basket action is offset above the system navigation region.
+- Authentication content is scrollable on compact screens and while the keyboard is open.
+
+Validation status: source changes are committed to the feature branch, but local Expo typecheck, Expo Doctor, real-device navigation-bar/keyboard testing, and EAS preview build remain to be completed. Do not describe this checkpoint as device-verified or released until those checks pass.
+
+Next native portal implementation sequence:
+1. Merchant order operations: load the authenticated user's approved merchant membership/branches; display new and active orders; open order details; reuse existing web-equivalent RPCs/actions for GCash verification, acceptance, preparation and ready-for-pickup. Never implement a second status transition or payment verifier in the client.
+2. Driver assignment operations: resolve approved driver profile; show availability; load only eligible assignments/offers; accept/decline using the existing server-side transition; show active pickup/delivery tasks and proof upload using existing authorization/storage contracts.
+3. Add role-aware workspace routing only after role and approval states are resolved from authoritative database records. An applicant's `intended_role` metadata is not proof of approval or portal access.
+4. Add merchant/driver financial views only after matching the web source calculations, access controls and RPC contracts. Keep server-calculated balances and earnings authoritative.
+
+Before implementing each portal, inspect its current web page, server actions, SQL/RPC dependencies, RLS policies and migrations. Document the exact contracts and test cases here when verified. Preserve the existing customer flow and run regression checks after every portal increment.
+
 ## 5. Customer app workflows
 
 The current customer app includes the following functional areas; check the current code before treating every subfeature as released:
