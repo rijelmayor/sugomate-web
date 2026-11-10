@@ -35,11 +35,11 @@ export default async function CustomerWalletPage({searchParams}:{searchParams:Pr
       <form action={submitWalletTopup} className="space-y-3 rounded-2xl border p-5">
         <h2 className="text-lg font-semibold">Top Up Wallet</h2><p className="text-sm text-gray-500">Submit your own payment request. Admin can only review the amount and proof you submit.</p>
         <label className="block text-sm">Amount (PHP)<input name="amount" type="number" min="1" max="100000" step="0.01" required className="mt-1 w-full rounded-lg border p-2"/></label>
-        <label className="block text-sm">Payment method<select name="payment_method" required className="mt-1 w-full rounded-lg border p-2">{paymentInstructions.map((x)=><option key={x.payment_method} value={x.payment_method}>{x.display_name}</option>)}</select></label>
-        <div className="rounded-lg bg-slate-50 p-3 text-sm">{paymentInstructions.map((x)=><div key={x.payment_method} className="mb-2"><b>{x.display_name}</b><p>{x.account_name} · {x.account_number}</p>{x.bank_name&&<p>{x.bank_name}</p>}<p>{x.instructions}</p></div>)}</div>
+        {paymentInstructions.length > 0 ? <label className="block text-sm">Payment method<select name="payment_method" required className="mt-1 w-full rounded-lg border p-2">{paymentInstructions.map((x)=><option key={x.payment_method} value={x.payment_method}>{x.display_name}</option>)}</select></label> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Top-ups are temporarily unavailable. SUGOMATE Admin has not configured an active payment method yet.</p>}
+        {paymentInstructions.length > 0 && <div className="rounded-lg bg-slate-50 p-3 text-sm">{paymentInstructions.map((x)=><div key={x.payment_method} className="mb-2"><b>{x.display_name}</b><p>{x.account_name} · {x.account_number}</p>{x.bank_name&&<p>{x.bank_name}</p>}<p>{x.instructions}</p></div>)}</div>}
         <label className="block text-sm">Payment reference<input name="payment_reference" minLength={4} maxLength={120} required className="mt-1 w-full rounded-lg border p-2"/></label>
         <label className="block text-sm">Upload payment proof<input name="proof" type="file" accept="image/jpeg,image/png,image/webp" required className="mt-1 w-full rounded-lg border p-2"/></label>
-        <button className="w-full rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white">Submit top-up request</button>
+        <button disabled={paymentInstructions.length===0} className="w-full rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Submit top-up request</button>
       </form>
       <form action={requestWalletWithdrawal} className="space-y-3 rounded-2xl border p-5">
         <h2 className="text-lg font-semibold">Request Withdrawal</h2><p className="text-sm text-gray-500">Funds are reserved immediately while Admin reviews your request. Rejected requests return to your available balance.</p>
