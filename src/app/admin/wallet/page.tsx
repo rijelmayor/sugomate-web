@@ -9,7 +9,8 @@ export default async function AdminWalletPage(){
   admin.from("wallet_top_up_requests").select("id,customer_id,amount,payment_method,payment_reference,proof_path,status,created_at").order("created_at",{ascending:false}).limit(100),
   admin.from("wallet_withdrawal_requests").select("id,customer_id,amount,payout_method,account_name,account_number,bank_name,status,created_at").order("created_at",{ascending:false}).limit(100),
   admin.from("order_refund_cases").select("id,order_id,customer_id,merchant_id,requested_amount,settlement_method,status,created_at").order("created_at",{ascending:false}).limit(100),
-  admin.from("gcash_payment_proof_history").select("id,order_id,customer_id,merchant_id,payment_reference,proof_path,amount,submitted_at,verified_at,verified_by,verification_status,event_type,captured_at").order("captured_at",{ascending:false}).limit(200)
+  admin.from("gcash_payment_proof_history").select("id,order_id,customer_id,merchant_id,payment_reference,proof_path,amount,submitted_at,verified_at,verified_by,verification_status,event_type,captured_at").order("captured_at",{ascending:false}).limit(200),
+  admin.from("wallet_payment_instructions").select("*").order("payment_method")
  ]);
  const topupRows=await Promise.all((topups??[]).map(async x=>{const {data}=await admin.storage.from("wallet-topup-proofs").createSignedUrl(x.proof_path,300);return {...x,proofUrl:data?.signedUrl??null}}));
  const gcashRows=await Promise.all((proofs??[]).map(async x=>{const {data}=await admin.storage.from("gcash-payment-proofs").createSignedUrl(x.proof_path,300);return {...x,proofUrl:data?.signedUrl??null}}));
