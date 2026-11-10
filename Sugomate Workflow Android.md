@@ -282,3 +282,19 @@ For every update:
 - `mobile/app.json` — Expo identity, Android package, plugins and EAS project ID.
 - `mobile/eas.json` — EAS development, preview APK and production AAB profiles.
 - `mobile/package.json` — SDK dependencies and scripts.
+
+## 4B. Customer marketplace parity checkpoint (10 November 2026)
+
+Implemented on `feat/android-auth-safe-area-foundation`:
+- Added the **Stores near you** section below the Android category grid on the marketplace home view.
+- Reuses the store list already derived from active products and branch/merchant relationships in `loadMarketplace`; no new query, recommendation algorithm, or backend contract is introduced.
+- Shows up to six store branches with merchant logo (or fallback), branch name, municipality, and the existing Asia/Manila operating-hours status.
+- Open stores can be selected to open their product catalog. Closed stores remain visible but cannot be opened, matching the existing store availability behavior.
+- Displays an empty state when no eligible product-backed stores are available.
+- This is a marketplace parity restoration based on the web customer page's **Stores near you** section. The supplied web screenshot did not show a promotional-products section, so no promotion feed or invented promotional logic has been added.
+
+Validation still required:
+- Re-run Android TypeScript typecheck and Expo Doctor.
+- Verify on the Android device that the nearby-store section appears below categories, store cards open the correct branch catalog, closed stores are not selectable, and the section remains scrollable above the bottom navigation.
+- Keyboard-open and registration/sign-in safe-area checks remain outstanding.
+- PR #147 remains unmerged; do not start an EAS APK build until validation is complete.
