@@ -28,7 +28,7 @@ export default async function AdminDispatchPage({searchParams}:{searchParams:Pro
  const to=params.to&&/^\d{4}-\d{2}-\d{2}$/.test(params.to)?params.to:today;
  const todayStart=today+"T00:00:00+08:00";
  const tomorrow=new Date(new Date(todayStart).getTime()+86400000).toISOString();
- let reportQuery=supabase.from("orders").select("id,order_number,status,total,subtotal,delivery_fee,payment_method,payment_status,placed_at,picked_up_at,delivered_at,driver_user_id,pickup_address_snapshot,address_snapshot,merchants(name,address)").order("placed_at",{ascending:false}).limit(1000);
+ let reportQuery=supabase.from("orders").select("id,order_number,status,total,subtotal,delivery_fee,payment_method,payment_status,placed_at,picked_up_at,delivered_at,delivery_proof_path,driver_user_id,pickup_address_snapshot,address_snapshot,merchants(name,address)").order("placed_at",{ascending:false}).limit(1000);
  if(from) reportQuery=reportQuery.gte("placed_at",from+"T00:00:00+08:00");
  if(to) reportQuery=reportQuery.lte("placed_at",to+"T23:59:59+08:00");
  const todayReportQuery=supabase.from("orders").select("id,total,status").gte("placed_at",todayStart).lt("placed_at",tomorrow);
