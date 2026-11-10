@@ -563,14 +563,18 @@ function CustomerApp() {
     try {
       const [addressResult, feeResult] = await Promise.all([
         supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,service_zone_id,municipalities(name),service_zones(name)").eq("customer_id", session.user.id).order("created_at", { ascending: false }),
-        supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true)
+        supabase.from("service_zones").select("id,name,municipality_id,base_delivery_fee").eq("is_active", true)
       ]);
       if (addressResult.error) throw addressResult.error;
       const saved = (addressResult.data ?? []) as unknown as CustomerAddress[];
       setAddresses(saved);
       setSelectedAddressId(saved[0]?.id ?? "");
       const feeMap: Record<string, number> = {};
-      if (!feeResult.error) for (const zone of (feeResult.data ?? []) as any[]) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      if (!feeResult.error) {
+        const activeZones = (feeResult.data ?? []) as any[];
+        setServiceZones(activeZones.map(zone => ({ id: zone.id, name: zone.name, municipality_id: zone.municipality_id })));
+        for (const zone of activeZones) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      }
       setDeliveryFees(feeMap);
       setDeliveryFeePreview(saved[0] && feeMap[saved[0].municipality_id] !== undefined ? feeMap[saved[0].municipality_id] : null);
       const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
