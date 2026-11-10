@@ -30,7 +30,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
  const active=driver.status==="active";
  const {data:driverPhoto}=active&&driver.profile_photo_path?await supabase.storage.from("driver-documents").createSignedUrl(driver.profile_photo_path,3600):{data:null};
  const {data:orders}=active?await supabase.from("orders")
-  .select("id,order_number,status,driver_assignment_status,rider_on_way_at,driver_response_deadline_at,payment_method,subtotal,total,delivery_fee,placed_at,address_snapshot,driver_note,order_items(id,product_name,quantity,line_total),merchants(name)")
+  .select("id,order_number,status,driver_assignment_status,rider_on_way_at,driver_response_deadline_at,payment_method,subtotal,total,delivery_fee,placed_at,address_snapshot,driver_note,delivery_proof_path,delivered_at,order_items(id,product_name,quantity,line_total),merchants(name)")
   .eq("driver_user_id",user.id).in("status",["accepted","preparing","ready_for_pickup","assigned","picked_up","in_transit","delivered"])
   .order("placed_at",{ascending:false}).limit(100):{data:[]};
  const {data:extraLocalities}=active?await supabase.from("rider_locality_authorizations").select("municipality_id").is("revoked_at",null).lte("starts_at",new Date().toISOString()).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`):{data:[]};
@@ -47,6 +47,9 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
   .order("assigned_at",{ascending:false}).limit(30):{data:[]};
  const current=(orders??[]).filter(o=>["accepted","preparing","ready_for_pickup","assigned","picked_up","in_transit"].includes(o.status));
  const completed=(orders??[]).filter(o=>o.status==="delivered");
+ const deliveryProofEntries=await Promise.all(completed.filter(o=>o.delivery_proof_path).map(async o=>{const {data}=await supabase.storage.from("delivery-proofs").createSignedUrl(o.delivery_proof_path as string,3600);return [o.id,data?.signedUrl] as const;}));
+ const deliveryProofUrls=new Map<string,string>();
+ for(const [id,url] of deliveryProofEntries) if(url) deliveryProofUrls.set(id,url);
  const offered=current.filter(o=>o.status==="assigned"&&o.driver_assignment_status==="offered");
  return <main className="min-h-screen bg-[#fff7ef] px-4 py-6 text-[#102e57] sm:px-6 sm:py-8">
   <div className="mx-auto max-w-5xl">
@@ -112,7 +115,7 @@ export default async function DriverPortal({searchParams}:{searchParams:Promise<
       </div>
      </article>}) : <div className="rounded-2xl border border-dashed border-orange-200 bg-white p-10 text-center"><div className="text-4xl">🛵</div><h3 className="mt-3 font-black">No active deliveries</h3><p className="mt-1 text-sm text-slate-500">{driver.is_available?"You are online. New dispatch offers will appear here.":"Go online when you are ready to receive delivery assignments."}</p></div>}</div>
     </section>
-    <section className="mt-8"><h2 className="text-xl font-black">Recent completed deliveries</h2><div className="mt-3 space-y-2">{completed.slice(0,10).map(o=><div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4"><div><p className="text-sm font-bold">{o.order_number}</p><p className="mt-1 text-xs text-slate-500">{new Date(o.placed_at).toLocaleDateString("en-PH",{timeZone:"Asia/Manila"})}</p></div><div className="text-right"><p className="text-[11px] text-slate-500">Delivery fee: {money(o.delivery_fee)}</p><p className="text-sm font-black text-emerald-700">Total: {money(o.total)}</p></div></div>)}{!completed.length&&<p className="text-sm text-slate-500">Completed deliveries will appear here.</p>}</div></section>
+    <section className="mt-8"><h2 className="text-xl font-black">Recent completed deliveries</h2><div className="mt-3 space-y-2">{completed.slice(0,10).map(o=><div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4"><div><p className="text-sm font-bold">{o.order_number}</p><p className="mt-1 text-xs text-slate-500">{new Date(o.placed_at).toLocaleDateString("en-PH",{timeZone:"Asia/Manila"})}</p></div><div className="text-right"><p className="text-[11px] text-slate-500">Delivery fee: {money(o.delivery_fee)}</p><p className="text-sm font-black text-emerald-700">Total: {money(o.total)}</p></div>{deliveryProofUrls.get(o.id)&&<a href={deliveryProofUrls.get(o.id)} target="_blank" rel="noreferrer" className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-center text-xs font-bold text-emerald-800 sm:w-auto">View delivery photo ↗</a>}</div>)}{!completed.length&&<p className="text-sm text-slate-500">Completed deliveries will appear here.</p>}</div></section>
    </>}
    <footer className="mt-10 border-t border-orange-100 pt-5 text-center text-xs text-slate-400">SUGOMATE · Imong sugo, among ihatod.</footer>
   </div>

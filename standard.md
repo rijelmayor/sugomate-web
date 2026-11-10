@@ -67,3 +67,19 @@ A PR is not ready to merge until the relevant checks above have been reviewed.
 - Subscribe only to orders belonging to the authenticated merchant memberships and rely on database row-level security. Never expose service-role credentials in the browser.
 - Show a visible fallback alert if audio is unavailable or disabled. Do not rely on sound alone.
 - Realtime subscriptions must be cleaned up when the merchant dashboard unmounts.
+
+## 7. Password visibility control — mandatory SOP
+
+- Every password input in every portal and authentication flow (sign-in, registration, reset/change password, admin, merchant, driver, and customer) MUST include an eye icon control to show/hide the password.
+- Use the shared `@/components/auth/PasswordField` component; do not create ad-hoc password `<input>` elements. If a new password UI needs controlled state, extend the shared component rather than bypassing it.
+- Default state is masked. Tapping the eye reveals the value; tapping again masks it. The toggle must be `type="button"`, must not submit the form, and must expose an accessible label (`Show password` / `Hide password`) and `aria-pressed` state.
+- Preserve the input's `name`, `required`, `minLength`, `autoComplete`, validation, and controlled/uncontrolled behavior. The toggle must not clear the value or steal focus from the input.
+- Before merging ANY UI change that touches authentication, password fields, shared form components, or layouts, search the affected flows for `type="password"` and verify that every instance uses the shared eye-toggle component. Include sign-in, sign-up, forgot/reset/change password, and all role-specific portals in regression checks.
+- A password field without a working eye toggle is a release-blocking UI regression.
+
+## 8. Admin delivery evidence archive — production requirement
+
+- The completed-delivery evidence archive must identify each record with order number, customer name, merchant/store name, rider name, delivery completion date/time (Philippine Time), order value, and a working private proof-photo link.
+- Keep the archive filtered by delivery completion timestamp, separate from live dispatch and order-placement reporting.
+- Use authenticated Admin-only access and short-lived signed URLs. Never make the delivery proof bucket public.
+- Verify metadata and photo access on mobile and desktop before production release.
