@@ -24,7 +24,7 @@ export default async function CustomerWalletPage({searchParams}:{searchParams:Pr
   const topupRequests = (topups ?? []) as (WalletRequest & { payment_method: string; payment_reference: string })[];
   const withdrawalRequests = (withdrawals ?? []) as (WalletRequest & { payout_method: string })[];
   return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-    <header><p className="text-sm font-semibold text-blue-700">SUGOMATE</p><h1 className="text-2xl font-bold">My Wallet</h1><p className="text-sm text-gray-500">Manage your balance, top-ups and withdrawals.</p></header>
+    <header><p className="text-sm font-semibold text-blue-700">SUGOMATE</p><h1 className="text-2xl font-bold">My Wallet</h1><p className="text-sm text-gray-500">Manage your balance, top-ups and withdrawals.</p><a href="/customer/refunds" className="mt-2 inline-block text-sm font-semibold text-blue-700 underline">View cancelled-order refunds</a></header>
     {params.error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">We could not complete that request. Please check the details and try again.</p>}
     {(params.topup||params.withdrawal) && <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">Your request has been submitted successfully.</p>}
     <section className="grid gap-3 sm:grid-cols-2">
