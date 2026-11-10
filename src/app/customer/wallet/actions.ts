@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { walletCustomerContext } from "@/lib/wallet-server";
+import { walletCustomerContext, walletServiceClient } from "@/lib/wallet-server";
 
 export async function submitWalletTopup(formData: FormData) {
   const { user, db } = await walletCustomerContext();
@@ -26,7 +26,8 @@ export async function submitWalletTopup(formData: FormData) {
 }
 
 export async function requestWalletWithdrawal(formData: FormData) {
-  const { user, admin } = await walletCustomerContext();
+  const { user } = await walletCustomerContext();
+  const admin = walletServiceClient();
   const amount = Number(formData.get("amount"));
   const method = String(formData.get("payout_method") ?? "");
   const accountName = String(formData.get("account_name") ?? "").trim().slice(0,120);
