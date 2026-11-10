@@ -78,6 +78,34 @@ The app shares the web platform's Supabase database, Auth, Storage, RLS and RPCs
 
 The mobile app must call the trusted server OTP endpoints. Do not implement Textbee sending or OTP validation with a secret embedded in the APK.
 
+
+## 4A. Android portal expansion plan and current implementation checkpoint
+
+Approved product direction (10 November 2026):
+- One installed SUGOMATE Android app with role-aware navigation and dashboards.
+- Customer, merchant and driver experiences share the same Supabase project and trusted web/database business rules.
+- Merchant implementation priority: order queue, order details, payment verification and accept/prepare/ready transitions.
+- Driver implementation priority: availability, incoming assignments/offers, accept/decline and active delivery workflow.
+- Admin approval remains required for merchant and driver applicants.
+
+Authentication and customer safe-area foundation (feature branch `feat/android-auth-safe-area-foundation`):
+- Sign-in remains a single minimalist screen with email/password and one Create an account entry point.
+- Registration now begins with a separate account-type choice screen (Customer, Merchant, Delivery partner); the role choice is no longer mixed into the registration form fields.
+- Role-specific account metadata, existing Supabase email confirmation, and existing server-side SMS OTP send/verify endpoints are preserved.
+- Customer root safe-area handling now explicitly reserves the Android system navigation inset for the bottom tab bar.
+- Customer scroll content receives additional bottom clearance; the floating basket action is offset above the system navigation region.
+- Authentication content is scrollable on compact screens and while the keyboard is open.
+
+Validation status: source changes are committed to the feature branch, but local Expo typecheck, Expo Doctor, real-device navigation-bar/keyboard testing, and EAS preview build remain to be completed. Do not describe this checkpoint as device-verified or released until those checks pass.
+
+Next native portal implementation sequence:
+1. Merchant order operations: load the authenticated user's approved merchant membership/branches; display new and active orders; open order details; reuse existing web-equivalent RPCs/actions for GCash verification, acceptance, preparation and ready-for-pickup. Never implement a second status transition or payment verifier in the client.
+2. Driver assignment operations: resolve approved driver profile; show availability; load only eligible assignments/offers; accept/decline using the existing server-side transition; show active pickup/delivery tasks and proof upload using existing authorization/storage contracts.
+3. Add role-aware workspace routing only after role and approval states are resolved from authoritative database records. An applicant's `intended_role` metadata is not proof of approval or portal access.
+4. Add merchant/driver financial views only after matching the web source calculations, access controls and RPC contracts. Keep server-calculated balances and earnings authoritative.
+
+Before implementing each portal, inspect its current web page, server actions, SQL/RPC dependencies, RLS policies and migrations. Document the exact contracts and test cases here when verified. Preserve the existing customer flow and run regression checks after every portal increment.
+
 ## 5. Customer app workflows
 
 The current customer app includes the following functional areas; check the current code before treating every subfeature as released:
@@ -254,3 +282,40 @@ For every update:
 - `mobile/app.json` — Expo identity, Android package, plugins and EAS project ID.
 - `mobile/eas.json` — EAS development, preview APK and production AAB profiles.
 - `mobile/package.json` — SDK dependencies and scripts.
+
+## 4B. Customer marketplace parity checkpoint (10 November 2026)
+
+Implemented on `feat/android-auth-safe-area-foundation`:
+- Added the **Stores near you** section below the Android category grid on the marketplace home view.
+- Reuses the store list already derived from active products and branch/merchant relationships in `loadMarketplace`; no new query, recommendation algorithm, or backend contract is introduced.
+- Shows up to six store branches with merchant logo (or fallback), branch name, municipality, and the existing Asia/Manila operating-hours status.
+- Open stores can be selected to open their product catalog. Closed stores remain visible but cannot be opened, matching the existing store availability behavior.
+- Displays an empty state when no eligible product-backed stores are available.
+- This is a marketplace parity restoration based on the web customer page's **Stores near you** section. The supplied web screenshot did not show a promotional-products section, so no promotion feed or invented promotional logic has been added.
+
+Validation still required:
+- Re-run Android TypeScript typecheck and Expo Doctor.
+- Verify on the Android device that the nearby-store section appears below categories, store cards open the correct branch catalog, closed stores are not selectable, and the section remains scrollable above the bottom navigation.
+- Keyboard-open and registration/sign-in safe-area checks remain outstanding.
+- PR #147 remains unmerged; do not start an EAS APK build until validation is complete.
+
+## 4C. Native customer area filtering and saved-address management (10 November 2026)
+
+Implemented on `feat/android-marketplace-area-addresses`:
+
+- Marketplace store cards, nearby-store cards, store counts and category counts use the same derived `visibleStores` collection. Municipality selection therefore applies consistently to the customer-facing store listings; **All areas** clears the municipality filter.
+- The account's **Manage saved addresses** action now opens a native in-app screen instead of navigating to `https://sugomate.com/customer/addresses`. It uses the current authenticated Supabase client/session and scopes address reads and inserts to the signed-in customer's `customer_id`.
+- The native address form follows the existing web address contract: label, recipient name, phone, serviceable municipality, active service zone (`service_zone_id`), address line and optional landmark.
+- Saved addresses display their service zone and municipality in the app.
+- Checkout's new-address form now requires and persists `service_zone_id`, and loads the active service-zone list before address entry. Order placement continues to call the existing `place_customer_order` RPC; no client-side order totals, delivery-fee authority, COD/GCash rules or payment transitions were changed.
+- The existing web address page supports adding and listing addresses; native behavior is intentionally aligned to that scope. Edit/delete/default-address operations have not been introduced.
+
+Validation still required on the local checkout and Android device:
+1. Run strict TypeScript typecheck and Expo Doctor.
+2. Verify **All areas**, Bato and Hilongos each show only eligible stores for the selected municipality, including category counts and nearby-store cards.
+3. Open **More → Manage saved addresses** and confirm it stays inside the app without a web redirect or second login.
+4. Save an address with a municipality and matching active service zone; confirm it appears in the saved list.
+5. Place a test checkout using both a previously saved address and a newly entered address; verify the existing order RPC remains the only order-creation path.
+6. Recheck GCash and COD flows; this change must not alter their existing rules.
+
+This is source-implemented but not yet locally typechecked or verified on a physical Android device. Do not call the customer portal complete or build/release an APK until the checks above pass.
