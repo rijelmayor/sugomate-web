@@ -298,3 +298,24 @@ Validation still required:
 - Verify on the Android device that the nearby-store section appears below categories, store cards open the correct branch catalog, closed stores are not selectable, and the section remains scrollable above the bottom navigation.
 - Keyboard-open and registration/sign-in safe-area checks remain outstanding.
 - PR #147 remains unmerged; do not start an EAS APK build until validation is complete.
+
+## 4C. Native customer area filtering and saved-address management (10 November 2026)
+
+Implemented on `feat/android-marketplace-area-addresses`:
+
+- Marketplace store cards, nearby-store cards, store counts and category counts use the same derived `visibleStores` collection. Municipality selection therefore applies consistently to the customer-facing store listings; **All areas** clears the municipality filter.
+- The account's **Manage saved addresses** action now opens a native in-app screen instead of navigating to `https://sugomate.com/customer/addresses`. It uses the current authenticated Supabase client/session and scopes address reads and inserts to the signed-in customer's `customer_id`.
+- The native address form follows the existing web address contract: label, recipient name, phone, serviceable municipality, active service zone (`service_zone_id`), address line and optional landmark.
+- Saved addresses display their service zone and municipality in the app.
+- Checkout's new-address form now requires and persists `service_zone_id`, and loads the active service-zone list before address entry. Order placement continues to call the existing `place_customer_order` RPC; no client-side order totals, delivery-fee authority, COD/GCash rules or payment transitions were changed.
+- The existing web address page supports adding and listing addresses; native behavior is intentionally aligned to that scope. Edit/delete/default-address operations have not been introduced.
+
+Validation still required on the local checkout and Android device:
+1. Run strict TypeScript typecheck and Expo Doctor.
+2. Verify **All areas**, Bato and Hilongos each show only eligible stores for the selected municipality, including category counts and nearby-store cards.
+3. Open **More → Manage saved addresses** and confirm it stays inside the app without a web redirect or second login.
+4. Save an address with a municipality and matching active service zone; confirm it appears in the saved list.
+5. Place a test checkout using both a previously saved address and a newly entered address; verify the existing order RPC remains the only order-creation path.
+6. Recheck GCash and COD flows; this change must not alter their existing rules.
+
+This is source-implemented but not yet locally typechecked or verified on a physical Android device. Do not call the customer portal complete or build/release an APK until the checks above pass.

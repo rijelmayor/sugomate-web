@@ -15,7 +15,8 @@ type DriverDetails = { name: string; phone: string | null; vehicleType: string |
 type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string; merchantName: string; recipientName: string; address: string; total: number; createdAt: string; driver?: DriverDetails | null };
 type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
-type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
+type ServiceZone = { id: string; name: string; municipality_id: string };
+type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; service_zone_id: string; municipalities: any; service_zones?: any };
 type MerchantUsageSettings = { merchant_usage_enabled: boolean; merchant_usage_method: string; merchant_usage_value: number | string };
 type Tab = "market" | "orders" | "account";
 
@@ -157,6 +158,10 @@ function CustomerApp() {
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressLandmark, setAddressLandmark] = useState("");
+  const [addressManagerOpen, setAddressManagerOpen] = useState(false);
+  const [addressManagerBusy, setAddressManagerBusy] = useState(false);
+  const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
+  const [addressServiceZone, setAddressServiceZone] = useState("");
 
   // Android system Back should unwind the customer's in-app screen state first.
   useEffect(() => {
@@ -367,6 +372,7 @@ function CustomerApp() {
     (!search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase()) || s.area.toLowerCase().includes(search.trim().toLowerCase()))
   ), [stores, selectedCategory, selectedMunicipality, search]);
   const currentStore = stores.find(s => s.id === selectedStore);
+  const managerZones = serviceZones.filter(zone => zone.municipality_id === addressMunicipality);
   const storeProducts = useMemo(() => products.filter(p => p.branch_id === selectedStore && (!search.trim() || p.name.toLowerCase().includes(search.trim().toLowerCase()))), [products, selectedStore, search]);
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((n, item) => n + item.quantity, 0);
@@ -481,6 +487,53 @@ function CustomerApp() {
     } finally { setGcashSubmitting(null); }
   }
 
+  async function openAddressManager() {
+    setAddressManagerBusy(true);
+    setAddressManagerOpen(true);
+    try {
+      const [addressResult, municipalityResult, zoneResult] = await Promise.all([
+        supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,service_zone_id,municipalities(name),service_zones(name)").eq("customer_id", session.user.id).order("created_at", { ascending: false }),
+        supabase.from("municipalities").select("id,name").eq("is_serviceable", true).order("name"),
+        supabase.from("service_zones").select("id,name,municipality_id").eq("is_active", true).order("name")
+      ]);
+      if (addressResult.error) throw addressResult.error;
+      if (municipalityResult.error) throw municipalityResult.error;
+      if (zoneResult.error) throw zoneResult.error;
+      setAddresses((addressResult.data ?? []) as unknown as CustomerAddress[]);
+      setMunicipalities(municipalityResult.data ?? []);
+      setServiceZones((zoneResult.data ?? []) as ServiceZone[]);
+    } catch (e: any) {
+      setAddressManagerOpen(false);
+      Alert.alert("Unable to load saved addresses", e?.message ?? "Please try again.");
+    } finally { setAddressManagerBusy(false); }
+  }
+
+  async function saveManagedAddress() {
+    if (!session?.user?.id || !recipientName.trim() || !recipientPhone.trim() || !addressMunicipality || !addressServiceZone || addressLine.trim().length < 5) {
+      Alert.alert("Complete delivery details", "Enter the recipient, mobile number, municipality, barangay/zone and complete street address.");
+      return;
+    }
+    setAddressManagerBusy(true);
+    try {
+      const { data, error } = await supabase.from("customer_addresses").insert({
+        customer_id: session.user.id,
+        label: addressLabel.trim().slice(0, 40) || "Home",
+        recipient_name: recipientName.trim().slice(0, 120),
+        recipient_phone: recipientPhone.trim().slice(0, 40),
+        municipality_id: addressMunicipality,
+        service_zone_id: addressServiceZone,
+        address_line: addressLine.trim().slice(0, 300),
+        landmark: addressLandmark.trim().slice(0, 200) || null
+      }).select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,service_zone_id,municipalities(name),service_zones(name)").single();
+      if (error || !data) throw error ?? new Error("Address was not saved.");
+      setAddresses(current => [data as unknown as CustomerAddress, ...current]);
+      setAddressLabel("Home"); setRecipientName(""); setRecipientPhone(""); setAddressMunicipality(""); setAddressServiceZone(""); setAddressLine(""); setAddressLandmark("");
+      Alert.alert("Address saved", "Your delivery address is now available in the app and at checkout.");
+    } catch (e: any) {
+      Alert.alert("Unable to save address", e?.message ?? "Please check the details and try again.");
+    } finally { setAddressManagerBusy(false); }
+  }
+
   async function signOut() { await supabase.auth.signOut(); setCart({}); setOrders([]); setProducts([]); setStores([]); setGcashProof({}); setGcashReference({}); }
   function addToCart(product: Product) {
     if (cartItems.length && cartItems[0].product.branch_id !== product.branch_id) {
@@ -509,15 +562,19 @@ function CustomerApp() {
     setCustomerNote("");
     try {
       const [addressResult, feeResult] = await Promise.all([
-        supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,municipalities(name)").eq("customer_id", session.user.id).order("created_at", { ascending: false }),
-        supabase.from("service_zones").select("municipality_id,base_delivery_fee").eq("is_active", true)
+        supabase.from("customer_addresses").select("id,label,recipient_name,recipient_phone,address_line,landmark,municipality_id,service_zone_id,municipalities(name),service_zones(name)").eq("customer_id", session.user.id).order("created_at", { ascending: false }),
+        supabase.from("service_zones").select("id,name,municipality_id,base_delivery_fee").eq("is_active", true)
       ]);
       if (addressResult.error) throw addressResult.error;
       const saved = (addressResult.data ?? []) as unknown as CustomerAddress[];
       setAddresses(saved);
       setSelectedAddressId(saved[0]?.id ?? "");
       const feeMap: Record<string, number> = {};
-      if (!feeResult.error) for (const zone of (feeResult.data ?? []) as any[]) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      if (!feeResult.error) {
+        const activeZones = (feeResult.data ?? []) as any[];
+        setServiceZones(activeZones.map(zone => ({ id: zone.id, name: zone.name, municipality_id: zone.municipality_id })));
+        for (const zone of activeZones) feeMap[zone.municipality_id] = Number(zone.base_delivery_fee);
+      }
       setDeliveryFees(feeMap);
       setDeliveryFeePreview(saved[0] && feeMap[saved[0].municipality_id] !== undefined ? feeMap[saved[0].municipality_id] : null);
       const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
@@ -540,8 +597,8 @@ function CustomerApp() {
       Alert.alert("Delivery address required", "Choose a saved address or add a new one.");
       return;
     }
-    if (newAddress && (!recipientName.trim() || !recipientPhone.trim() || !addressMunicipality || addressLine.trim().length < 5)) {
-      Alert.alert("Complete delivery details", "Enter the recipient, mobile number, municipality, and complete street/barangay address.");
+    if (newAddress && (!recipientName.trim() || !recipientPhone.trim() || !addressMunicipality || !addressServiceZone || addressLine.trim().length < 5)) {
+      Alert.alert("Complete delivery details", "Enter the recipient, mobile number, municipality, barangay/zone, and complete street address.");
       return;
     }
     setCheckoutBusy(true);
@@ -554,6 +611,7 @@ function CustomerApp() {
           recipient_name: recipientName.trim().slice(0, 120),
           recipient_phone: recipientPhone.trim().slice(0, 40),
           municipality_id: addressMunicipality,
+          service_zone_id: addressServiceZone,
           address_line: addressLine.trim().slice(0, 300),
           landmark: addressLandmark.trim().slice(0, 200) || null
         }).select("id").single();
@@ -640,7 +698,7 @@ function CustomerApp() {
           {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory && childCategories.length > 0) setSelectedCategory(""); else { setSelectedCategory(""); setSelectedParentCategory(""); } }}><Text style={styles.backLinkText}>{selectedCategory && childCategories.length > 0 ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
           {!selectedParentCategory && <View style={styles.categoryGrid}>{topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { const hasSubcategories = categories.some(child => child.parent_id === c.id); setSelectedParentCategory(c.id); setSelectedCategory(hasSubcategories ? "" : c.slug); }}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
-            <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
+            <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{visibleStores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
           </TouchableOpacity>)}</View>}
           {!selectedParentCategory && !selectedCategory && <>
             <View style={styles.storesHeading}><Text style={styles.sectionTitle}>Stores near you</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
@@ -710,7 +768,7 @@ function CustomerApp() {
         })}
         {!loading && orders.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛵</Text><Text style={styles.emptyTitle}>No orders yet</Text><Text style={styles.muted}>Your placed orders will appear here.</Text><TouchableOpacity onPress={() => setTab("market")} style={styles.primary}><Text style={styles.primaryText}>Browse marketplace</Text></TouchableOpacity></View>}
       </>}
-      {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => Linking.openURL("https://sugomate.com/customer/addresses")}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
+      {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
     {tab === "market" && cartCount > 0 && <TouchableOpacity style={[styles.basketBar, { bottom: 72 + insets.bottom }]} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
@@ -744,6 +802,37 @@ function CustomerApp() {
         </View>
       </View>}
     </Modal>
+    <Modal visible={addressManagerOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!addressManagerBusy) setAddressManagerOpen(false); }}>
+      <SafeAreaView style={styles.checkoutSafe}>
+        <ScrollView contentContainerStyle={styles.checkoutContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.checkoutHeader}><TouchableOpacity disabled={addressManagerBusy} onPress={() => setAddressManagerOpen(false)}><Text style={styles.backLinkText}>‹  Back</Text></TouchableOpacity><Text style={styles.checkoutTitle}>Saved addresses</Text></View>
+          <View style={styles.checkoutCard}>
+            <Text style={styles.checkoutSection}>Add a delivery address</Text>
+            <Text style={styles.checkoutHint}>Saved securely to your customer account. You will stay signed in.</Text>
+            <TextInput style={styles.checkoutInput} placeholder="Address label (Home, Work)" value={addressLabel} onChangeText={setAddressLabel}/>
+            <TextInput style={styles.checkoutInput} placeholder="Recipient full name" value={recipientName} onChangeText={setRecipientName}/>
+            <TextInput style={styles.checkoutInput} placeholder="Mobile number" keyboardType="phone-pad" value={recipientPhone} onChangeText={setRecipientPhone}/>
+            <Text style={styles.checkoutHint}>Select municipality</Text>
+            {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => { setAddressMunicipality(m.id); setAddressServiceZone(""); }} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
+            <Text style={styles.checkoutHint}>Select barangay / service zone</Text>
+            {managerZones.map(zone => <TouchableOpacity key={zone.id} onPress={() => setAddressServiceZone(zone.id)} style={[styles.municipalityOption, addressServiceZone === zone.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressServiceZone === zone.id ? "● " : "○ "}{zone.name}</Text></TouchableOpacity>)}
+            {!!addressMunicipality && managerZones.length === 0 && <Text style={styles.checkoutHint}>No active delivery zones are configured for this municipality.</Text>}
+            <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="House no., street, purok / sitio, barangay" multiline value={addressLine} onChangeText={setAddressLine}/>
+            <TextInput style={styles.checkoutInput} placeholder="Nearby landmark (optional)" value={addressLandmark} onChangeText={setAddressLandmark}/>
+            <TouchableOpacity disabled={addressManagerBusy} style={[styles.primary, addressManagerBusy && styles.disabled]} onPress={() => void saveManagedAddress()}><Text style={styles.primaryText}>{addressManagerBusy ? "Saving…" : "Save address"}</Text></TouchableOpacity>
+          </View>
+          <View style={styles.checkoutCard}>
+            <Text style={styles.checkoutSection}>Your saved addresses ({addresses.length})</Text>
+            {addressManagerBusy && addresses.length === 0 ? <ActivityIndicator color={ORANGE}/> : addresses.length ? addresses.map(a => <View key={a.id} style={styles.addressOption}>
+              <Text style={styles.addressOptionTitle}>{a.label} · {a.recipient_name}</Text>
+              <Text style={styles.addressOptionText}>{a.address_line}</Text>
+              <Text style={styles.addressOptionText}>{one(a.service_zones)?.name ?? "Service zone"} · {one(a.municipalities)?.name ?? ""}</Text>
+              <Text style={styles.addressOptionText}>{a.recipient_phone}{a.landmark ? " · Near " + a.landmark : ""}</Text>
+            </View>) : <Text style={styles.checkoutHint}>No saved addresses yet. Add one above.</Text>}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
     <Modal visible={checkoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!checkoutBusy) setCheckoutOpen(false); }}>
       <SafeAreaView style={styles.checkoutSafe}>
         <ScrollView contentContainerStyle={styles.checkoutContent} keyboardShouldPersistTaps="handled">
@@ -761,7 +850,10 @@ function CustomerApp() {
               <TextInput style={styles.checkoutInput} placeholder="Recipient full name" value={recipientName} onChangeText={setRecipientName}/>
               <TextInput style={styles.checkoutInput} placeholder="Mobile number" keyboardType="phone-pad" value={recipientPhone} onChangeText={setRecipientPhone}/>
               <Text style={styles.checkoutHint}>Select municipality</Text>
-              {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => { setAddressMunicipality(m.id); setDeliveryFeePreview(deliveryFees[m.id] ?? null); }} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
+              {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => { setAddressMunicipality(m.id); setAddressServiceZone(""); setDeliveryFeePreview(deliveryFees[m.id] ?? null); }} style={[styles.municipalityOption, addressMunicipality === m.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressMunicipality === m.id ? "● " : "○ "}{m.name}</Text></TouchableOpacity>)}
+              <Text style={styles.checkoutHint}>Select barangay / service zone</Text>
+              {serviceZones.filter(zone => zone.municipality_id === addressMunicipality).map(zone => <TouchableOpacity key={zone.id} onPress={() => setAddressServiceZone(zone.id)} style={[styles.municipalityOption, addressServiceZone === zone.id && styles.addressOptionActive]}><Text style={styles.addressOptionText}>{addressServiceZone === zone.id ? "● " : "○ "}{zone.name}</Text></TouchableOpacity>)}
+              {!!addressMunicipality && managerZones.length === 0 && serviceZones.filter(zone => zone.municipality_id === addressMunicipality).length === 0 && <Text style={styles.checkoutHint}>No active delivery zones are configured for this municipality. Please choose another area.</Text>}
               <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="House no., street, purok / sitio, barangay" multiline value={addressLine} onChangeText={setAddressLine}/>
               <TextInput style={styles.checkoutInput} placeholder="Nearby landmark (optional)" value={addressLandmark} onChangeText={setAddressLandmark}/>
             </>}
