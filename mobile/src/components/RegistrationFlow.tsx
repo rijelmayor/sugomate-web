@@ -12,6 +12,7 @@ const RED = "#e95718";
 
 export default function RegistrationFlow({ onBack }: Props) {
   const [role, setRole] = useState<Role>("customer");
+  const [roleSelected, setRoleSelected] = useState(false);
   const [step, setStep] = useState<"details" | "verify" | "complete">("details");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -87,8 +88,22 @@ export default function RegistrationFlow({ onBack }: Props) {
       <Text style={styles.subtitle}>{step === "details" ? "Choose the account type you want to register." : step === "verify" ? "Enter the code sent to your Philippine mobile number." : "Your mobile verification is complete."}</Text>
       {!!error && <Text style={styles.error}>{error}</Text>}
       {!!notice && <Text style={styles.notice}>{notice}</Text>}
-      {step === "details" ? <>
-        <View style={styles.roles}>{(["customer", "merchant", "driver"] as Role[]).map(item => <TouchableOpacity key={item} onPress={() => setRole(item)} style={[styles.role, role === item && styles.roleActive]}><Text style={[styles.roleText, role === item && styles.roleTextActive]}>{item === "driver" ? "Delivery partner" : item[0].toUpperCase() + item.slice(1)}</Text></TouchableOpacity>)}</View>
+      {step === "details" && !roleSelected ? <>
+        <Text style={styles.choiceTitle}>How will you use SUGOMATE?</Text>
+        <Text style={styles.choiceSubtitle}>Choose an account type to continue.</Text>
+        <View style={styles.roleChoices}>
+          <TouchableOpacity onPress={() => { setRole("customer"); setRoleSelected(true); }} style={styles.roleChoice}>
+            <Text style={styles.roleChoiceIcon}>🛍️</Text><View style={styles.roleChoiceBody}><Text style={styles.roleChoiceTitle}>Customer</Text><Text style={styles.roleChoiceText}>Discover local stores and place orders.</Text></View><Text style={styles.roleArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setRole("merchant"); setRoleSelected(true); }} style={styles.roleChoice}>
+            <Text style={styles.roleChoiceIcon}>🏪</Text><View style={styles.roleChoiceBody}><Text style={styles.roleChoiceTitle}>Merchant</Text><Text style={styles.roleChoiceText}>Register your store and manage orders.</Text></View><Text style={styles.roleArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setRole("driver"); setRoleSelected(true); }} style={styles.roleChoice}>
+            <Text style={styles.roleChoiceIcon}>🛵</Text><View style={styles.roleChoiceBody}><Text style={styles.roleChoiceTitle}>Delivery partner</Text><Text style={styles.roleChoiceText}>Apply to receive and deliver orders.</Text></View><Text style={styles.roleArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </> : step === "details" ? <>
+        <TouchableOpacity onPress={() => setRoleSelected(false)} style={styles.changeRole}><Text style={styles.backText}>‹  Change account type · {role === "driver" ? "Delivery partner" : role[0].toUpperCase() + role.slice(1)}</Text></TouchableOpacity>
         <TextInput style={styles.input} placeholder="Full name" value={name} onChangeText={setName} autoCapitalize="words" />
         <TextInput style={styles.input} placeholder="Mobile number (09XXXXXXXXX)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <TextInput style={styles.input} placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
@@ -105,12 +120,14 @@ export default function RegistrationFlow({ onBack }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff7ef" }, wrap: { flexGrow: 1, justifyContent: "center", padding: 24 },
+  safe: { flex: 1, backgroundColor: "#fff7ef" }, wrap: { flexGrow: 1, justifyContent: "center", padding: 24, paddingBottom: 42 },
   back: { paddingVertical: 12 }, backText: { color: RED, fontWeight: "800" },
   eyebrow: { marginTop: 20, color: RED, fontSize: 11, fontWeight: "900", letterSpacing: 2 },
   title: { marginTop: 8, color: NAVY, fontSize: 27, fontWeight: "900" }, subtitle: { marginTop: 7, color: "#738096", fontSize: 13, lineHeight: 19 },
-  roles: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 22 }, role: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: "#e5eaf0", backgroundColor: "#fff" },
-  roleActive: { backgroundColor: NAVY, borderColor: NAVY }, roleText: { color: NAVY, fontSize: 11, fontWeight: "800" }, roleTextActive: { color: "#fff" },
+  choiceTitle: { marginTop: 24, color: NAVY, fontSize: 19, fontWeight: "900" }, choiceSubtitle: { color: "#738096", fontSize: 12, marginTop: 5, marginBottom: 14 },
+  roleChoices: { gap: 10, marginTop: 8 }, roleChoice: { flexDirection: "row", alignItems: "center", padding: 15, borderRadius: 17, backgroundColor: "#fff", borderWidth: 1, borderColor: "#f0e3d9", gap: 12 },
+  roleChoiceIcon: { fontSize: 25 }, roleChoiceBody: { flex: 1 }, roleChoiceTitle: { color: NAVY, fontSize: 14, fontWeight: "900" }, roleChoiceText: { color: "#738096", fontSize: 11, lineHeight: 16, marginTop: 3 }, roleArrow: { color: RED, fontSize: 27, fontWeight: "700" },
+  changeRole: { marginTop: 20, paddingVertical: 8 },
   input: { marginTop: 13, paddingHorizontal: 14, paddingVertical: 14, borderRadius: 13, borderWidth: 1, borderColor: "#e5eaf0", backgroundColor: "#fff", color: NAVY, fontSize: 14 },
   code: { textAlign: "center", fontSize: 24, letterSpacing: 8, marginTop: 25 }, primary: { marginTop: 18, padding: 15, borderRadius: 15, backgroundColor: ORANGE, alignItems: "center" }, disabled: { opacity: .6 },
   primaryText: { color: "#fff", fontWeight: "900", fontSize: 13 }, secondary: { padding: 14, alignItems: "center" }, secondaryText: { color: RED, fontWeight: "800" },
