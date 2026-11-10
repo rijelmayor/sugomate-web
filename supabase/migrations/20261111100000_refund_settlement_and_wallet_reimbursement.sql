@@ -5,7 +5,7 @@ alter table public.order_refund_cases
   add column if not exists settlement_proof_path text,
   add column if not exists settlement_submitted_at timestamptz,
   add column if not exists merchant_reimbursement_status text not null default 'not_applicable'
-    check (merchant_reimbursement_status in ('not_applicable','payable_to_platform','submitted','verified','rejected')),
+    check (merchant_reimbursement_status in ('not_applicable','payable_to_platform','platform_payable_to_merchant','submitted','verified','rejected')),
   add column if not exists customer_choice_at timestamptz;
 
 alter table public.order_refund_cases drop constraint if exists order_refund_cases_status_check;
@@ -21,7 +21,7 @@ create table if not exists public.merchant_reimbursement_obligations (
   refund_case_id uuid not null unique references public.order_refund_cases(id) on delete restrict,
   amount numeric(12,2) not null check(amount > 0),
   status text not null default 'payable_to_platform'
-    check(status in ('payable_to_platform','submitted','verified','rejected')),
+    check(status in ('payable_to_platform','platform_payable_to_merchant','submitted','verified','rejected')),
   settlement_reference text,
   settlement_proof_path text,
   verified_by uuid references auth.users(id) on delete set null,
@@ -82,7 +82,7 @@ begin
  values(new.id,new.customer_id,new.merchant_id,new.total,null,
    case when new.payment_method='wallet' then 'sugomate_wallet' else null end,
    case when new.payment_method='wallet' then 'credited_to_wallet' else 'awaiting_customer_choice' end,
-   case when new.payment_method='wallet' then 'payable_to_platform' else 'not_applicable' end)
+   case when new.payment_method='wallet' then 'platform_payable_to_merchant' else 'not_applicable' end)
  returning id into v_case;
 
  if new.payment_method='wallet' then
@@ -103,7 +103,7 @@ begin
    insert into public.wallet_audit_events(actor_user_id,actor_role,event_type,entity_type,entity_id,details)
     values(null,'system','wallet_order_auto_refunded','order_refund_case',v_case,
       jsonb_build_object('order_id',new.id,'amount',new.total,'merchant_id',new.merchant_id,
-        'merchant_reimbursement','payable_to_platform','wallet_transaction_id',v_tx));
+        'platform_payable_to_merchant','wallet_transaction_id',v_tx));
  else
    insert into public.wallet_audit_events(actor_user_id,actor_role,event_type,entity_type,entity_id,details)
     values(null,'system','gcash_order_refund_choice_required','order_refund_case',v_case,
