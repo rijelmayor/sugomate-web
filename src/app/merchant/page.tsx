@@ -60,7 +60,7 @@ export default async function MerchantPortal({ searchParams }: {
   const storeInfo = (approvedRows[0] ?? merchantRows[0])?.merchant;
   const { data: orders } = approvedIds.length
     ? await supabase.from("orders")
-        .select("id,updated_at,order_number,status,driver_user_id,driver_assignment_status,driver_response_deadline_at,rider_claim_deadline_at,rider_assignment_expired_at,rider_on_way_at,stock_reserved_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,gcash_payment_verified_at,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,order_items(id,product_name,quantity,line_total)")
+        .select("id,updated_at,order_number,status,driver_user_id,driver_assignment_status,driver_response_deadline_at,rider_claim_deadline_at,rider_assignment_expired_at,rider_on_way_at,stock_reserved_at,payment_method,payment_status,gcash_payment_reference,gcash_payment_proof_path,gcash_payment_submitted_at,gcash_payment_verified_at,subtotal,delivery_fee,total,placed_at,customer_id,address_snapshot,customer_note,delivery_proof_path,delivered_at,order_items(id,product_name,quantity,line_total)")
         .in("merchant_id", approvedIds)
         .order("placed_at", { ascending: false })
         .limit(100)
@@ -72,6 +72,12 @@ export default async function MerchantPortal({ searchParams }: {
   }));
   const paymentProofUrls = new Map<string,string>();
   for (const [id,url] of proofEntries) if (url) paymentProofUrls.set(id,url);
+  const deliveryProofEntries = await Promise.all((orders ?? []).filter(order => order.status === "delivered" && order.delivery_proof_path).map(async order => {
+    const { data } = await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string, 3600);
+    return [order.id, data?.signedUrl] as const;
+  }));
+  const deliveryProofUrls = new Map<string,string>();
+  for (const [id,url] of deliveryProofEntries) if (url) deliveryProofUrls.set(id,url);
 
   const all = orders ?? [];
   const count = (tab: Tab) => all.filter(o => (groups[tab] as readonly string[]).includes(o.status)).length;
@@ -119,6 +125,7 @@ export default async function MerchantPortal({ searchParams }: {
                 : next ? <div className="flex w-full flex-wrap items-center gap-2"><form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id} /><input type="hidden" name="next_status" value={next} /><FormSubmitButton pendingLabel="Updating…" className="min-h-11 rounded-full bg-[#ff8a00] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#ed5a19]">{next === "preparing" ? "Start preparing" : "Mark ready for pickup"}</FormSubmitButton></form>{order.status==="preparing"&&<form action={updateMerchantOrderStatus}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="next_status" value="cancelled"/><FormSubmitButton pendingLabel="Cancelling…" className="min-h-10 rounded-full border border-rose-200 px-4 py-2 text-xs font-bold text-rose-700">Cancel order</FormSubmitButton></form>}</div>
                 : null}
             </div>
+            {deliveryProofUrls.get(order.id) && <a href={deliveryProofUrls.get(order.id)} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800">View delivery photo ↗</a>}
             <details className="mt-3"><summary className="cursor-pointer text-xs font-bold text-slate-500">Delivery details</summary><p className="mt-2 text-sm font-semibold">{address?.address_line || "Address unavailable"}</p><p className="mt-1 text-sm text-slate-500">{address?.recipient_phone || ""}{address?.landmark ? " · Near " + address.landmark : ""}</p></details>
           </article>;
         }) : <div className="rounded-2xl border border-dashed border-orange-200 bg-white p-10 text-center"><Inbox aria-hidden="true" size={38} strokeWidth={1.5} className="mx-auto text-orange-300" /><p className="mt-3 text-sm text-slate-500">{emptyText[tab]}</p></div>}
