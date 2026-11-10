@@ -62,6 +62,7 @@ begin
  if not found then raise exception 'order_not_found'; end if;
  if v_order.status not in ('cancelled','rejected') then raise exception 'order_not_cancelled'; end if;
  if v_order.payment_status not in ('paid','completed') then raise exception 'payment_not_collected'; end if;
+ if exists(select 1 from public.order_refund_cases where order_id=v_order.id and status in ('refunded_directly','credited_to_wallet')) then raise exception 'refund_already_settled'; end if;
  if (p_method='direct_gcash' and v_order.payment_method<>'gcash')
     or (p_method='sugomate_wallet' and v_order.payment_method<>'wallet') then
    raise exception 'refund_method_mismatch';
