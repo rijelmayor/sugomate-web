@@ -45,16 +45,36 @@ function getAdminClient() {
 }
 
 async function sendEmail(to: string, subject: string, html: string, text: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) throw new Error("Email receipt provider is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL).");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, html, text }),
-    cache: "no-store",
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD;
+  const fromEmail = process.env.SMTP_FROM_EMAIL || user;
+  const fromName = process.env.SMTP_FROM_NAME || "SUGOMATE";
+  if (!host || !Number.isInteger(port) || !user || !pass || !fromEmail) {
+    throw new Error("Email receipt SMTP is not configured. Check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and SMTP_FROM_EMAIL.");
+  }
+  const nodemailer = await import("nodemailer");
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
   });
-  if (!response.ok) throw new Error(`Email provider returned HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  try {
+    await transporter.sendMail({
+      from: { name: fromName, address: fromEmail },
+      to,
+      subject,
+      text,
+      html,
+    });
+  } finally {
+    transporter.close();
+  }
 }
 
 async function sendSms(to: string, message: string) {
