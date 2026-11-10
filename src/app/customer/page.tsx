@@ -97,6 +97,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         </div>
       </header>
       <NotificationBell userId={user.id} />
+      {(refundChoiceCount ?? 0) > 0 && <Link href="/customer/refunds" className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-600" /> {refundChoiceCount} cancelled paid order{refundChoiceCount === 1 ? "" : "s"} need your refund choice · Review now</Link>}
 
       <section className="mt-6 mb-5">
         <p className="text-sm font-bold text-orange-600">Maayong adlaw, {firstName}!</p>
