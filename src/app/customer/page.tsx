@@ -85,6 +85,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const zoneFees: Record<string, number> = {};
   for (const zone of serviceZones ?? []) zoneFees[zone.id] = Number(zone.base_delivery_fee);
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || "there";
+  const { count: refundChoiceCount } = await supabase.from("order_refund_cases").select("id", { count: "exact", head: true }).eq("customer_id", user.id).eq("status", "awaiting_customer_choice");
 
   return <main className="min-h-screen bg-[#fff7ef] px-4 py-5 text-[#102e57] sm:px-6 sm:py-8">
     <div className="mx-auto max-w-6xl">
