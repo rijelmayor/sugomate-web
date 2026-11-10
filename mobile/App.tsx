@@ -122,6 +122,7 @@ function CustomerApp() {
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
   const [tab, setTab] = useState<Tab>("market");
+  const [tabbarHeight, setTabbarHeight] = useState(0);
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -682,7 +683,7 @@ function CustomerApp() {
       {municipalities.map(m => <TouchableOpacity key={m.id} onPress={() => setSelectedMunicipality(m.id)} style={[styles.areaChip, selectedMunicipality === m.id && styles.areaChipActive]}><Text style={[styles.areaChipText, selectedMunicipality === m.id && styles.areaChipTextActive]}>{m.name}</Text></TouchableOpacity>)}
     </ScrollView>}
     {loading && <ActivityIndicator style={{ marginVertical: 8 }} color={ORANGE} />}
-    <ScrollView style={styles.content} contentContainerStyle={[styles.contentInner, { paddingBottom: Math.max(105, insets.bottom + 105) }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
+    <ScrollView style={styles.content} contentContainerStyle={[styles.contentInner, { paddingBottom: Math.max(cartCount > 0 ? 175 : 105, insets.bottom + (cartCount > 0 ? 175 : 105)) }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
       {tab === "market" && <>
         {selectedStore && currentStore ? <>
           <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedStore(""); setSearch(""); }}><Text style={styles.backLinkText}>‹  Back to stores</Text></TouchableOpacity>
@@ -770,7 +771,7 @@ function CustomerApp() {
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
-    {tab === "market" && cartCount > 0 && <TouchableOpacity style={[styles.basketBar, { bottom: 72 + insets.bottom }]} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
+    {tab === "market" && cartCount > 0 && <TouchableOpacity style={[styles.basketBar, { bottom: tabbarHeight + 12 }]} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
       {activeOrderEvent && <View style={styles.eventOverlay}>
         <View style={styles.eventCard}>
@@ -877,7 +878,7 @@ function CustomerApp() {
         </ScrollView>
       </SafeAreaView>
     </Modal>
-    <View style={[styles.tabbar, { paddingBottom: Math.max(8, insets.bottom + 6) }]}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
+    <View onLayout={event => setTabbarHeight(event.nativeEvent.layout.height)} style={[styles.tabbar, { paddingBottom: Math.max(8, insets.bottom + 6) }]}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
   </SafeAreaView>;
 }
 
