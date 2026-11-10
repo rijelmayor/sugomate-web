@@ -141,3 +141,15 @@ grant execute on function public.customer_request_order_refund(uuid,text) to aut
 grant execute on function public.merchant_submit_direct_gcash_refund_evidence(uuid,text,text) to authenticated;
 grant execute on function public.customer_confirm_direct_gcash_refund(uuid) to authenticated;
 grant execute on function public.admin_credit_wallet_refund(uuid,uuid) to service_role;
+
+drop policy if exists "customer reads own direct refund evidence" on storage.objects;
+create policy "customer reads own direct refund evidence" on storage.objects
+for select to authenticated using (
+ bucket_id='merchant-refund-proofs'
+ and exists (
+   select 1 from public.order_refund_cases rc
+   where rc.customer_id=auth.uid()
+     and rc.merchant_proof_path=name
+     and rc.status in ('evidence_submitted','refunded_directly')
+ )
+);
