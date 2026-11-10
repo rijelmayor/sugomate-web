@@ -32,7 +32,7 @@ create policy "wallet customer read own refund cases" on public.order_refund_cas
 for select to authenticated using (customer_id=auth.uid());
 drop policy if exists "merchant reads own refund cases" on public.order_refund_cases;
 create policy "merchant reads own refund cases" on public.order_refund_cases
-for select to authenticated using (merchant_id=auth.uid());
+for select to authenticated using (exists(select 1 from public.merchant_members mm where mm.merchant_id=order_refund_cases.merchant_id and mm.user_id=auth.uid()));
 revoke insert,update,delete on public.order_refund_cases from anon,authenticated;
 
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
@@ -82,7 +82,7 @@ create or replace function public.merchant_submit_direct_gcash_refund_evidence(
 declare v_case public.order_refund_cases%rowtype;
 begin
  select * into v_case from public.order_refund_cases where id=p_case_id for update;
- if not found or v_case.merchant_id<>auth.uid() then raise exception 'refund_case_not_found'; end if;
+ if not found or not exists(select 1 from public.merchant_members mm where mm.merchant_id=v_case.merchant_id and mm.user_id=auth.uid()) then raise exception 'refund_case_not_found'; end if;
  if v_case.settlement_method<>'direct_gcash' or v_case.status<>'awaiting_merchant' then raise exception 'refund_not_awaiting_evidence'; end if;
  if length(trim(coalesce(p_reference,'')))<4 or p_proof_path not like auth.uid()::text||'/%' then raise exception 'invalid_refund_evidence'; end if;
  update public.order_refund_cases set merchant_reference=trim(p_reference),merchant_proof_path=p_proof_path,
