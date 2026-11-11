@@ -46,8 +46,16 @@ export async function resendRegistrationPhoneOtp(formData:FormData){
   const {createClient:adminClient}=await import("@supabase/supabase-js");
   const admin=adminClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   const {data:challenge}=await admin.from("phone_verification_challenges").select("user_id,email,phone").eq("email",email).maybeSingle();
-  if(!challenge) redirect(`/register?error=invalid&next=${encodeURIComponent(next)}`);
+  if(!challenge) {
+    // Verification consumes the challenge. A stale verification page should not
+    // attempt to send another code when there is no active challenge.
+    redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=missing`);
+  }
   try { await createAndSendPhoneOtp(challenge.user_id,challenge.email,challenge.phone); }
-  catch { redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`); }
+  catch (e) {
+    const message=e instanceof Error?e.message:"";
+    if(message.includes("wait 60 seconds")) redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=cooldown`);
+    redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&error=sms`);
+  }
   redirect(`/verify-phone?email=${encodeURIComponent(email)}${nextQuery}&success=resent`);
 }
