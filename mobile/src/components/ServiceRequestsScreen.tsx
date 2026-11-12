@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { supabase } from "../lib/supabase";
 
-type Props = { userId: string; onBack: () => void };
+type Props = { userId: string; onBack: () => void; initialServiceType?: "papalit" | "pasugo" | null };
 type Address = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; municipalities: any };
 type ServiceRequest = {
   id: string; request_number: string; service_type: "papalit" | "pasugo"; status: string;
@@ -26,13 +26,13 @@ const statusLabel: Record<string,string> = {
 };
 const eventLabel = (value: string) => value.replaceAll("_", " ").replace(/^\w/, c => c.toUpperCase());
 
-export default function ServiceRequestsScreen({ userId, onBack }: Props) {
+export default function ServiceRequestsScreen({ userId, onBack, initialServiceType = null }: Props) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [events, setEvents] = useState<RequestEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [serviceType, setServiceType] = useState<"papalit" | "pasugo" | null>(null);
+  const [serviceType, setServiceType] = useState<"papalit" | "pasugo" | null>(initialServiceType);
   const [title, setTitle] = useState("");
   const [itemsText, setItemsText] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -133,7 +133,7 @@ export default function ServiceRequestsScreen({ userId, onBack }: Props) {
         service_request_id: created.id, actor_user_id: userId, actor_role: "customer",
         event_type: "request_submitted", note: serviceType === "papalit" ? "Papalit request submitted." : "Pasugo request submitted."
       });
-      if (eventError) throw new Error("Your request was saved, but its activity record could not be added. Contact support with " + created.request_number + ".");
+      if (eventError) Alert.alert("Request saved", "Your request " + created.request_number + " was submitted, but the activity timeline could not be updated. You do not need to submit it again.");
       if (reference) {
         const ext = reference.mimeType === "image/png" ? "png" : reference.mimeType === "image/webp" ? "webp" : "jpg";
         const path = created.id + "/reference." + ext;
