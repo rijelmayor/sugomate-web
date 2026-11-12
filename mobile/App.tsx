@@ -6,6 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import RegistrationFlow from "./src/components/RegistrationFlow";
 import RoleApplicationFlow from "./src/components/RoleApplicationFlow";
+import ServiceRequestsScreen from "./src/components/ServiceRequestsScreen";
 
 type Category = { id: string; name: string; slug: string; icon: string; parent_id?: string | null; image_url?: string | null };
 type Municipality = { id: string; name: string };
@@ -122,6 +123,8 @@ function CustomerApp() {
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
   const [tab, setTab] = useState<Tab>("market");
+  const [serviceRequestsOpen, setServiceRequestsOpen] = useState(false);
+  const [serviceRequestsInitialType, setServiceRequestsInitialType] = useState<"papalit" | "pasugo" | null>(null);
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -167,6 +170,7 @@ function CustomerApp() {
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (serviceRequestsOpen) { setServiceRequestsOpen(false); return true; }
       if (checkoutOpen) {
         if (!checkoutBusy) setCheckoutOpen(false);
         return true;
@@ -196,7 +200,7 @@ function CustomerApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search, categories]);
+  }, [serviceRequestsOpen, checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search, categories]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -670,6 +674,7 @@ function CustomerApp() {
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
+  if (serviceRequestsOpen && session?.user?.id) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false}/><ServiceRequestsScreen userId={session.user.id} initialServiceType={serviceRequestsInitialType} onBack={() => { setServiceRequestsOpen(false); setServiceRequestsInitialType(null); }}/></SafeAreaView>;
   return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
     <View style={styles.topbar}>
       <View style={styles.brandRow}><Image source={BRAND_LOGO} style={styles.headerLogo} resizeMode="contain" /><View style={styles.taglineWrap}><Text style={styles.topTag} numberOfLines={1}>Imong sugo, kami bahala.</Text></View></View>
@@ -694,6 +699,7 @@ function CustomerApp() {
           </View>) : <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🕒</Text><Text style={styles.emptyTitle}>This store is currently closed</Text><Text style={styles.muted}>Please check back during its operating hours.</Text></View>}
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
+          {!selectedParentCategory && !selectedCategory && <View style={{ marginBottom: 18 }}><Text style={styles.sectionTitle}>Papalit & Pasugo</Text><Text style={styles.sectionSub}>Need something bought or picked up? Send a separate service request.</Text><View style={{ flexDirection: "row", gap: 9 }}><TouchableOpacity onPress={() => { setServiceRequestsInitialType("papalit"); setServiceRequestsOpen(true); }} style={{ flex: 1, backgroundColor: "#102e57", borderRadius: 15, padding: 13 }}><Text style={{ fontSize: 22 }}>🛍️</Text><Text style={{ color: "#fff", fontSize: 13, fontWeight: "900", marginTop: 5 }}>Papalit</Text><Text style={{ color: "#dce7f5", fontSize: 9, marginTop: 3 }}>We buy and deliver</Text></TouchableOpacity><TouchableOpacity onPress={() => { setServiceRequestsInitialType("pasugo"); setServiceRequestsOpen(true); }} style={{ flex: 1, backgroundColor: "#fff", borderRadius: 15, borderWidth: 1, borderColor: "#ffb76a", padding: 13 }}><Text style={{ fontSize: 22 }}>📦</Text><Text style={{ color: "#102e57", fontSize: 13, fontWeight: "900", marginTop: 5 }}>Pasugo</Text><Text style={{ color: "#738096", fontSize: 9, marginTop: 3 }}>We pick up for you</Text></TouchableOpacity></View><TouchableOpacity onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }} style={{ marginTop: 8, paddingVertical: 9 }}><Text style={{ color: RED, fontSize: 11, fontWeight: "900" }}>My service requests  ›</Text></TouchableOpacity></View>}
           <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
           {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory && childCategories.length > 0) setSelectedCategory(""); else { setSelectedCategory(""); setSelectedParentCategory(""); } }}><Text style={styles.backLinkText}>{selectedCategory && childCategories.length > 0 ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
           {!selectedParentCategory && <View style={styles.categoryGrid}>{topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { const hasSubcategories = categories.some(child => child.parent_id === c.id); setSelectedParentCategory(c.id); setSelectedCategory(hasSubcategories ? "" : c.slug); }}>
@@ -768,7 +774,7 @@ function CustomerApp() {
         })}
         {!loading && orders.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛵</Text><Text style={styles.emptyTitle}>No orders yet</Text><Text style={styles.muted}>Your placed orders will appear here.</Text><TouchableOpacity onPress={() => setTab("market")} style={styles.primary}><Text style={styles.primaryText}>Browse marketplace</Text></TouchableOpacity></View>}
       </>}
-      {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
+      {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }}><Text style={styles.accountLinkText}>Papalit & Pasugo requests  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
     {tab === "market" && cartCount > 0 && <TouchableOpacity style={styles.basketBar} onPress={openCheckout}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketTotal}>{peso(cartTotal)}</Text></TouchableOpacity>}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
