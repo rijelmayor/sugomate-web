@@ -68,6 +68,15 @@ export default function ServiceRequestsScreen({ userId, onBack, initialServiceTy
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    const channel = supabase.channel("customer-service-requests-" + userId)
+      .on("postgres_changes", { event: "*", schema: "public", table: "service_requests", filter: "customer_id=eq." + userId }, () => { void load(true); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "service_request_events" }, () => { void load(true); })
+      .subscribe();
+    const timer = setInterval(() => { void load(true); }, 60000);
+    return () => { clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [userId, load]);
+
   const resetForm = () => {
     setServiceType(null); setTitle(""); setItemsText(""); setInstructions(""); setBudget("");
     setPickupLocation(""); setPickupContactName(""); setPickupContactPhone("");
