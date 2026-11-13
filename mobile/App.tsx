@@ -126,6 +126,7 @@ function CustomerApp() {
   const [applicationRole, setApplicationRole] = useState<"merchant" | "driver" | null>(null);
   const [tab, setTab] = useState<Tab>("market");
   const [serviceRequestsOpen, setServiceRequestsOpen] = useState(false);
+  const [pabiliEssentialsOpen, setPabiliEssentialsOpen] = useState(false);
   const [serviceRequestsInitialType, setServiceRequestsInitialType] = useState<"papalit" | "pasugo" | null>(null);
   const [profileName, setProfileName] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -174,6 +175,7 @@ function CustomerApp() {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (serviceRequestsOpen) { setServiceRequestsOpen(false); return true; }
+      if (pabiliEssentialsOpen) { setPabiliEssentialsOpen(false); return true; }
       if (checkoutOpen) {
         if (!checkoutBusy) setCheckoutOpen(false);
         return true;
@@ -203,7 +205,7 @@ function CustomerApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [serviceRequestsOpen, checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search, categories]);
+  }, [serviceRequestsOpen, pabiliEssentialsOpen, checkoutOpen, checkoutBusy, selectedStore, tab, selectedCategory, selectedParentCategory, selectedMunicipality, search, categories]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -388,7 +390,7 @@ function CustomerApp() {
     return () => { void supabase.removeChannel(channel); };
   }, [session?.user?.id, loadOrders]);
 
-  const topLevelCategories = categories.filter(c => !c.parent_id);
+  const topLevelCategories = categories.filter(c => !c.parent_id && c.slug !== "pabili-essentials");
   const childCategories = categories.filter(c => c.parent_id === selectedParentCategory);
   const activeCategory = categories.find(c => c.slug === selectedCategory);
   const visibleStores = useMemo(() => stores.filter(s =>
@@ -728,9 +730,21 @@ function CustomerApp() {
           {currentStore.isOpen && storeProducts.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No items available right now</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
         </> : <>
 
-          <Text style={styles.sectionTitle}>Browse by category</Text><Text style={styles.sectionSub}>Pick what you need — we'll show you the stores.</Text>
-          {selectedParentCategory ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory && childCategories.length > 0) setSelectedCategory(""); else { setSelectedCategory(""); setSelectedParentCategory(""); } }}><Text style={styles.backLinkText}>{selectedCategory && childCategories.length > 0 ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
-          {!selectedParentCategory && <View style={styles.categoryGrid}>
+          <Text style={styles.sectionTitle}>{pabiliEssentialsOpen ? "Pabili & Essentials" : "Browse by category"}</Text><Text style={styles.sectionSub}>{pabiliEssentialsOpen ? "Choose the service you need." : "Pick what you need — we'll show you the stores."}</Text>
+          {pabiliEssentialsOpen ? <TouchableOpacity style={styles.backLink} onPress={() => setPabiliEssentialsOpen(false)}><Text style={styles.backLinkText}>‹  Back to all categories</Text></TouchableOpacity> : null}
+          {selectedParentCategory && !pabiliEssentialsOpen ? <TouchableOpacity style={styles.backLink} onPress={() => { if (selectedCategory && childCategories.length > 0) setSelectedCategory(""); else { setSelectedCategory(""); setSelectedParentCategory(""); } }}><Text style={styles.backLinkText}>{selectedCategory && childCategories.length > 0 ? "‹  Back to subcategories" : "‹  Back to all categories"}</Text></TouchableOpacity> : null}
+          {!selectedParentCategory && !pabiliEssentialsOpen && <View style={styles.categoryGrid}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Pabili and Essentials, two services" style={styles.categoryCard} onPress={() => { setPabiliEssentialsOpen(true); setSearch(""); }}>
+              <View style={[styles.categoryFallback, { backgroundColor: "#294d75" }]}><Text style={styles.categoryEmoji}>🛍️</Text></View>
+              <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>Pabili & Essentials</Text><Text style={styles.categoryCount}>2 services</Text></View>
+            </TouchableOpacity>
+            {topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { const hasSubcategories = categories.some(child => child.parent_id === c.id); setSelectedParentCategory(c.id); setSelectedCategory(hasSubcategories ? "" : c.slug); }}>
+              {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
+              <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{visibleStores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
+            </TouchableOpacity>)}
+          </View>
+          }
+          {pabiliEssentialsOpen && <View style={styles.categoryGrid}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Papalit, buy and deliver service" style={styles.categoryCard} onPress={() => { setServiceRequestsInitialType("papalit"); setServiceRequestsOpen(true); }}>
               <View style={[styles.categoryFallback, { backgroundColor: "#294d75" }]}><Text style={styles.categoryEmoji}>🛍️</Text></View>
               <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>Papalit</Text><Text style={styles.categoryCount}>We buy and deliver</Text></View>
@@ -739,26 +753,21 @@ function CustomerApp() {
               <View style={[styles.categoryFallback, { backgroundColor: "#294d75" }]}><Text style={styles.categoryEmoji}>📦</Text></View>
               <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>Pasugo</Text><Text style={styles.categoryCount}>We pick up for you</Text></View>
             </TouchableOpacity>
-            {topLevelCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => { const hasSubcategories = categories.some(child => child.parent_id === c.id); setSelectedParentCategory(c.id); setSelectedCategory(hasSubcategories ? "" : c.slug); }}>
-              {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
-              <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{visibleStores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
-            </TouchableOpacity>)}
-          </View>
-          }
-          {!selectedParentCategory && <TouchableOpacity onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }} style={{ marginTop: 10, paddingVertical: 7, alignSelf: "flex-start" }}><Text style={{ color: RED, fontSize: 11, fontWeight: "900" }}>My service requests  ›</Text></TouchableOpacity>}
-          {!selectedParentCategory && !selectedCategory && <>
+          </View>}
+          {!selectedParentCategory && !pabiliEssentialsOpen && <TouchableOpacity onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }} style={{ marginTop: 10, paddingVertical: 7, alignSelf: "flex-start" }}><Text style={{ color: RED, fontSize: 11, fontWeight: "900" }}>My service requests  ›</Text></TouchableOpacity>}
+          {!selectedParentCategory && !pabiliEssentialsOpen && !selectedCategory && <>
             <View style={styles.storesHeading}><Text style={styles.sectionTitle}>Stores near you</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
             {visibleStores.length > 0 ? visibleStores.slice(0, 6).map(s => <TouchableOpacity key={"nearby-" + s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
               {s.image ? <Image source={{ uri: s.image }} style={styles.storeImage} /> : <View style={styles.storeImageFallback}><Text style={{ fontSize: 25 }}>🏪</Text></View>}
               <View style={styles.storeInfo}><Text style={styles.storeName}>{s.name}</Text>{!!s.branchName && <Text style={styles.storeBranch}>{s.branchName}</Text>}<Text style={styles.storeArea}>⌖  {s.area || "Leyte"}</Text><Text style={[styles.openLabel, s.isOpen ? styles.open : styles.closed]}>{s.isOpen ? "Open now" : "Closed"}</Text></View>{s.isOpen ? <Text style={styles.chevron}>›</Text> : <Text style={styles.storeCount}>Unavailable</Text>}
             </TouchableOpacity>) : <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛍️</Text><Text style={styles.emptyTitle}>Your local marketplace is getting ready</Text><Text style={styles.muted}>Approved stores will appear here as they join.</Text></View>}
           </>}
-          {selectedParentCategory && !selectedCategory && childCategories.length > 0 && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
+          {!pabiliEssentialsOpen && selectedParentCategory && !selectedCategory && childCategories.length > 0 && <View style={styles.categoryGrid}>{childCategories.map(c => <TouchableOpacity key={c.id} style={styles.categoryCard} onPress={() => setSelectedCategory(c.slug)}>
             {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.categoryImage} /> : <View style={styles.categoryFallback}><Text style={styles.categoryEmoji}>{categoryEmoji(c.slug)}</Text></View>}
             <View style={styles.categoryShade} /><View style={styles.categoryCaption}><Text style={styles.categoryName}>{c.name}</Text><Text style={styles.categoryCount}>{stores.filter(s => s.categorySlug === c.slug).length} stores</Text></View>
           </TouchableOpacity>)}</View>}
-          {selectedParentCategory && !selectedCategory && childCategories.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No subcategories available</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
-          {selectedCategory && <><View style={styles.storesHeading}><Text style={styles.sectionTitle}>{activeCategory?.name ?? "Stores"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
+          {!pabiliEssentialsOpen && selectedParentCategory && !selectedCategory && childCategories.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>No subcategories available</Text><Text style={styles.muted}>Please check back soon.</Text></View>}
+          {!pabiliEssentialsOpen && selectedCategory && <><View style={styles.storesHeading}><Text style={styles.sectionTitle}>{activeCategory?.name ?? "Stores"}</Text><Text style={styles.storeCount}>{visibleStores.length} {visibleStores.length === 1 ? "store" : "stores"}</Text></View>
           {visibleStores.map(s => <TouchableOpacity key={s.id} style={styles.storeCard} onPress={() => { if (!s.isOpen) { Alert.alert("Store closed", "This store is not accepting orders right now."); return; } setSelectedStore(s.id); setSearch(""); }}>
             {s.image ? <Image source={{ uri: s.image }} style={styles.storeImage} /> : <View style={styles.storeImageFallback}><Text style={{ fontSize: 25 }}>🏪</Text></View>}
             <View style={styles.storeInfo}><Text style={styles.storeName}>{s.name}</Text>{!!s.branchName && <Text style={styles.storeBranch}>{s.branchName}</Text>}<Text style={styles.storeArea}>⌖  {s.area || "Leyte"}</Text><Text style={[styles.openLabel, s.isOpen ? styles.open : styles.closed]}>{s.isOpen ? "Open now" : "Closed"}</Text></View><Text style={styles.chevron}>›</Text>
