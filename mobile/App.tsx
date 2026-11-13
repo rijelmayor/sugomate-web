@@ -141,7 +141,6 @@ function CustomerApp() {
   const [selectedStore, setSelectedStore] = useState("");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<Cart>({});
-  const [basketCollapsed, setBasketCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [gcashReference, setGcashReference] = useState<Record<string, string>>({});
@@ -386,7 +385,6 @@ function CustomerApp() {
   const cartPaymentMethods = Array.isArray(cartMerchant?.accepted_payment_methods) && cartMerchant.accepted_payment_methods.length
     ? cartMerchant.accepted_payment_methods
     : ["cod"];
-  useEffect(() => { if (cartCount === 0) setBasketCollapsed(false); }, [cartCount]);
   const customerUnitPrice = (merchantPrice: number | string) => {
     const base = Number(merchantPrice) || 0;
     if (!merchantUsageSettings.merchant_usage_enabled) return base;
@@ -785,19 +783,25 @@ function CustomerApp() {
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }}><Text style={styles.accountLinkText}>Papalit & Pasugo requests  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
-    {tab === "market" && cartCount > 0 && (basketCollapsed
-      ? <TouchableOpacity accessibilityRole="button" accessibilityLabel={cartCount + " items in basket. Expand basket"} style={styles.basketCollapsedBar} onPress={() => setBasketCollapsed(false)}>
-          <View style={styles.basketCollapsedIconWrap}><Text style={styles.basketCollapsedIcon}>🛒</Text><View style={styles.basketCountBadge}><Text style={styles.basketCountBadgeText}>{cartCount > 99 ? "99+" : cartCount}</Text></View></View>
-          <View style={{ flex: 1 }}><Text style={styles.basketCollapsedTitle}>Basket</Text><Text style={styles.basketCollapsedSubtitle}>Items added · Tap to expand</Text></View>
-          <Text style={styles.basketCollapsedTotal}>{peso(cartTotal)}</Text>
-        </TouchableOpacity>
-      : <View style={styles.basketBar}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="View basket and continue to checkout" style={styles.basketMain} onPress={openCheckout}>
-            <View style={{ flex: 1 }}><Text style={styles.basketText}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text><Text style={styles.basketSubtext}>Your selection is in the basket</Text></View>
-            <Text style={styles.basketTotal}>{peso(cartTotal)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Collapse basket" style={styles.basketCollapse} onPress={() => setBasketCollapsed(true)}><Text style={styles.basketCollapseText}>⌄</Text></TouchableOpacity>
+    {tab === "market" && cartCount > 0 && (
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={cartCount + " items in basket. View basket and checkout"}
+        activeOpacity={0.82}
+        style={styles.basketCollapsedBar}
+        onPress={() => void openCheckout()}
+      >
+        <View style={styles.basketCollapsedIconWrap}>
+          <Text style={styles.basketCollapsedIcon}>🛒</Text>
+          <View style={styles.basketCountBadge}><Text style={styles.basketCountBadgeText}>{cartCount > 99 ? "99+" : cartCount}</Text></View>
         </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.basketCollapsedTitle}>{cartCount} {cartCount === 1 ? "item" : "items"} · View basket</Text>
+          <Text style={styles.basketCollapsedSubtitle}>Tap to review items and checkout</Text>
+        </View>
+        <Text style={styles.basketCollapsedTotal}>{peso(cartTotal)}</Text>
+        <Text style={styles.basketCollapsedChevron}>›</Text>
+      </TouchableOpacity>
     )}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
       {activeOrderEvent && <View style={styles.eventOverlay}>
@@ -929,7 +933,7 @@ const styles = StyleSheet.create({
   backLink: { marginBottom: 12 }, backLinkText: { fontSize: 12, fontWeight: "800", color: RED }, storeHero: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 18, backgroundColor: "#fff", marginBottom: 13, borderWidth: 1, borderColor: "#ffead8" }, storeHeroImage: { width: 62, height: 62, borderRadius: 14, resizeMode: "contain" }, storeHeroIcon: { fontSize: 40, width: 62, textAlign: "center" },
   productCard: { flexDirection: "row", padding: 10, backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#ffead8", marginBottom: 10, gap: 10 }, productImage: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff7ef" }, productPlaceholder: { width: 104, height: 112, borderRadius: 13, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, productInfo: { flex: 1, justifyContent: "space-between", paddingVertical: 3 }, productName: { fontSize: 13, fontWeight: "900", color: NAVY }, productDescription: { fontSize: 10, color: "#8995a7", marginTop: 4 }, productBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5, marginTop: 7 }, price: { fontSize: 14, fontWeight: "900", color: RED }, qtyRow: { flexDirection: "row", alignItems: "center", gap: 8 }, qtyButton: { width: 27, height: 27, borderRadius: 14, backgroundColor: NAVY, alignItems: "center", justifyContent: "center" }, qtyText: { fontSize: 17, color: "#fff", fontWeight: "900" }, qtyValue: { fontSize: 12, fontWeight: "900", color: NAVY }, addButton: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: NAVY }, addButtonText: { fontSize: 10, fontWeight: "900", color: "#fff" },
   emptyCard: { alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ffead8", padding: 25, marginTop: 10 }, emptyIcon: { fontSize: 34 }, emptyTitle: { fontSize: 14, fontWeight: "900", color: NAVY, marginTop: 8 },
-  basketBar: { marginHorizontal: 15, marginTop: 8, marginBottom: 8, backgroundColor: ORANGE, borderRadius: 25, paddingLeft: 18, paddingRight: 8, paddingVertical: 7, minHeight: 58, flexDirection: "row", alignItems: "center", elevation: 5 }, basketMain: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketSubtext: { fontSize: 9, color: "#fff7e8", marginTop: 3 }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" }, basketCollapse: { width: 38, height: 42, marginLeft: 7, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }, basketCollapseText: { color: "#fff", fontSize: 25, fontWeight: "900", lineHeight: 27 }, basketCollapsedBar: { alignSelf: "flex-end", marginHorizontal: 15, marginTop: 8, marginBottom: 8, minHeight: 54, maxWidth: "92%", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 28, backgroundColor: "#fff", borderWidth: 1.5, borderColor: ORANGE, elevation: 5 }, basketCollapsedIconWrap: { width: 34, height: 34, borderRadius: 18, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, basketCollapsedIcon: { fontSize: 18 }, basketCountBadge: { position: "absolute", top: -5, right: -7, minWidth: 18, height: 18, borderRadius: 10, paddingHorizontal: 4, backgroundColor: ORANGE, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#fff" }, basketCountBadgeText: { color: "#fff", fontSize: 8, fontWeight: "900" }, basketCollapsedTitle: { color: NAVY, fontSize: 11, fontWeight: "900" }, basketCollapsedSubtitle: { color: RED, fontSize: 8, fontWeight: "700", marginTop: 2 }, basketCollapsedTotal: { color: NAVY, fontSize: 11, fontWeight: "900" },
+  basketBar: { marginHorizontal: 15, marginTop: 8, marginBottom: 8, backgroundColor: ORANGE, borderRadius: 25, paddingLeft: 18, paddingRight: 8, paddingVertical: 7, minHeight: 58, flexDirection: "row", alignItems: "center", elevation: 5 }, basketMain: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }, basketText: { fontSize: 12, fontWeight: "900", color: "#fff" }, basketSubtext: { fontSize: 9, color: "#fff7e8", marginTop: 3 }, basketTotal: { fontSize: 13, fontWeight: "900", color: "#fff" }, basketCollapse: { width: 38, height: 42, marginLeft: 7, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }, basketCollapseText: { color: "#fff", fontSize: 25, fontWeight: "900", lineHeight: 27 }, basketCollapsedBar: { alignSelf: "stretch", marginHorizontal: 15, marginTop: 8, marginBottom: 8, minHeight: 62, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 28, backgroundColor: "#fff", borderWidth: 1.5, borderColor: ORANGE, elevation: 5 }, basketCollapsedIconWrap: { width: 34, height: 34, borderRadius: 18, backgroundColor: "#fff0df", alignItems: "center", justifyContent: "center" }, basketCollapsedIcon: { fontSize: 18 }, basketCountBadge: { position: "absolute", top: -5, right: -7, minWidth: 18, height: 18, borderRadius: 10, paddingHorizontal: 4, backgroundColor: ORANGE, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#fff" }, basketCountBadgeText: { color: "#fff", fontSize: 8, fontWeight: "900" }, basketCollapsedTitle: { color: NAVY, fontSize: 11, fontWeight: "900" }, basketCollapsedSubtitle: { color: RED, fontSize: 8, fontWeight: "700", marginTop: 2 }, basketCollapsedTotal: { color: NAVY, fontSize: 12, fontWeight: "900" }, basketCollapsedChevron: { color: "#9aa4b3", fontSize: 25, fontWeight: "700", marginLeft: 1 },
   tabbar: { minHeight: 66, marginBottom: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f0e3d9", flexDirection: "row", alignItems: "center", paddingHorizontal: 9, paddingTop: 7, paddingBottom: 8, gap: 8 }, tab: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: "#e4e8ee", backgroundColor: "#f8fafc", paddingVertical: 5 }, activeTab: { backgroundColor: "#fff0e5", borderColor: "#e66b2e", borderWidth: 1.5 }, tabIcon: { fontSize: 18, lineHeight: 21, color: "#40516a", fontWeight: "800" }, tabText: { fontSize: 10, lineHeight: 14, fontWeight: "900", color: "#34445c", marginTop: 2 }, activeTabText: { color: "#c95522" },
   driverCard: { marginTop: 12, borderRadius: 16, padding: 13, backgroundColor: "#effaf3", borderWidth: 1, borderColor: "#d5f0df" },
   driverCardTitle: { fontSize: 10, fontWeight: "900", color: "#166534", marginBottom: 10, letterSpacing: 0.5 },
