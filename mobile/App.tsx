@@ -339,13 +339,15 @@ function CustomerApp() {
           const statusEventId = String((event as any).id);
           const eventAge = Date.now() - new Date((event as any).created_at).getTime();
           if (!isInitialOrderLoad && !seenOrderEvents.current.has(statusEventId) && eventAge >= -60000 && eventAge <= 15 * 60 * 1000) hasFreshStatusChange = true;
-          seenOrderEvents.current.add(statusEventId);
         }
         for (const event of (order.history ?? []).filter((item: any) => item.to_status === "accepted")) {
           const id = String(event.id);
           const age = Date.now() - new Date(event.created_at).getTime();
           if (!seenOrderEvents.current.has(id) && age >= -60000 && age <= 15 * 60 * 1000) freshEvents.push({ ...base, id, kind: "accepted", createdAt: event.created_at });
           seenOrderEvents.current.add(id);
+        }
+        for (const event of order.history ?? []) {
+          if ((event as any).to_status !== "accepted") seenOrderEvents.current.add(String((event as any).id));
         }
         if (order.driver_user_id && order.assigned_at) {
           const id = `driver-${order.id}-${order.driver_user_id}`;
@@ -358,7 +360,7 @@ function CustomerApp() {
       if (freshEvents.length) setOrderEventQueue(current => [...current, ...freshEvents.sort((a, b) => a.createdAt.localeCompare(b.createdAt))]);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, customerStatusAudio]);
 
   useEffect(() => { if (session?.user?.id) void loadMarketplace(); }, [session?.user?.id, loadMarketplace]);
   useEffect(() => { if (session?.user?.id) void loadOrders(); }, [session?.user?.id, loadOrders]);
