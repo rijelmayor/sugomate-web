@@ -381,6 +381,11 @@ function CustomerApp() {
   const storeProducts = useMemo(() => products.filter(p => p.branch_id === selectedStore && (!search.trim() || p.name.toLowerCase().includes(search.trim().toLowerCase()))), [products, selectedStore, search]);
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((n, item) => n + item.quantity, 0);
+  // Checkout must use the merchant attached to the selected cart items, not the currently visible store screen.
+  const cartMerchant = cartItems[0]?.product.merchant;
+  const cartPaymentMethods = Array.isArray(cartMerchant?.accepted_payment_methods) && cartMerchant.accepted_payment_methods.length
+    ? cartMerchant.accepted_payment_methods
+    : ["cod"];
   useEffect(() => { if (cartCount === 0) setBasketCollapsed(false); }, [cartCount]);
   const customerUnitPrice = (merchantPrice: number | string) => {
     const base = Number(merchantPrice) || 0;
@@ -561,7 +566,10 @@ function CustomerApp() {
     });
   }
   async function openCheckout() {
-    if (!cartItems.length || !currentStore) return;
+    if (!cartItems.length || !session?.user?.id) {
+      Alert.alert("Basket unavailable", "Add an item to your basket before continuing.");
+      return;
+    }
     setCheckoutBusy(true);
     setCheckoutOpen(true);
     setNewAddress(false);
@@ -583,8 +591,7 @@ function CustomerApp() {
       }
       setDeliveryFees(feeMap);
       setDeliveryFeePreview(saved[0] && feeMap[saved[0].municipality_id] !== undefined ? feeMap[saved[0].municipality_id] : null);
-      const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
-      setPaymentMethod(methods.includes("cod") ? "cod" : "gcash");
+      setPaymentMethod(cartPaymentMethods.includes("cod") ? "cod" : cartPaymentMethods.includes("gcash") ? "gcash" : "cod");
       if (!saved.length) setNewAddress(true);
     } catch (e: any) {
       setCheckoutOpen(false);
@@ -594,7 +601,7 @@ function CustomerApp() {
 
   async function placeNativeOrder() {
     if (!cartItems.length || !session?.user?.id) return;
-    const methods = storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"];
+    const methods = cartPaymentMethods;
     if (!methods.includes(paymentMethod)) {
       Alert.alert("Payment method unavailable", "This store does not accept the selected payment method.");
       return;
@@ -889,8 +896,8 @@ function CustomerApp() {
           </View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Payment method</Text>
-            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? ["cod"]).includes("cod") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "cod" && styles.addressOptionActive]} onPress={() => setPaymentMethod("cod")}><Text style={styles.paymentTitle}>{paymentMethod === "cod" ? "● " : "○ "}Cash on Delivery (COD)</Text><Text style={styles.checkoutHint}>Pay the displayed order total in cash on delivery. Rider cash capacity and assignment safeguards are handled in the order workflow.</Text></TouchableOpacity>}
-            {(storeProducts[0]?.merchant?.accepted_payment_methods ?? []).includes("gcash") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "gcash" && styles.addressOptionActive]} onPress={() => setPaymentMethod("gcash")}><Text style={styles.paymentTitle}>{paymentMethod === "gcash" ? "● " : "○ "}GCash</Text><Text style={styles.checkoutHint}>Pay the full order total, including the delivery fee. Merchant confirmation is required before preparation.</Text></TouchableOpacity>}
+            {cartPaymentMethods.includes("cod") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "cod" && styles.addressOptionActive]} onPress={() => setPaymentMethod("cod")}><Text style={styles.paymentTitle}>{paymentMethod === "cod" ? "● " : "○ "}Cash on Delivery (COD)</Text><Text style={styles.checkoutHint}>Pay the displayed order total in cash on delivery. Rider cash capacity and assignment safeguards are handled in the order workflow.</Text></TouchableOpacity>}
+            {cartPaymentMethods.includes("gcash") && <TouchableOpacity style={[styles.paymentOption, paymentMethod === "gcash" && styles.addressOptionActive]} onPress={() => setPaymentMethod("gcash")}><Text style={styles.paymentTitle}>{paymentMethod === "gcash" ? "● " : "○ "}GCash</Text><Text style={styles.checkoutHint}>Pay the full order total, including the delivery fee. Merchant confirmation is required before preparation.</Text></TouchableOpacity>}
             <TextInput style={[styles.checkoutInput, styles.checkoutMultiline]} placeholder="Delivery instructions (optional)" multiline value={customerNote} onChangeText={setCustomerNote}/>
           </View>
           <TouchableOpacity disabled={checkoutBusy || !cartItems.length} style={[styles.primary, checkoutBusy && styles.disabled]} onPress={placeNativeOrder}><Text style={styles.primaryText}>{checkoutBusy ? "Placing order…" : deliveryFeePreview === null ? "Place order · Confirm total at placement" : "Place order · " + peso(cartTotal + deliveryFeePreview)}</Text></TouchableOpacity>
