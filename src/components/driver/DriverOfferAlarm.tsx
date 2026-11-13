@@ -12,7 +12,7 @@ import { useAlertSound, useKeepAwake, useRepeat } from "@/components/alerts/useA
 // the moment the rider accepts or declines.
 export default function DriverOfferAlarm({ userId, offeredIds, availableIds }: { userId: string; offeredIds: string[]; availableIds: string[] }) {
   const router = useRouter();
-  const sound = useAlertSound();
+  const sound = useAlertSound("/notifications/drivernotification.mp3");
   const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [newAvailableIds, setNewAvailableIds] = useState<string[]>([]);
   const previousAvailableRef = useRef<Set<string>>(new Set(availableIds));
