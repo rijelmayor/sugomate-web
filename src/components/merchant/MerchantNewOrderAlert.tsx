@@ -23,7 +23,7 @@ const deliveryMessages: Record<string, string> = {
 
 export default function MerchantNewOrderAlert({ merchantIds, snapshot }: { merchantIds: string[]; snapshot: Snapshot }) {
   const router = useRouter();
-  const sound = useAlertSound();
+  const sound = useAlertSound("/notifications/merchantnotification.mp3");
   const [queue, setQueue] = useState<IncomingOrder[]>([]);
   const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
   const [channelUp, setChannelUp] = useState(false);
