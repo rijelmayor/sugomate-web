@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, Keybo
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "./src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
+import { useAudioPlayer } from "expo-audio";
 import { File } from "expo-file-system";
 import RegistrationFlow from "./src/components/RegistrationFlow";
 import RoleApplicationFlow from "./src/components/RoleApplicationFlow";
@@ -115,6 +116,7 @@ function OrderProgressTracker({ status }: { status: string }) {
 
 function CustomerApp() {
   const insets = useSafeAreaInsets();
+  const customerStatusAudio = useAudioPlayer(require("./assets/notifications/cxstatuses.mp3"));
   const [session, setSession] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
@@ -135,6 +137,7 @@ function CustomerApp() {
   const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
   const [activeOrderEvent, setActiveOrderEvent] = useState<OrderEvent | null>(null);
   const seenOrderEvents = useRef<Set<string>>(new Set());
+  const hasLoadedOrdersRef = useRef(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedParentCategory, setSelectedParentCategory] = useState("");
   const [selectedMunicipality, setSelectedMunicipality] = useState("");
@@ -220,7 +223,7 @@ function CustomerApp() {
     }
     resolveAccountRole();
     return () => { active = false; };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, customerStatusAudio]);
 
   const loadMarketplace = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -319,10 +322,25 @@ function CustomerApp() {
       }));
       setOrders(nextOrders);
       const freshEvents: OrderEvent[] = [];
+      const isInitialOrderLoad = !hasLoadedOrdersRef.current;
+      if (isInitialOrderLoad) {
+        for (const order of nextOrders) {
+          for (const event of order.history ?? []) seenOrderEvents.current.add(String((event as any).id));
+          if (order.driver_user_id) seenOrderEvents.current.add(`driver-${order.id}-${order.driver_user_id}`);
+        }
+        hasLoadedOrdersRef.current = true;
+      }
+      let hasFreshStatusChange = false;
       for (const order of nextOrders) {
         const merchantName = one(order.merchants)?.name ?? "Local merchant";
         const address = order.address_snapshot ?? {};
         const base = { orderNumber: order.order_number, merchantName, recipientName: address.recipient_name ?? "Customer", address: [address.address_line, address.landmark].filter(Boolean).join(" · "), total: Number(order.total) };
+        for (const event of (order.history ?? [])) {
+          const statusEventId = String((event as any).id);
+          const eventAge = Date.now() - new Date((event as any).created_at).getTime();
+          if (!isInitialOrderLoad && !seenOrderEvents.current.has(statusEventId) && eventAge >= -60000 && eventAge <= 15 * 60 * 1000) hasFreshStatusChange = true;
+          seenOrderEvents.current.add(statusEventId);
+        }
         for (const event of (order.history ?? []).filter((item: any) => item.to_status === "accepted")) {
           const id = String(event.id);
           const age = Date.now() - new Date(event.created_at).getTime();
@@ -336,13 +354,14 @@ function CustomerApp() {
           seenOrderEvents.current.add(id);
         }
       }
+      if (hasFreshStatusChange) { try { customerStatusAudio.seekTo(0); customerStatusAudio.play(); } catch { /* audio can be unavailable until the native player is ready */ } }
       if (freshEvents.length) setOrderEventQueue(current => [...current, ...freshEvents.sort((a, b) => a.createdAt.localeCompare(b.createdAt))]);
     } catch (e: any) { Alert.alert("Unable to load orders", e?.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [session?.user?.id]);
 
   useEffect(() => { if (session?.user?.id) void loadMarketplace(); }, [session?.user?.id, loadMarketplace]);
-  useEffect(() => { if (tab === "orders" && session?.user?.id) void loadOrders(); }, [tab, session?.user?.id, loadOrders]);
+  useEffect(() => { if (session?.user?.id) void loadOrders(); }, [session?.user?.id, loadOrders]);
   useEffect(() => {
     if (!activeOrderEvent && orderEventQueue.length) {
       setActiveOrderEvent(orderEventQueue[0]);
@@ -354,7 +373,7 @@ function CustomerApp() {
     if (!session?.user?.id) return;
     const timer = setInterval(() => {
       if (tab === "market") void loadMarketplace();
-      if (tab === "orders") void loadOrders();
+      void loadOrders();
     }, 60000);
     return () => clearInterval(timer);
   }, [session?.user?.id, tab, loadMarketplace, loadOrders]);
@@ -362,10 +381,10 @@ function CustomerApp() {
   useEffect(() => {
     if (!session?.user?.id) return;
     const channel = supabase.channel("customer-orders-" + session.user.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: "customer_id=eq." + session.user.id }, () => { if (tab === "orders") void loadOrders(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: "customer_id=eq." + session.user.id }, () => { void loadOrders(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [session?.user?.id, tab, loadOrders]);
+  }, [session?.user?.id, loadOrders]);
 
   const topLevelCategories = categories.filter(c => !c.parent_id);
   const childCategories = categories.filter(c => c.parent_id === selectedParentCategory);
