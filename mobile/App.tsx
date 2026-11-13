@@ -747,6 +747,7 @@ function CustomerApp() {
 
   const firstName = profileName.split(/\s+/)[0] || "there";
   const completedOrderCount = orders.filter(order => order.status === "delivered").length;
+  const pendingRefundCount = refundCases.filter(refund => !["credited_to_wallet", "refunded_directly", "rejected"].includes(refund.status)).length;
   const visibleOrders = showCompletedOrders ? orders.filter(order => order.status === "delivered") : orders.filter(order => order.status !== "delivered");
   if (serviceRequestsOpen && session?.user?.id) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false}/><ServiceRequestsScreen userId={session.user.id} initialServiceType={serviceRequestsInitialType} onBack={() => { setServiceRequestsOpen(false); setServiceRequestsInitialType(null); }}/></SafeAreaView>;
   return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
@@ -763,6 +764,7 @@ function CustomerApp() {
     {loading && <ActivityIndicator style={{ marginVertical: 8 }} color={ORANGE} />}
     <ScrollView style={styles.content} contentContainerStyle={[styles.contentInner, { paddingBottom: 16 }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); if (tab === "orders") void loadOrders(); else void loadMarketplace(); }} tintColor={ORANGE} />} >
       {tab === "market" && <>
+        {pendingRefundCount > 0 && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${pendingRefundCount} pending refunds. Open My Orders`} onPress={() => { setTab("orders"); setShowCompletedOrders(false); }} style={{ marginHorizontal: 15, marginTop: 10, marginBottom: 4, padding: 13, borderRadius: 14, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fff1f2", flexDirection: "row", alignItems: "center", gap: 10 }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#dc2626" }}/><View style={{ flex: 1 }}><Text style={{ color: "#991b1b", fontSize: 12, fontWeight: "900" }}>{pendingRefundCount} pending refund{pendingRefundCount === 1 ? "" : "s"}</Text><Text style={{ color: "#7f1d1d", fontSize: 10, marginTop: 2 }}>A cancelled paid order needs your attention · Review in My Orders</Text></View><Text style={{ color: "#991b1b", fontSize: 18, fontWeight: "900" }}>›</Text></TouchableOpacity>}
         {selectedStore && currentStore ? <>
           <TouchableOpacity style={styles.backLink} onPress={() => { setSelectedStore(""); setSearch(""); }}><Text style={styles.backLinkText}>‹  Back to stores</Text></TouchableOpacity>
           <View style={styles.storeHero}>{currentStore.image ? <Image source={{ uri: currentStore.image }} style={styles.storeHeroImage} /> : <Text style={styles.storeHeroIcon}>🏪</Text>}
@@ -820,6 +822,7 @@ function CustomerApp() {
         </>}
       </>}
       {tab === "orders" && <>
+        {pendingRefundCount > 0 && <View style={{ marginBottom: 12, padding: 12, borderRadius: 13, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fff1f2" }}><Text style={{ color: "#991b1b", fontSize: 12, fontWeight: "900" }}>● {pendingRefundCount} refund{pendingRefundCount === 1 ? "" : "s"} still in progress</Text><Text style={{ color: "#7f1d1d", fontSize: 10, marginTop: 3 }}>Review the refund section in each cancelled order below for your next action.</Text></View>}
         <Text style={styles.sectionTitle}>{showCompletedOrders ? "Completed orders" : "My orders"}</Text><Text style={styles.sectionSub}>{showCompletedOrders ? "Your delivered orders are kept here for reference." : "Follow your current orders from store confirmation through delivery."}</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={showCompletedOrders ? "Show current orders" : `View ${completedOrderCount} completed orders`} style={[styles.backLink, { alignSelf: "flex-start", paddingVertical: 7 }]} onPress={() => setShowCompletedOrders(value => !value)}>
           <Text style={styles.backLinkText}>{showCompletedOrders ? "‹  Current orders" : `Completed orders (${completedOrderCount})  ›`}</Text>
@@ -1019,7 +1022,7 @@ function CustomerApp() {
         </ScrollView>
       </SafeAreaView>
     </Modal>
-    <View style={[styles.tabbar, { paddingBottom: Math.max(8, insets.bottom + 6) }]}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
+    <View style={[styles.tabbar, { paddingBottom: Math.max(8, insets.bottom + 6) }]}>{(["market", "orders", "account"] as Tab[]).map(t => <TouchableOpacity key={t} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More menu"} onPress={() => { setTab(t); if (t !== "market") setSelectedStore(""); }} style={[styles.tab, tab === t && styles.activeTab]}><View style={{ position: "relative" }}><Text style={[styles.tabIcon, tab === t && styles.activeTabText]}>{t === "market" ? "⌂" : t === "orders" ? "▤" : "☰"}</Text>{t === "orders" && pendingRefundCount > 0 && <View style={{ position: "absolute", top: -5, right: -12, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center" }}><Text style={{ color: "#fff", fontSize: 8, fontWeight: "900" }}>{pendingRefundCount > 9 ? "9+" : pendingRefundCount}</Text></View>}</View><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t === "market" ? "Marketplace" : t === "orders" ? "My Orders" : "More"}</Text></TouchableOpacity>)}</View>
   </SafeAreaView>;
 }
 
