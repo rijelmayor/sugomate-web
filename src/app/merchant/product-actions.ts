@@ -49,6 +49,10 @@ export async function saveMerchantProduct(formData: FormData) {
   const stockRaw = String(formData.get("stock_quantity") ?? "").trim();
   const stock = stockRaw === "" ? null : Number(stockRaw);
   const categoryId = String(formData.get("category_id") ?? "") || null;
+  if (categoryId) {
+    const { data: selectedCategory } = await supabase.from("product_categories").select("slug").eq("id", categoryId).maybeSingle();
+    if (selectedCategory?.slug === "pabili-essentials") redirect("/merchant/products?error=category");
+  }
   const existingImageUrl = String(formData.get("image_url") ?? "").trim();
   const available = formData.get("is_available") === "on";
   const { data: branch } = await supabase.from("merchant_branches")

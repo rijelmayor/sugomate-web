@@ -20,6 +20,10 @@ function slugify(value: string) {
 export async function saveMerchantCategory(formData: FormData) {
   const supabase = await requireAdmin();
   const id = String(formData.get("category_id") ?? "");
+  if (id) {
+    const { data: currentCategory } = await supabase.from("merchant_categories").select("slug").eq("id", id).maybeSingle();
+    if (currentCategory?.slug === "pabili-essentials") redirect("/admin/store-categories?error=reserved");
+  }
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   const icon = String(formData.get("icon") ?? "🏪").trim().slice(0, 12) || "🏪";
   const sortOrder = Number(formData.get("sort_order") ?? 0);
@@ -70,6 +74,10 @@ export async function assignMerchantCategory(formData: FormData) {
   const supabase = await requireAdmin();
   const merchantId = String(formData.get("merchant_id") ?? "");
   const categoryId = String(formData.get("category_id") ?? "") || null;
+  if (categoryId) {
+    const { data: selectedCategory } = await supabase.from("merchant_categories").select("slug").eq("id", categoryId).maybeSingle();
+    if (selectedCategory?.slug === "pabili-essentials") redirect("/admin/store-categories?error=reserved");
+  }
   if (!/^[0-9a-f-]{36}$/i.test(merchantId) ||
       (categoryId && !/^[0-9a-f-]{36}$/i.test(categoryId))) {
     redirect("/admin/store-categories?error=invalid");

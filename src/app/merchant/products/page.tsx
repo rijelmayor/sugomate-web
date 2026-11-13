@@ -24,7 +24,7 @@ export default async function MerchantProductsPage({ searchParams }: { searchPar
   const storeIds = approved.map((row) => row.id);
   const [{ data: branches }, { data: categories }, { data: products }, { data: municipalities }] = await Promise.all([
     storeIds.length ? supabase.from("merchant_branches").select("id,merchant_id,name,address_line,municipality_id,is_active,municipalities(name)").in("merchant_id", storeIds).order("created_at") : Promise.resolve({ data: [] }),
-    supabase.from("product_categories").select("id,name,icon").eq("is_active", true).order("sort_order"),
+    supabase.from("product_categories").select("id,name,icon,slug").eq("is_active", true).neq("slug", "pabili-essentials").order("sort_order"),
     storeIds.length ? supabase.from("products").select("id,merchant_id,branch_id,category_id,name,description,price,image_url,is_available,stock_quantity").in("merchant_id", storeIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from("municipalities").select("id,name,province").eq("is_serviceable", true).order("name"),
   ]);
