@@ -26,7 +26,7 @@ const MAX_NOTES = 30;
 
 /** Customer notification bell: always visible, live over Supabase Realtime, remembers recent updates. */
 export default function NotificationBell({ userId, ordersHref = "/customer/orders" }: { userId: string; ordersHref?: string }) {
-  const sound = useAlertSound();
+  const sound = useAlertSound("/notifications/cxstatuses.mp3");
   const soundRef = useRef(sound);
   useEffect(() => { soundRef.current = sound; });
   const storageKey = `sugomate_notes_v1:${userId}`;

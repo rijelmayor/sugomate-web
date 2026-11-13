@@ -23,7 +23,7 @@ const deliveryMessages: Record<string, string> = {
 
 export default function MerchantNewOrderAlert({ merchantIds, snapshot }: { merchantIds: string[]; snapshot: Snapshot }) {
   const router = useRouter();
-  const sound = useAlertSound();
+  const sound = useAlertSound("/notifications/merchantnotification.mp3");
   const [queue, setQueue] = useState<IncomingOrder[]>([]);
   const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
   const [channelUp, setChannelUp] = useState(false);
@@ -156,7 +156,7 @@ export default function MerchantNewOrderAlert({ merchantIds, snapshot }: { merch
   useRepeat(ringing, () => {
     sound.chime();
     window.setTimeout(() => sound.speak(queue.length > 1 ? `You have ${queue.length} new orders.` : "New order received."), 700);
-  }, 7000);
+  }, 30000);
   useKeepAwake(sound.enabled);
 
   // Flash the tab title so a waiting order is noticed even from another tab.

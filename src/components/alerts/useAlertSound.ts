@@ -11,8 +11,9 @@ type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
  * Browsers only allow audio after a tap, so the user enables it once; the choice is
  * remembered and re-armed by the first tap on a later visit.
  */
-export function useAlertSound() {
+export function useAlertSound(soundFile = "/notifications/cxstatuses.mp3") {
   const ctxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const enabledRef = useRef(false);
   const [enabled, setEnabled] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
@@ -67,6 +68,7 @@ export function useAlertSound() {
 
   useEffect(() => () => {
     if (ctxRef.current && ctxRef.current.state !== "closed") void ctxRef.current.close();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
   }, []);
 
   const tones = useCallback((notes: { freq: number; start: number; length: number; type?: OscillatorType; volume?: number }[]) => {
@@ -90,16 +92,18 @@ export function useAlertSound() {
     }
   }, []);
 
-  /** Friendly two-note chime (new order for a store, status update for a customer). */
-  const chime = useCallback(() => tones([
-    { freq: 880, start: 0, length: 0.32 },
-    { freq: 1174, start: 0.18, length: 0.34 },
-  ]), [tones]);
-
-  /** Loud, urgent alarm for riders: four fast alternating beeps. */
-  const alarmBeep = useCallback(() => tones([0, 0.22, 0.44, 0.66].map((start, index) => ({
-    freq: index % 2 === 0 ? 1046 : 784, start, length: 0.15, type: "square" as OscillatorType, volume: 0.32,
-  }))), [tones]);
+  /** Plays the portal-specific MP3 supplied by the application. */
+  const playMp3 = useCallback(() => {
+    if (!enabledRef.current) return;
+    try {
+      const audio = audioRef.current ?? new Audio(soundFile);
+      audioRef.current = audio;
+      audio.currentTime = 0;
+      void audio.play().catch(() => setNeedsTap(true));
+    } catch { setUnsupported(true); }
+  }, [soundFile]);
+  const chime = playMp3;
+  const alarmBeep = playMp3;
 
   const speak = useCallback((text: string) => {
     if (!enabledRef.current || !("speechSynthesis" in window)) return;
