@@ -802,7 +802,7 @@ function CustomerApp() {
         <Text style={styles.basketCollapsedTotal}>{peso(cartTotal)}</Text>
         <Text style={styles.basketCollapsedChevron}>›</Text>
       </TouchableOpacity>
-
+    )}
     <Modal visible={Boolean(activeOrderEvent)} transparent animationType="fade" onRequestClose={() => setActiveOrderEvent(null)}>
       {activeOrderEvent && <View style={styles.eventOverlay}>
         <View style={styles.eventCard}>
