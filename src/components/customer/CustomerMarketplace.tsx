@@ -145,7 +145,7 @@ export default function CustomerMarketplace({ products, stores, selectedStore = 
   const productMatches = useMemo(() => products.filter(p => (!selectedMerchantCategory || p.category?.slug === selectedMerchantCategory) && (!q || p.name.toLowerCase().includes(q))), [products, q, selectedMerchantCategory]);
   const tiles = merchantCategories;
   // Count distinct branches carrying at least one product in each product category.
-  const topLevelTiles = tiles.map(item => ({ ...item, count: stores.filter(store => store.categorySlugs.includes(item.slug)).length }));
+  const topLevelTiles = tiles.map(item => ({ ...item, count: item.slug === "pabili-essentials" ? 2 : stores.filter(store => store.categorySlugs.includes(item.slug)).length }));
   const selectedCategory = tiles.find(item => item.slug === selectedMerchantCategory);
   const activeCategory = selectedCategory;
   const storeMatches = stores.filter(item => (!selectedMerchantCategory || item.categorySlugs.includes(selectedMerchantCategory)) && (!q || item.name.toLowerCase().includes(q) || item.area.toLowerCase().includes(q)));

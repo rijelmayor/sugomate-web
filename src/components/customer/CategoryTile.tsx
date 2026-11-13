@@ -36,7 +36,7 @@ export default function CategoryTile({ href, name, slug, imageUrl, count }: { hr
     <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#0a1f3d]/90 via-[#0a1f3d]/25 to-transparent" />
     <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
       <span className="block text-sm font-extrabold leading-tight text-white sm:text-base" style={{ color: "#fff", WebkitTextFillColor: "#fff" }}>{name}</span>
-      <span className="mt-1 inline-flex rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold backdrop-blur-sm" style={{ color: "#fff", WebkitTextFillColor: "#fff" }}>{count} {count === 1 ? "store" : "stores"}</span>
+      <span className="mt-1 inline-flex rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold backdrop-blur-sm" style={{ color: "#fff", WebkitTextFillColor: "#fff" }}>{count} {slug === "pabili-essentials" ? (count === 1 ? "service" : "services") : (count === 1 ? "store" : "stores")}</span>
     </div>
   </PendingLink>;
 }
