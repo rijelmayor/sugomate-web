@@ -17,6 +17,7 @@ type DriverDetails = { name: string; phone: string | null; vehicleType: string |
 type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string; merchantName: string; recipientName: string; address: string; total: number; createdAt: string; driver?: DriverDetails | null };
 type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
+type RefundCase = { id: string; order_id: string; requested_amount: number | string; settlement_method: string | null; refund_method_preference: string | null; status: string; merchant_reference: string | null; merchant_proof_path: string | null; settlement_proof_path: string | null; created_at: string; proofUrl?: string | null };
 type ServiceZone = { id: string; name: string; municipality_id: string };
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; service_zone_id: string; municipalities: any; service_zones?: any };
 type MerchantUsageSettings = { merchant_usage_enabled: boolean; merchant_usage_method: string; merchant_usage_value: number | string };
@@ -135,6 +136,8 @@ function CustomerApp() {
   const [merchantUsageSettings, setMerchantUsageSettings] = useState<MerchantUsageSettings>({ merchant_usage_enabled: false, merchant_usage_method: "percentage", merchant_usage_value: 0 });
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [refundCases, setRefundCases] = useState<RefundCase[]>([]);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
   const [showCompletedOrders, setShowCompletedOrders] = useState(false);
   const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
   const [activeOrderEvent, setActiveOrderEvent] = useState<OrderEvent | null>(null);
@@ -297,13 +300,24 @@ function CustomerApp() {
       if (error) throw error;
       const rows = (data ?? []) as unknown as Order[];
       const ids = rows.map(order => order.id);
-      const [{ data: events }, proofResults] = await Promise.all([
+      const [{ data: events }, proofResults, refundResult] = await Promise.all([
         ids.length ? supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id", ids).order("created_at", { ascending: true }) : Promise.resolve({ data: [] as any[] }),
         Promise.all(rows.filter(order => order.delivery_proof_path).map(async order => {
           const { data: signed } = await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string, 3600);
           return [order.id, signed?.signedUrl ?? null] as const;
-        }))
+        })),
+        supabase.from("order_refund_cases").select("id,order_id,requested_amount,settlement_method,refund_method_preference,status,merchant_reference,merchant_proof_path,settlement_proof_path,created_at").order("created_at", { ascending: false }).limit(100)
       ]);
+      if (refundResult.error) throw refundResult.error;
+      const refundRows = (refundResult.data ?? []) as RefundCase[];
+      const refundProofs = await Promise.all(refundRows.map(async refund => {
+        const path = refund.merchant_proof_path || refund.settlement_proof_path;
+        if (!path) return [refund.id, null] as const;
+        const { data: signed } = await supabase.storage.from("merchant-refund-proofs").createSignedUrl(path, 300);
+        return [refund.id, signed?.signedUrl ?? null] as const;
+      }));
+      const refundProofMap = new Map(refundProofs);
+      setRefundCases(refundRows.map(refund => ({ ...refund, proofUrl: refundProofMap.get(refund.id) ?? null })));
       const { data: driverRows, error: driverError } = ids.length
         ? await supabase.rpc("customer_order_driver_details", { p_order_ids: ids })
         : { data: [], error: null };
