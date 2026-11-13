@@ -895,8 +895,7 @@ function CustomerApp() {
             {cartItems.map(item => <View key={item.product.id} style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>{item.quantity} × {item.product.name}</Text><Text style={styles.checkoutAmountValue}>{peso(customerUnitPrice(item.product.price) * item.quantity)}</Text></View>)}
             <View style={styles.checkoutAmountRow}><Text style={styles.checkoutAmountLabel}>Items subtotal</Text><Text style={styles.checkoutAmountValue}>{peso(cartTotal)}</Text></View>
             <View style={styles.checkoutAmountRow}><Text style={styles.checkoutDeliveryLabel}>Delivery fee</Text><Text style={styles.checkoutDeliveryLabel}>{deliveryFeePreview === null ? "Calculated at checkout" : peso(deliveryFeePreview)}</Text></View>
-            <View style={[styles.checkoutAmountRow, styles.checkoutTotalRow]}><Text style={styles.checkoutTotalLabel}>Estimated total</Text><Text style={styles.checkoutTotalLabel}>{deliveryFeePreview === null ? "Confirmed after placement" : peso(cartTotal + deliveryFeePreview)}</Text></View>
-            <Text style={styles.checkoutHint}>Displayed item prices include the applicable system usage fee. Final prices, stock, delivery fee and total are validated securely when you place the order.</Text>
+            <View style={[styles.checkoutAmountRow, styles.checkoutTotalRow]}><Text style={styles.checkoutTotalLabel}>Cart Total:</Text><Text style={styles.checkoutTotalLabel}>{deliveryFeePreview === null ? "Confirmed after placement" : peso(cartTotal + deliveryFeePreview)}</Text></View>
           </View>
           <View style={styles.checkoutCard}>
             <Text style={styles.checkoutSection}>Payment method</Text>
