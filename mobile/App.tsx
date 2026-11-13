@@ -135,6 +135,7 @@ function CustomerApp() {
   const [merchantUsageSettings, setMerchantUsageSettings] = useState<MerchantUsageSettings>({ merchant_usage_enabled: false, merchant_usage_method: "percentage", merchant_usage_value: 0 });
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [showCompletedOrders, setShowCompletedOrders] = useState(false);
   const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
   const [activeOrderEvent, setActiveOrderEvent] = useState<OrderEvent | null>(null);
   const seenOrderEvents = useRef<Set<string>>(new Set());
@@ -704,6 +705,8 @@ function CustomerApp() {
   </KeyboardAvoidingView></SafeAreaView>;
 
   const firstName = profileName.split(/\s+/)[0] || "there";
+  const completedOrderCount = orders.filter(order => order.status === "delivered").length;
+  const visibleOrders = showCompletedOrders ? orders.filter(order => order.status === "delivered") : orders.filter(order => order.status !== "delivered");
   if (serviceRequestsOpen && session?.user?.id) return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false}/><ServiceRequestsScreen userId={session.user.id} initialServiceType={serviceRequestsInitialType} onBack={() => { setServiceRequestsOpen(false); setServiceRequestsInitialType(null); }}/></SafeAreaView>;
   return <SafeAreaView style={styles.safe}><AndroidStatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
     <View style={styles.topbar}>
@@ -776,8 +779,11 @@ function CustomerApp() {
         </>}
       </>}
       {tab === "orders" && <>
-        <Text style={styles.sectionTitle}>My orders</Text><Text style={styles.sectionSub}>Follow your orders from store confirmation through delivery.</Text>
-        {orders.map(o => {
+        <Text style={styles.sectionTitle}>{showCompletedOrders ? "Completed orders" : "My orders"}</Text><Text style={styles.sectionSub}>{showCompletedOrders ? "Your delivered orders are kept here for reference." : "Follow your current orders from store confirmation through delivery."}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={showCompletedOrders ? "Show current orders" : `View ${completedOrderCount} completed orders`} style={[styles.backLink, { alignSelf: "flex-start", paddingVertical: 7 }]} onPress={() => setShowCompletedOrders(value => !value)}>
+          <Text style={styles.backLinkText}>{showCompletedOrders ? "‹  Current orders" : `Completed orders (${completedOrderCount})  ›`}</Text>
+        </TouchableOpacity>
+        {visibleOrders.map(o => {
           const merchant = one(o.merchants);
           const isTerminal = ["cancelled", "rejected", "delivered"].includes(o.status);
           const submitted = Boolean(o.gcash_payment_submitted_at) && o.payment_status !== "failed";
@@ -821,7 +827,7 @@ function CustomerApp() {
             </View>}
           </View>;
         })}
-        {!loading && orders.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>🛵</Text><Text style={styles.emptyTitle}>No orders yet</Text><Text style={styles.muted}>Your placed orders will appear here.</Text><TouchableOpacity onPress={() => setTab("market")} style={styles.primary}><Text style={styles.primaryText}>Browse marketplace</Text></TouchableOpacity></View>}
+        {!loading && visibleOrders.length === 0 && <View style={styles.emptyCard}><Text style={styles.emptyIcon}>{showCompletedOrders ? "📦" : "🛵"}</Text><Text style={styles.emptyTitle}>{showCompletedOrders ? "No completed orders" : orders.length ? "No current orders" : "No orders yet"}</Text><Text style={styles.muted}>{showCompletedOrders ? "Delivered orders will appear here for your reference." : orders.length ? "Your delivered orders are available in Completed Orders." : "Your placed orders will appear here."}</Text>{!showCompletedOrders && orders.length === 0 && <TouchableOpacity onPress={() => setTab("market")} style={styles.primary}><Text style={styles.primaryText}>Browse marketplace</Text></TouchableOpacity>}</View>}
       </>}
       {tab === "account" && <View style={styles.accountCard}><Text style={styles.sectionTitle}>Your account</Text><Text style={styles.muted}>{session.user.email}</Text><TouchableOpacity style={styles.accountLink} onPress={() => void openAddressManager()}><Text style={styles.accountLinkText}>Manage saved addresses  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => setTab("orders")}><Text style={styles.accountLinkText}>My orders  ›</Text></TouchableOpacity><TouchableOpacity style={styles.accountLink} onPress={() => { setServiceRequestsInitialType(null); setServiceRequestsOpen(true); }}><Text style={styles.accountLinkText}>Papalit & Pasugo requests  ›</Text></TouchableOpacity><TouchableOpacity style={[styles.primary, { marginTop: 22 }]} onPress={signOut}><Text style={styles.primaryText}>Sign out</Text></TouchableOpacity></View>}
     </ScrollView>
