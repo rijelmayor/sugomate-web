@@ -17,6 +17,7 @@ type DriverDetails = { name: string; phone: string | null; vehicleType: string |
 type OrderEvent = { id: string; kind: "accepted" | "driver"; orderNumber: string; merchantName: string; recipientName: string; address: string; total: number; createdAt: string; driver?: DriverDetails | null };
 type Order = { id: string; order_number: string; status: string; driver_user_id?: string | null; assigned_at?: string | null; address_snapshot?: any; driver?: DriverDetails | null; subtotal: number | string; delivery_fee: number | string; total: number | string; placed_at: string; payment_method: string; payment_status: string; gcash_payment_reference: string | null; gcash_payment_proof_path: string | null; gcash_payment_submitted_at: string | null; rider_on_way_at?: string | null; delivery_proof_path?: string | null; driver_note?: string | null; order_items?: any[]; history?: any[]; deliveryProofUrl?: string | null; merchants: any };
 type Cart = Record<string, { product: Product; quantity: number }>;
+type RefundCase = { id: string; order_id: string; requested_amount: number | string; settlement_method: string | null; refund_method_preference: string | null; status: string; merchant_reference: string | null; merchant_proof_path: string | null; settlement_proof_path: string | null; created_at: string; proofUrl?: string | null };
 type ServiceZone = { id: string; name: string; municipality_id: string };
 type CustomerAddress = { id: string; label: string; recipient_name: string; recipient_phone: string; address_line: string; landmark: string | null; municipality_id: string; service_zone_id: string; municipalities: any; service_zones?: any };
 type MerchantUsageSettings = { merchant_usage_enabled: boolean; merchant_usage_method: string; merchant_usage_value: number | string };
@@ -135,6 +136,8 @@ function CustomerApp() {
   const [merchantUsageSettings, setMerchantUsageSettings] = useState<MerchantUsageSettings>({ merchant_usage_enabled: false, merchant_usage_method: "percentage", merchant_usage_value: 0 });
   const [stores, setStores] = useState<Store[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [refundCases, setRefundCases] = useState<RefundCase[]>([]);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
   const [showCompletedOrders, setShowCompletedOrders] = useState(false);
   const [orderEventQueue, setOrderEventQueue] = useState<OrderEvent[]>([]);
   const [activeOrderEvent, setActiveOrderEvent] = useState<OrderEvent | null>(null);
@@ -297,13 +300,24 @@ function CustomerApp() {
       if (error) throw error;
       const rows = (data ?? []) as unknown as Order[];
       const ids = rows.map(order => order.id);
-      const [{ data: events }, proofResults] = await Promise.all([
+      const [{ data: events }, proofResults, refundResult] = await Promise.all([
         ids.length ? supabase.from("order_status_history").select("id,order_id,to_status,note,created_at").in("order_id", ids).order("created_at", { ascending: true }) : Promise.resolve({ data: [] as any[] }),
         Promise.all(rows.filter(order => order.delivery_proof_path).map(async order => {
           const { data: signed } = await supabase.storage.from("delivery-proofs").createSignedUrl(order.delivery_proof_path as string, 3600);
           return [order.id, signed?.signedUrl ?? null] as const;
-        }))
+        })),
+        supabase.from("order_refund_cases").select("id,order_id,requested_amount,settlement_method,refund_method_preference,status,merchant_reference,merchant_proof_path,settlement_proof_path,created_at").order("created_at", { ascending: false }).limit(100)
       ]);
+      if (refundResult.error) throw refundResult.error;
+      const refundRows = (refundResult.data ?? []) as RefundCase[];
+      const refundProofs = await Promise.all(refundRows.map(async refund => {
+        const path = refund.merchant_proof_path || refund.settlement_proof_path;
+        if (!path) return [refund.id, null] as const;
+        const { data: signed } = await supabase.storage.from("merchant-refund-proofs").createSignedUrl(path, 300);
+        return [refund.id, signed?.signedUrl ?? null] as const;
+      }));
+      const refundProofMap = new Map(refundProofs);
+      setRefundCases(refundRows.map(refund => ({ ...refund, proofUrl: refundProofMap.get(refund.id) ?? null })));
       const { data: driverRows, error: driverError } = ids.length
         ? await supabase.rpc("customer_order_driver_details", { p_order_ids: ids })
         : { data: [], error: null };
@@ -704,6 +718,33 @@ function CustomerApp() {
     </ScrollView>
   </KeyboardAvoidingView></SafeAreaView>;
 
+  async function chooseRefundMethod(refund: RefundCase, method: "direct_gcash" | "sugomate_wallet") {
+    setRefundBusy(refund.id);
+    try {
+      const { error } = await supabase.rpc("customer_request_order_refund", { p_order_id: refund.order_id, p_method: method });
+      if (error) throw error;
+      await loadOrders();
+      Alert.alert("Refund choice saved", method === "direct_gcash" ? "The merchant will send the refund to your original GCash account. You will be asked to confirm after the transfer evidence is submitted." : "The merchant will remit the refund to SUGOMATE. Admin must verify the remittance before your wallet is credited.");
+    } catch (error: any) { Alert.alert("Unable to save refund choice", error?.message ?? "Please refresh and try again."); }
+    finally { setRefundBusy(null); }
+  }
+
+  async function confirmDirectRefund(refund: RefundCase) {
+    Alert.alert("Confirm GCash refund", "Only confirm if the refund money has already arrived in your GCash account.", [
+      { text: "Not yet", style: "cancel" },
+      { text: "Yes, I received it", onPress: () => { void (async () => {
+        setRefundBusy(refund.id);
+        try {
+          const { error } = await supabase.rpc("customer_confirm_direct_gcash_refund", { p_case_id: refund.id });
+          if (error) throw error;
+          await loadOrders();
+          Alert.alert("Refund confirmed", "Your confirmation has been recorded.");
+        } catch (error: any) { Alert.alert("Unable to confirm refund", error?.message ?? "Please refresh and try again."); }
+        finally { setRefundBusy(null); }
+      })(); } }
+    ]);
+  }
+
   const firstName = profileName.split(/\s+/)[0] || "there";
   const completedOrderCount = orders.filter(order => order.status === "delivered").length;
   const visibleOrders = showCompletedOrders ? orders.filter(order => order.status === "delivered") : orders.filter(order => order.status !== "delivered");
@@ -805,6 +846,28 @@ function CustomerApp() {
               </View>
             </View>}
             <View style={styles.paymentSummary}><Text style={styles.paymentSummaryText}>Payment: {String(o.payment_method).toUpperCase()} · {String(o.payment_status).replaceAll("_", " ")}</Text></View>
+            {refundCases.filter(refund => refund.order_id === o.id).map(refund => <View key={refund.id} style={{ marginTop: 12, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: refund.status === "awaiting_customer_choice" || refund.status === "evidence_submitted" ? "#f0b45b" : "#cbd5e1", backgroundColor: "#fffaf0", gap: 9 }}>
+              <Text style={{ color: NAVY, fontWeight: "800", fontSize: 15 }}>Refund · {peso(refund.requested_amount)}</Text>
+              {refund.status === "awaiting_customer_choice" && o.payment_method === "gcash" && <>
+                <Text style={{ color: "#7c4a03", fontSize: 13, lineHeight: 19 }}>The merchant cancelled this paid order. Choose how you want to receive your refund:</Text>
+                <TouchableOpacity disabled={refundBusy === refund.id} style={[styles.primary, { backgroundColor: "#1762a5" }, refundBusy === refund.id && styles.disabled]} onPress={() => void chooseRefundMethod(refund, "direct_gcash")}><Text style={styles.primaryText}>{refundBusy === refund.id ? "Saving your choice…" : "Refund to my GCash"}</Text></TouchableOpacity>
+                <Text style={{ color: "#64748b", fontSize: 12 }}>The merchant sends the refund to your original GCash account. You confirm only after it arrives.</Text>
+                <TouchableOpacity disabled={refundBusy === refund.id} style={[styles.primary, { backgroundColor: NAVY }, refundBusy === refund.id && styles.disabled]} onPress={() => void chooseRefundMethod(refund, "sugomate_wallet")}><Text style={styles.primaryText}>Refund to SUGOMATE Wallet</Text></TouchableOpacity>
+                <Text style={{ color: "#64748b", fontSize: 12 }}>The merchant remits to SUGOMATE. Admin verifies the transfer before your wallet is credited.</Text>
+              </>}
+              {refund.status === "awaiting_merchant" && <Text style={{ color: "#7c4a03", fontSize: 13 }}>You chose a direct GCash refund. The merchant must send the refund and upload transfer evidence. You’ll be asked to confirm when it is submitted.</Text>}
+              {refund.status === "evidence_submitted" && refund.settlement_method === "direct_gcash" && <>
+                <Text style={{ color: "#7c4a03", fontSize: 13, lineHeight: 19 }}>The merchant submitted a GCash refund transfer. Check your GCash account and confirm only after the money has arrived.</Text>
+                {refund.merchant_reference && <Text style={{ color: "#475569", fontSize: 12 }}>Transfer reference: {refund.merchant_reference}</Text>}
+                {refund.proofUrl && <TouchableOpacity onPress={() => Linking.openURL(refund.proofUrl as string)}><Text style={{ color: "#1762a5", fontWeight: "700" }}>View merchant transfer evidence ↗</Text></TouchableOpacity>}
+                <TouchableOpacity disabled={refundBusy === refund.id} style={[styles.primary, { backgroundColor: "#16834a" }, refundBusy === refund.id && styles.disabled]} onPress={() => void confirmDirectRefund(refund)}><Text style={styles.primaryText}>{refundBusy === refund.id ? "Confirming…" : "I received the GCash refund"}</Text></TouchableOpacity>
+              </>}
+              {refund.status === "wallet_remittance_pending" && <Text style={{ color: "#7c4a03", fontSize: 13, lineHeight: 19 }}>Your SUGOMATE Wallet refund was selected. The merchant must remit the amount to SUGOMATE; Admin will verify it before your wallet is credited.</Text>}
+              {refund.status === "wallet_remittance_submitted" && <Text style={{ color: "#7c4a03", fontSize: 13, lineHeight: 19 }}>The merchant submitted the SUGOMATE remittance. Admin verification is pending. Your wallet will be credited after verification.</Text>}
+              {refund.status === "credited_to_wallet" && <Text style={{ color: "#16834a", fontSize: 13, fontWeight: "700" }}>✓ Refund credited to your SUGOMATE Wallet.</Text>}
+              {refund.status === "refunded_directly" && <Text style={{ color: "#16834a", fontSize: 13, fontWeight: "700" }}>✓ You confirmed receipt of the direct GCash refund.</Text>}
+              {!["awaiting_customer_choice","awaiting_merchant","evidence_submitted","wallet_remittance_pending","wallet_remittance_submitted","credited_to_wallet","refunded_directly"].includes(refund.status) && <Text style={{ color: "#475569", fontSize: 13 }}>Refund status: {refund.status.replaceAll("_"," ")}. Contact support if you need assistance.</Text>}
+            </View>)}
             {Boolean(o.history?.length) && <View style={styles.orderHistory}><Text style={styles.orderDetailTitle}>Order activity</Text>{o.history?.map((event: any, index: number) => <View key={event.id} style={styles.historyRow}><View style={styles.historyMarker}><View style={[styles.historyDot, index === (o.history?.length ?? 0) - 1 && styles.historyDotActive]}/>{index !== (o.history?.length ?? 0) - 1 && <View style={styles.historyLine}/>}</View><View style={styles.historyBody}><Text style={styles.historyStatus}>{orderStatus[event.to_status] ?? String(event.to_status).replaceAll("_", " ")}</Text><Text style={styles.historyDate}>{new Date(event.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</Text>{event.note && <Text style={styles.historyNote}>{event.note}</Text>}</View></View>)}</View>}
             {o.deliveryProofUrl && <TouchableOpacity style={styles.deliveryProofButton} onPress={() => Linking.openURL(o.deliveryProofUrl as string)}><Text style={styles.deliveryProofText}>View delivery photo ↗</Text></TouchableOpacity>}
             {o.driver_note && <Text style={styles.driverNote}>Driver note: {o.driver_note}</Text>}
